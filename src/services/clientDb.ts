@@ -2978,11 +2978,15 @@ const SEED_DATA: any = {
       "sku": "NX-AUD-001",
       "quantityDelta": -2,
       "stateTarget": "DAMAGED",
+      "targetState": "DAMAGED",
       "reasonCode": "DAMAGED_IN_TRANSIT",
       "status": "APPROVED",
+      "requestedBy": "Jack Miller (Warehouse Staff)",
       "requestedByUserId": "usr_warehouse",
+      "approvedBy": "Marcus Reid (Ops Manager)",
       "reviewedByUserId": "usr_opsmanager",
       "reviewedAt": "2026-11-04T15:21:20.991Z",
+      "evaluatedValueMinor": 7600,
       "approvalNote": "Approved: Scratched chassis on warehouse pallet transit.",
       "createdAt": "2026-11-03T15:21:20.991Z"
     },
@@ -2993,9 +2997,13 @@ const SEED_DATA: any = {
       "sku": "NX-CAM-002",
       "quantityDelta": 5,
       "stateTarget": "ON_HAND",
+      "targetState": "ON_HAND",
       "reasonCode": "COUNT_DISCREPANCY_SURPLUS",
       "status": "PENDING_APPROVAL",
+      "requestedBy": "Jack Miller (Warehouse Staff)",
       "requestedByUserId": "usr_warehouse",
+      "evaluatedValueMinor": 12000,
+      "approvalNote": "Discovered surplus box during routine quarterly cycle count.",
       "createdAt": "2026-11-06T15:21:20.991Z"
     },
     {
@@ -3005,11 +3013,15 @@ const SEED_DATA: any = {
       "sku": "NX-KEY-004",
       "quantityDelta": -1,
       "stateTarget": "DAMAGED",
+      "targetState": "DAMAGED",
       "reasonCode": "QUALITY_ASSURANCE_REJECT",
       "status": "APPROVED",
+      "requestedBy": "Jack Miller (Warehouse Staff)",
       "requestedByUserId": "usr_warehouse",
+      "approvedBy": "Marcus Reid (Ops Manager)",
       "reviewedByUserId": "usr_opsmanager",
       "reviewedAt": "2026-11-06T15:21:20.991Z",
+      "evaluatedValueMinor": 3100,
       "approvalNote": "Spacebar key switch sticky, sent to scrap write-off.",
       "createdAt": "2026-11-06T15:21:20.991Z"
     }
@@ -3582,8 +3594,19 @@ const SEED_DATA: any = {
       "invoiceId": "inv_001",
       "amountMinor": 36000,
       "paymentDate": "2026-11-03T15:21:20.991Z",
+      "paymentMethod": "BANK_TRANSFER",
       "method": "BANK_TRANSFER",
       "reference": "BACS-APEX-INV001",
+      "payerName": "Apex Electronics Ltd",
+      "allocations": [
+        {
+          "invoiceId": "inv_001",
+          "invoiceNumber": "NX-INV-2026-001",
+          "amountMinor": 36000
+        }
+      ],
+      "unallocatedCreditMinor": 0,
+      "recordedBy": "Elena Rostova (Finance)",
       "currency": "GBP",
       "createdAt": "2026-11-03T15:21:20.991Z"
     },
@@ -3593,8 +3616,19 @@ const SEED_DATA: any = {
       "invoiceId": "inv_002",
       "amountMinor": 25000,
       "paymentDate": "2026-11-05T15:21:20.991Z",
+      "paymentMethod": "BANK_TRANSFER",
       "method": "BANK_TRANSFER",
       "reference": "CHAPS-BOLT-PARTIAL",
+      "payerName": "Bolt Gear Ltd",
+      "allocations": [
+        {
+          "invoiceId": "inv_002",
+          "invoiceNumber": "NX-INV-2026-002",
+          "amountMinor": 25000
+        }
+      ],
+      "unallocatedCreditMinor": 0,
+      "recordedBy": "Elena Rostova (Finance)",
       "currency": "GBP",
       "createdAt": "2026-11-05T15:21:20.991Z"
     }
