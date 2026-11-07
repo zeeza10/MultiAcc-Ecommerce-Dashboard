@@ -38,7 +38,7 @@ const DEFAULT_CONFIG: SystemConfig = {
   defaultVatRatePercent: 20,
   adjustmentApprovalThresholdValueMinor: 25000,
   adjustmentApprovalThresholdQuantity: 10,
-  activeReleasePhase: 'P1',
+  activeReleasePhase: 'ALL',
   allowNegativeStock: false,
   autoSyncEnabled: true,
 };

@@ -121,7 +121,7 @@ class DatabaseService {
       defaultVatRatePercent: 20,
       adjustmentApprovalThresholdValueMinor: 25000, // £250.00
       adjustmentApprovalThresholdQuantity: 10,
-      activeReleasePhase: 'P1',
+      activeReleasePhase: 'ALL',
       allowNegativeStock: false,
       autoSyncEnabled: true,
     };
