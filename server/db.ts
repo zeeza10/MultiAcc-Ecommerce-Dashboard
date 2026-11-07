@@ -105,6 +105,16 @@ class DatabaseService {
     return this.data;
   }
 
+  public reload() {
+    try {
+      if (fs.existsSync(DB_FILE_PATH)) {
+        this.data = JSON.parse(fs.readFileSync(DB_FILE_PATH, 'utf-8'));
+      }
+    } catch (err) {
+      console.error('Failed to reload database:', err);
+    }
+  }
+
   public resetToSeed() {
     this.seedInitialData();
     this.save();

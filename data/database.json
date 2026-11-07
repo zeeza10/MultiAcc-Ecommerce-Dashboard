@@ -8,7 +8,7 @@
       "isActive": true,
       "twoFactorEnabled": true,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
       "id": "usr_opsmanager",
@@ -18,7 +18,7 @@
       "isActive": true,
       "twoFactorEnabled": true,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
       "id": "usr_warehouse",
@@ -28,7 +28,7 @@
       "isActive": true,
       "twoFactorEnabled": false,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
       "id": "usr_finance",
@@ -38,7 +38,7 @@
       "isActive": true,
       "twoFactorEnabled": true,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
       "id": "usr_client_apex",
@@ -49,7 +49,7 @@
       "isActive": true,
       "twoFactorEnabled": false,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
       "id": "usr_viewer",
@@ -59,7 +59,7 @@
       "isActive": true,
       "twoFactorEnabled": false,
       "failedLoginAttempts": 0,
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
     }
   ],
   "marketplaceAccounts": [
@@ -70,10 +70,10 @@
       "sellerUsername": "nexus_direct_uk",
       "authStatus": "CONNECTED",
       "environment": "PRODUCTION",
-      "lastSyncAt": "2026-11-07T12:25:45.066Z",
-      "lastSyncStatus": "PARTIAL",
-      "lastSyncMessage": "Imported 2 new order(s), skipped 1 duplicate(s), raised 1 exception(s).",
-      "tokenExpiresAt": "2026-12-07T12:25:17.524Z",
+      "lastSyncAt": "2026-11-07T15:16:20.991Z",
+      "lastSyncStatus": "SUCCESS",
+      "lastSyncMessage": "Poll complete: 28 orders inspected, 3 new imported.",
+      "tokenExpiresAt": "2026-12-07T15:21:20.991Z",
       "autoSyncIntervalMinutes": 15,
       "isDemo": true
     },
@@ -84,85 +84,30 @@
       "sellerUsername": "nexus_outlet_us",
       "authStatus": "CONNECTED",
       "environment": "PRODUCTION",
-      "lastSyncAt": "2026-11-07T11:55:17.524Z",
+      "lastSyncAt": "2026-11-07T15:06:20.991Z",
       "lastSyncStatus": "SUCCESS",
-      "lastSyncMessage": "Poll complete: 6 orders checked, 1 new imported.",
-      "tokenExpiresAt": "2026-12-02T12:25:17.524Z",
+      "lastSyncMessage": "Poll complete: 12 orders checked, 2 new imported.",
+      "tokenExpiresAt": "2026-12-02T15:21:20.991Z",
+      "autoSyncIntervalMinutes": 30,
+      "isDemo": true
+    },
+    {
+      "id": "mkt_ebay_de",
+      "name": "Nexus Tech Europe (DE)",
+      "marketplace": "EBAY_DE",
+      "sellerUsername": "nexus_de_shop",
+      "authStatus": "CONNECTED",
+      "environment": "PRODUCTION",
+      "lastSyncAt": "2026-11-07T14:56:20.991Z",
+      "lastSyncStatus": "SUCCESS",
+      "lastSyncMessage": "Poll complete: 9 orders checked, 1 new imported.",
+      "tokenExpiresAt": "2026-12-05T15:21:20.991Z",
       "autoSyncIntervalMinutes": 30,
       "isDemo": true
     }
   ],
-  "syncRuns": [
-    {
-      "id": "sync_1794054345066",
-      "accountId": "mkt_ebay_uk",
-      "startedAt": "2026-11-07T12:25:45.066Z",
-      "completedAt": "2026-11-07T12:25:45.066Z",
-      "status": "COMPLETED",
-      "ordersFetched": 3,
-      "ordersImported": 2,
-      "ordersSkippedDuplicate": 1,
-      "exceptionsRaised": 1,
-      "logMessage": "Imported 2 new order(s), skipped 1 duplicate(s), raised 1 exception(s)."
-    },
-    {
-      "id": "sync_1794054340980",
-      "accountId": "mkt_ebay_uk",
-      "startedAt": "2026-11-07T12:25:40.980Z",
-      "completedAt": "2026-11-07T12:25:40.981Z",
-      "status": "COMPLETED",
-      "ordersFetched": 3,
-      "ordersImported": 2,
-      "ordersSkippedDuplicate": 1,
-      "exceptionsRaised": 1,
-      "logMessage": "Imported 2 new order(s), skipped 1 duplicate(s), raised 1 exception(s)."
-    },
-    {
-      "id": "sync_001",
-      "accountId": "mkt_ebay_uk",
-      "startedAt": "2026-11-07T12:15:07.524Z",
-      "completedAt": "2026-11-07T12:15:17.524Z",
-      "status": "COMPLETED",
-      "ordersFetched": 14,
-      "ordersImported": 2,
-      "ordersSkippedDuplicate": 12,
-      "exceptionsRaised": 0,
-      "logMessage": "Incremental sync succeeded with high-water mark."
-    },
-    {
-      "id": "sync_002",
-      "accountId": "mkt_ebay_us",
-      "startedAt": "2026-11-07T11:55:07.524Z",
-      "completedAt": "2026-11-07T11:55:17.524Z",
-      "status": "COMPLETED",
-      "ordersFetched": 6,
-      "ordersImported": 1,
-      "ordersSkippedDuplicate": 5,
-      "exceptionsRaised": 1,
-      "logMessage": "Order imported with unmapped line item routed to exception queue."
-    }
-  ],
+  "syncRuns": [],
   "exceptions": [
-    {
-      "id": "exc_1794054345066_fhzg",
-      "type": "UNMAPPED_SKU",
-      "source": "EBAY",
-      "referenceId": "19-09555-32823",
-      "details": "External listing SKU \"EBAY-UNMAPPED-USB-CABLE\" on Order 19-09555-32823 does not map to any active internal catalog product.",
-      "rawPayloadSnippet": "{\"lineItemId\":\"li_unmapped_02\",\"sku\":\"EBAY-UNMAPPED-USB-CABLE\",\"title\":\"Braided Type-C Fast Charging Cable 2M\",\"quantity\":1,\"lineItemCost\":{\"value\":\"18.99\",\"currency\":\"GBP\"}}",
-      "status": "PENDING",
-      "createdAt": "2026-11-07T12:25:45.066Z"
-    },
-    {
-      "id": "exc_1794054340981_dq3x",
-      "type": "UNMAPPED_SKU",
-      "source": "EBAY",
-      "referenceId": "19-09555-97445",
-      "details": "External listing SKU \"EBAY-UNMAPPED-USB-CABLE\" on Order 19-09555-97445 does not map to any active internal catalog product.",
-      "rawPayloadSnippet": "{\"lineItemId\":\"li_unmapped_02\",\"sku\":\"EBAY-UNMAPPED-USB-CABLE\",\"title\":\"Braided Type-C Fast Charging Cable 2M\",\"quantity\":1,\"lineItemCost\":{\"value\":\"18.99\",\"currency\":\"GBP\"}}",
-      "status": "PENDING",
-      "createdAt": "2026-11-07T12:25:40.981Z"
-    },
     {
       "id": "exc_001",
       "type": "UNMAPPED_SKU",
@@ -171,7 +116,7 @@
       "details": "External listing SKU \"EB-WIRE-EXT-RED\" does not map to any active internal catalog product.",
       "rawPayloadSnippet": "{\"externalSku\": \"EB-WIRE-EXT-RED\", \"orderId\": \"19-10822-44120\", \"title\": \"Heavy Duty Extension Cable 5M - Red\"}",
       "status": "PENDING",
-      "createdAt": "2026-11-07T11:55:17.524Z"
+      "createdAt": "2026-11-05T15:21:20.991Z"
     }
   ],
   "products": [
@@ -194,8 +139,8 @@
       "lowStockThreshold": 15,
       "reorderLevel": 50,
       "category": "Audio",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
       "id": "prd_002",
@@ -213,11 +158,11 @@
       "status": "ACTIVE",
       "costPriceMinor": 2400,
       "sellingPriceMinor": 5999,
-      "lowStockThreshold": 20,
-      "reorderLevel": 60,
+      "lowStockThreshold": 10,
+      "reorderLevel": 30,
       "category": "Video",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
       "id": "prd_003",
@@ -227,7 +172,7 @@
       "dimensions": {
         "lengthCm": 14,
         "widthCm": 9,
-        "heightCm": 6
+        "heightCm": 5
       },
       "weightKg": 0.15,
       "ownerType": "OPERATOR",
@@ -235,11 +180,11 @@
       "status": "ACTIVE",
       "costPriceMinor": 1250,
       "sellingPriceMinor": 3499,
-      "lowStockThreshold": 10,
-      "reorderLevel": 40,
-      "category": "Peripherals",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "lowStockThreshold": 20,
+      "reorderLevel": 60,
+      "category": "Accessories",
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
       "id": "prd_004",
@@ -257,11 +202,11 @@
       "status": "ACTIVE",
       "costPriceMinor": 3100,
       "sellingPriceMinor": 7499,
-      "lowStockThreshold": 12,
-      "reorderLevel": 35,
-      "category": "Peripherals",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "lowStockThreshold": 10,
+      "reorderLevel": 25,
+      "category": "Accessories",
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
       "id": "prd_005",
@@ -269,33 +214,187 @@
       "name": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
       "barcode": "5060001001056",
       "dimensions": {
-        "lengthCm": 15,
-        "widthCm": 5,
+        "lengthCm": 16,
+        "widthCm": 7,
         "heightCm": 2
       },
-      "weightKg": 0.12,
+      "weightKg": 0.18,
       "ownerType": "OPERATOR",
       "ownerId": "operator",
       "status": "ACTIVE",
       "costPriceMinor": 1100,
       "sellingPriceMinor": 2999,
       "lowStockThreshold": 25,
-      "reorderLevel": 75,
+      "reorderLevel": 80,
+      "category": "Adapters",
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_006",
+      "sku": "NX-MIC-006",
+      "name": "Nexus Studio Broadcast USB Condenser Microphone",
+      "barcode": "5060001001063",
+      "dimensions": {
+        "lengthCm": 24,
+        "widthCm": 14,
+        "heightCm": 12
+      },
+      "weightKg": 0.85,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 4200,
+      "sellingPriceMinor": 9999,
+      "lowStockThreshold": 12,
+      "reorderLevel": 35,
+      "category": "Audio",
+      "createdAt": "2026-11-01T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_007",
+      "sku": "NX-STAND-007",
+      "name": "Nexus Ergonomic Aluminum Laptop Riser Stand",
+      "barcode": "5060001001070",
+      "dimensions": {
+        "lengthCm": 28,
+        "widthCm": 26,
+        "heightCm": 6
+      },
+      "weightKg": 0.72,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 1450,
+      "sellingPriceMinor": 3999,
+      "lowStockThreshold": 15,
+      "reorderLevel": 45,
       "category": "Accessories",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-11-01T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_008",
+      "sku": "NX-CHG-008",
+      "name": "Nexus 65W GaN Fast Charger Dual USB-C",
+      "barcode": "5060001001087",
+      "dimensions": {
+        "lengthCm": 8,
+        "widthCm": 5,
+        "heightCm": 4
+      },
+      "weightKg": 0.14,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 950,
+      "sellingPriceMinor": 2499,
+      "lowStockThreshold": 30,
+      "reorderLevel": 100,
+      "category": "Power",
+      "createdAt": "2026-11-02T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_009",
+      "sku": "NX-CAB-009",
+      "name": "Nexus Thunderbolt 4 High Speed Braided Cable 1M",
+      "barcode": "5060001001094",
+      "dimensions": {
+        "lengthCm": 15,
+        "widthCm": 10,
+        "heightCm": 2
+      },
+      "weightKg": 0.08,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 680,
+      "sellingPriceMinor": 1999,
+      "lowStockThreshold": 40,
+      "reorderLevel": 120,
+      "category": "Cables",
+      "createdAt": "2026-11-02T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_010",
+      "sku": "NX-LIGHT-010",
+      "name": "Nexus Studio LED Key Light with Desk Clamp",
+      "barcode": "5060001001100",
+      "dimensions": {
+        "lengthCm": 35,
+        "widthCm": 24,
+        "heightCm": 8
+      },
+      "weightKg": 1.45,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 3400,
+      "sellingPriceMinor": 7999,
+      "lowStockThreshold": 8,
+      "reorderLevel": 20,
+      "category": "Video",
+      "createdAt": "2026-11-03T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_011",
+      "sku": "NX-SSD-011",
+      "name": "Nexus Rugged 1TB Portable NVMe External SSD",
+      "barcode": "5060001001117",
+      "dimensions": {
+        "lengthCm": 10,
+        "widthCm": 6,
+        "heightCm": 2
+      },
+      "weightKg": 0.11,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 4800,
+      "sellingPriceMinor": 10999,
+      "lowStockThreshold": 10,
+      "reorderLevel": 30,
+      "category": "Storage",
+      "createdAt": "2026-11-03T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_012",
+      "sku": "NX-PAD-012",
+      "name": "Nexus XL Spill-Proof Gaming Desk Mat (900x400mm)",
+      "barcode": "5060001001124",
+      "dimensions": {
+        "lengthCm": 42,
+        "widthCm": 8,
+        "heightCm": 8
+      },
+      "weightKg": 0.65,
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "status": "ACTIVE",
+      "costPriceMinor": 580,
+      "sellingPriceMinor": 1799,
+      "lowStockThreshold": 20,
+      "reorderLevel": 50,
+      "category": "Accessories",
+      "createdAt": "2026-11-04T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
       "id": "prd_apex_01",
       "sku": "APX-SPK-100",
       "name": "Apex SoundPulse Rugged Waterproof Speaker",
-      "barcode": "5060002002011",
+      "barcode": "5069992002014",
       "dimensions": {
-        "lengthCm": 18,
-        "widthCm": 8,
-        "heightCm": 8
+        "lengthCm": 20,
+        "widthCm": 10,
+        "heightCm": 10
       },
-      "weightKg": 0.48,
+      "weightKg": 0.65,
       "ownerType": "CLIENT",
       "ownerId": "client_apex",
       "status": "ACTIVE",
@@ -304,397 +403,160 @@
       "lowStockThreshold": 20,
       "reorderLevel": 50,
       "category": "Audio",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_apex_02",
+      "sku": "APX-EAR-200",
+      "name": "Apex PureBass Wireless Earbuds with ANC",
+      "barcode": "5069992002021",
+      "dimensions": {
+        "lengthCm": 10,
+        "widthCm": 8,
+        "heightCm": 4
+      },
+      "weightKg": 0.12,
+      "ownerType": "CLIENT",
+      "ownerId": "client_apex",
+      "status": "ACTIVE",
+      "costPriceMinor": 2100,
+      "sellingPriceMinor": 5499,
+      "lowStockThreshold": 15,
+      "reorderLevel": 40,
+      "category": "Audio",
+      "createdAt": "2026-11-01T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_bolt_01",
+      "sku": "BLT-SND-10",
+      "name": "Bolt CinemaSound 120W Compact TV Soundbar",
+      "barcode": "5069993003011",
+      "dimensions": {
+        "lengthCm": 65,
+        "widthCm": 12,
+        "heightCm": 10
+      },
+      "weightKg": 2.8,
+      "ownerType": "CLIENT",
+      "ownerId": "client_bolt",
+      "status": "ACTIVE",
+      "costPriceMinor": 5200,
+      "sellingPriceMinor": 12999,
+      "lowStockThreshold": 8,
+      "reorderLevel": 25,
+      "category": "Audio",
+      "createdAt": "2026-11-01T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_luma_01",
+      "sku": "LUM-CAM-01",
+      "name": "Luma Smart 2K Pan & Tilt Indoor WiFi Camera",
+      "barcode": "5069994004018",
+      "dimensions": {
+        "lengthCm": 15,
+        "widthCm": 12,
+        "heightCm": 12
+      },
+      "weightKg": 0.38,
+      "ownerType": "CLIENT",
+      "ownerId": "client_luma",
+      "status": "ACTIVE",
+      "costPriceMinor": 1650,
+      "sellingPriceMinor": 4299,
+      "lowStockThreshold": 15,
+      "reorderLevel": 45,
+      "category": "Smart Home",
+      "createdAt": "2026-11-02T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "prd_nordic_01",
+      "sku": "NRD-WRM-01",
+      "name": "Nordic Eco Wool Heated Smart Throw Blanket",
+      "barcode": "5069995005015",
+      "dimensions": {
+        "lengthCm": 40,
+        "widthCm": 35,
+        "heightCm": 12
+      },
+      "weightKg": 1.85,
+      "ownerType": "CLIENT",
+      "ownerId": "client_nordic",
+      "status": "ACTIVE",
+      "costPriceMinor": 3100,
+      "sellingPriceMinor": 7999,
+      "lowStockThreshold": 10,
+      "reorderLevel": 30,
+      "category": "Home",
+      "createdAt": "2026-11-03T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     }
   ],
   "skuMappings": [
     {
-      "id": "map_001",
+      "id": "map_01",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "marketplaceSku": "EBAY-UK-NXAUD001",
       "productId": "prd_001",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalSku": "EBAY-UK-NXAUD001",
-      "externalListingId": "265892100411",
-      "listingTitle": "Nexus Pro Wireless ANC Headphones - Black",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "internalSku": "NX-AUD-001",
+      "isVerified": true,
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "map_002",
+      "id": "map_02",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "marketplaceSku": "EBAY-UK-NXCAM002",
       "productId": "prd_002",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalSku": "EBAY-UK-NXCAM002",
-      "externalListingId": "265892100412",
-      "listingTitle": "Nexus 4K Ultra Wide Streaming Webcam HD",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "internalSku": "NX-CAM-002",
+      "isVerified": true,
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "map_003",
-      "productId": "prd_003",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalSku": "EBAY-UK-NXMOU003",
-      "externalListingId": "265892100413",
-      "listingTitle": "Ergonomic Wireless Bluetooth Optical Mouse",
-      "createdAt": "2026-11-05T12:25:17.524Z"
-    },
-    {
-      "id": "map_004",
-      "productId": "prd_004",
+      "id": "map_03",
       "marketplaceAccountId": "mkt_ebay_us",
-      "externalSku": "EBAY-US-NXKEY004",
-      "externalListingId": "384910293811",
-      "listingTitle": "Nexus Mechanical RGB Keyboard Tactile Brown",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "marketplaceSku": "EBAY-US-NXKEY004",
+      "productId": "prd_004",
+      "internalSku": "NX-KEY-004",
+      "isVerified": true,
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "map_005",
-      "productId": "prd_005",
+      "id": "map_04",
       "marketplaceAccountId": "mkt_ebay_uk",
-      "externalSku": "EBAY-UK-NXHUB005",
-      "externalListingId": "265892100415",
-      "listingTitle": "USB C Hub Multiport Adapter 8 in 1 Aluminum",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "marketplaceSku": "EBAY-UK-NXHUB005",
+      "productId": "prd_005",
+      "internalSku": "NX-HUB-005",
+      "isVerified": true,
+      "createdAt": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "map_05",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "marketplaceSku": "EBAY-DE-NXMIC006",
+      "productId": "prd_006",
+      "internalSku": "NX-MIC-006",
+      "isVerified": true,
+      "createdAt": "2026-11-01T15:21:20.991Z"
+    },
+    {
+      "id": "map_06",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "marketplaceSku": "EBAY-UK-NXSSD011",
+      "productId": "prd_011",
+      "internalSku": "NX-SSD-011",
+      "isVerified": true,
+      "createdAt": "2026-11-03T15:21:20.991Z"
     }
   ],
   "orders": [
     {
-      "id": "ord_1794054345066_bl12",
-      "orderNumber": "NX-ORD-2026-010",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09555-32823",
-      "salesSource": "EBAY",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "customerName": "Alan Parker",
-      "customerEmail": "gamer_al_99@marketplace.ebay.com",
-      "shippingAddress": {
-        "name": "Alan Parker",
-        "street": "10 Station Road",
-        "city": "Leeds",
-        "postalCode": "LS2 8HE",
-        "country": "GB"
-      },
-      "status": "New",
-      "paymentState": "PAID",
-      "totalMinor": 1899,
-      "taxMinor": 380,
-      "shippingChargeMinor": 0,
-      "currency": "GBP",
-      "lines": [
-        {
-          "id": "ordl_1794054345066_6f33",
-          "orderId": "ord_1794054345066_bl12",
-          "productId": "UNMAPPED",
-          "sku": "EBAY-UNMAPPED-USB-CABLE",
-          "productName": "Braided Type-C Fast Charging Cable 2M",
-          "quantity": 1,
-          "unitPriceMinor": 1899,
-          "taxAmountMinor": 380,
-          "totalPriceMinor": 1899,
-          "isBackordered": false,
-          "reservedQuantity": 0
-        }
-      ],
-      "rawPayload": {
-        "orderId": "19-09555-32823",
-        "creationDate": "2026-11-07T12:25:45.066Z",
-        "orderPaymentStatus": "PAID",
-        "orderFulfillmentStatus": "NOT_STARTED",
-        "buyer": {
-          "username": "gamer_al_99",
-          "registrationAddress": {
-            "fullName": "Alan Parker",
-            "countryCode": "GB"
-          }
-        },
-        "pricingSummary": {
-          "priceSubtotal": {
-            "value": "18.99",
-            "currency": "GBP"
-          }
-        },
-        "shippingStep": {
-          "shipTo": {
-            "fullName": "Alan Parker",
-            "contactAddress": {
-              "addressLine1": "10 Station Road",
-              "city": "Leeds",
-              "postalCode": "LS2 8HE",
-              "countryCode": "GB"
-            }
-          }
-        },
-        "lineItems": [
-          {
-            "lineItemId": "li_unmapped_02",
-            "sku": "EBAY-UNMAPPED-USB-CABLE",
-            "title": "Braided Type-C Fast Charging Cable 2M",
-            "quantity": 1,
-            "lineItemCost": {
-              "value": "18.99",
-              "currency": "GBP"
-            }
-          }
-        ]
-      },
-      "notes": "Contains unmapped external line items awaiting mapping.",
-      "createdAt": "2026-11-07T12:25:45.066Z",
-      "updatedAt": "2026-11-07T12:25:45.066Z"
-    },
-    {
-      "id": "ord_1794054345066_ry4d",
-      "orderNumber": "NX-ORD-2026-009",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09499-83015",
-      "salesSource": "EBAY",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "customerName": "Sophie Taylor",
-      "customerEmail": "buyer_305@marketplace.ebay.com",
-      "shippingAddress": {
-        "name": "Sophie Taylor",
-        "street": "27 Park Lane",
-        "city": "Bristol",
-        "postalCode": "BS1 5TR",
-        "country": "GB"
-      },
-      "status": "Confirmed",
-      "paymentState": "PAID",
-      "totalMinor": 5999,
-      "taxMinor": 1200,
-      "shippingChargeMinor": 0,
-      "currency": "GBP",
-      "lines": [
-        {
-          "id": "ordl_1794054345066_qvqu",
-          "orderId": "ord_1794054345066_ry4d",
-          "productId": "prd_002",
-          "sku": "NX-CAM-002",
-          "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
-          "quantity": 1,
-          "unitPriceMinor": 5999,
-          "taxAmountMinor": 1200,
-          "totalPriceMinor": 5999,
-          "isBackordered": false,
-          "reservedQuantity": 0
-        }
-      ],
-      "rawPayload": {
-        "orderId": "19-09499-83015",
-        "creationDate": "2026-11-07T12:25:45.066Z",
-        "orderPaymentStatus": "PAID",
-        "orderFulfillmentStatus": "NOT_STARTED",
-        "buyer": {
-          "username": "buyer_305",
-          "registrationAddress": {
-            "fullName": "Sophie Taylor",
-            "countryCode": "GB"
-          }
-        },
-        "pricingSummary": {
-          "priceSubtotal": {
-            "value": "59.99",
-            "currency": "GBP"
-          }
-        },
-        "shippingStep": {
-          "shipTo": {
-            "fullName": "Sophie Taylor",
-            "contactAddress": {
-              "addressLine1": "27 Park Lane",
-              "city": "Bristol",
-              "postalCode": "BS1 5TR",
-              "countryCode": "GB"
-            }
-          }
-        },
-        "lineItems": [
-          {
-            "lineItemId": "li_new_01",
-            "sku": "EBAY-UK-NXCAM002",
-            "title": "Nexus 4K Ultra Wide Streaming Webcam HD",
-            "quantity": 1,
-            "lineItemCost": {
-              "value": "59.99",
-              "currency": "GBP"
-            }
-          }
-        ]
-      },
-      "createdAt": "2026-11-07T12:25:45.066Z",
-      "updatedAt": "2026-11-07T12:25:45.066Z"
-    },
-    {
-      "id": "ord_1794054340981_jsci",
-      "orderNumber": "NX-ORD-2026-008",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09555-97445",
-      "salesSource": "EBAY",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "customerName": "Alan Parker",
-      "customerEmail": "gamer_al_99@marketplace.ebay.com",
-      "shippingAddress": {
-        "name": "Alan Parker",
-        "street": "10 Station Road",
-        "city": "Leeds",
-        "postalCode": "LS2 8HE",
-        "country": "GB"
-      },
-      "status": "New",
-      "paymentState": "PAID",
-      "totalMinor": 1899,
-      "taxMinor": 380,
-      "shippingChargeMinor": 0,
-      "currency": "GBP",
-      "lines": [
-        {
-          "id": "ordl_1794054340981_i6al",
-          "orderId": "ord_1794054340981_jsci",
-          "productId": "UNMAPPED",
-          "sku": "EBAY-UNMAPPED-USB-CABLE",
-          "productName": "Braided Type-C Fast Charging Cable 2M",
-          "quantity": 1,
-          "unitPriceMinor": 1899,
-          "taxAmountMinor": 380,
-          "totalPriceMinor": 1899,
-          "isBackordered": false,
-          "reservedQuantity": 0
-        }
-      ],
-      "rawPayload": {
-        "orderId": "19-09555-97445",
-        "creationDate": "2026-11-07T12:25:40.980Z",
-        "orderPaymentStatus": "PAID",
-        "orderFulfillmentStatus": "NOT_STARTED",
-        "buyer": {
-          "username": "gamer_al_99",
-          "registrationAddress": {
-            "fullName": "Alan Parker",
-            "countryCode": "GB"
-          }
-        },
-        "pricingSummary": {
-          "priceSubtotal": {
-            "value": "18.99",
-            "currency": "GBP"
-          }
-        },
-        "shippingStep": {
-          "shipTo": {
-            "fullName": "Alan Parker",
-            "contactAddress": {
-              "addressLine1": "10 Station Road",
-              "city": "Leeds",
-              "postalCode": "LS2 8HE",
-              "countryCode": "GB"
-            }
-          }
-        },
-        "lineItems": [
-          {
-            "lineItemId": "li_unmapped_02",
-            "sku": "EBAY-UNMAPPED-USB-CABLE",
-            "title": "Braided Type-C Fast Charging Cable 2M",
-            "quantity": 1,
-            "lineItemCost": {
-              "value": "18.99",
-              "currency": "GBP"
-            }
-          }
-        ]
-      },
-      "notes": "Contains unmapped external line items awaiting mapping.",
-      "createdAt": "2026-11-07T12:25:40.980Z",
-      "updatedAt": "2026-11-07T12:25:40.981Z"
-    },
-    {
-      "id": "ord_1794054340981_3zab",
-      "orderNumber": "NX-ORD-2026-007",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09499-33499",
-      "salesSource": "EBAY",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "customerName": "Sophie Taylor",
-      "customerEmail": "buyer_566@marketplace.ebay.com",
-      "shippingAddress": {
-        "name": "Sophie Taylor",
-        "street": "27 Park Lane",
-        "city": "Bristol",
-        "postalCode": "BS1 5TR",
-        "country": "GB"
-      },
-      "status": "Confirmed",
-      "paymentState": "PAID",
-      "totalMinor": 5999,
-      "taxMinor": 1200,
-      "shippingChargeMinor": 0,
-      "currency": "GBP",
-      "lines": [
-        {
-          "id": "ordl_1794054340980_8tzz",
-          "orderId": "ord_1794054340981_3zab",
-          "productId": "prd_002",
-          "sku": "NX-CAM-002",
-          "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
-          "quantity": 1,
-          "unitPriceMinor": 5999,
-          "taxAmountMinor": 1200,
-          "totalPriceMinor": 5999,
-          "isBackordered": false,
-          "reservedQuantity": 0
-        }
-      ],
-      "rawPayload": {
-        "orderId": "19-09499-33499",
-        "creationDate": "2026-11-07T12:25:40.980Z",
-        "orderPaymentStatus": "PAID",
-        "orderFulfillmentStatus": "NOT_STARTED",
-        "buyer": {
-          "username": "buyer_566",
-          "registrationAddress": {
-            "fullName": "Sophie Taylor",
-            "countryCode": "GB"
-          }
-        },
-        "pricingSummary": {
-          "priceSubtotal": {
-            "value": "59.99",
-            "currency": "GBP"
-          }
-        },
-        "shippingStep": {
-          "shipTo": {
-            "fullName": "Sophie Taylor",
-            "contactAddress": {
-              "addressLine1": "27 Park Lane",
-              "city": "Bristol",
-              "postalCode": "BS1 5TR",
-              "countryCode": "GB"
-            }
-          }
-        },
-        "lineItems": [
-          {
-            "lineItemId": "li_new_01",
-            "sku": "EBAY-UK-NXCAM002",
-            "title": "Nexus 4K Ultra Wide Streaming Webcam HD",
-            "quantity": 1,
-            "lineItemCost": {
-              "value": "59.99",
-              "currency": "GBP"
-            }
-          }
-        ]
-      },
-      "createdAt": "2026-11-07T12:25:40.980Z",
-      "updatedAt": "2026-11-07T12:25:40.981Z"
-    },
-    {
-      "id": "ord_1001",
+      "id": "ord_gen_1001",
       "orderNumber": "NX-ORD-2026-001",
       "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09412-88211",
+      "externalOrderId": "19-09411-2017",
       "salesSource": "EBAY",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
@@ -705,55 +567,40 @@
         "street": "14 Kensington Church Street",
         "city": "London",
         "postalCode": "W8 4EP",
-        "country": "United Kingdom"
+        "country": "GB"
       },
       "status": "Delivered",
       "paymentState": "PAID",
-      "totalMinor": 8999,
-      "taxMinor": 1500,
+      "totalMinor": 17998,
+      "taxMinor": 3600,
       "shippingChargeMinor": 0,
       "currency": "GBP",
-      "carrier": "Royal Mail",
-      "trackingNumber": "GB982103841RM",
-      "shippingCostMinor": 450,
-      "rawPayload": {
-        "ebayOrderId": "19-09412-88211",
-        "buyer": {
-          "username": "oliver_smith_22",
-          "registrationAddress": {
-            "countryCode": "GB"
-          }
-        },
-        "pricingSummary": {
-          "priceSubtotal": {
-            "value": "89.99",
-            "currency": "GBP"
-          }
-        }
-      },
+      "carrier": "DPD UK Next Day",
+      "trackingNumber": "DPD-GB-892020",
+      "shippingCostMinor": 580,
       "lines": [
         {
-          "id": "ordl_1001_1",
-          "orderId": "ord_1001",
+          "id": "ordl_ord_gen_1001_1",
+          "orderId": "ord_gen_1001",
           "productId": "prd_001",
           "sku": "NX-AUD-001",
           "productName": "Nexus Pro Active Noise-Cancelling Headphones",
-          "quantity": 1,
+          "quantity": 2,
           "unitPriceMinor": 8999,
-          "taxAmountMinor": 1500,
-          "totalPriceMinor": 8999,
+          "taxAmountMinor": 3600,
+          "totalPriceMinor": 17998,
           "isBackordered": false,
           "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "updatedAt": "2026-11-06T12:25:17.524Z"
+      "createdAt": "2026-11-01T04:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
-      "id": "ord_1002",
+      "id": "ord_gen_1002",
       "orderNumber": "NX-ORD-2026-002",
       "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09415-33419",
+      "externalOrderId": "19-09412-2034",
       "salesSource": "EBAY",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
@@ -764,53 +611,40 @@
         "street": "88 George Street",
         "city": "Edinburgh",
         "postalCode": "EH2 3BU",
-        "country": "United Kingdom"
+        "country": "GB"
       },
-      "status": "Shipped",
+      "status": "Delivered",
       "paymentState": "PAID",
-      "totalMinor": 9498,
-      "taxMinor": 1583,
+      "totalMinor": 17997,
+      "taxMinor": 3599,
       "shippingChargeMinor": 0,
       "currency": "GBP",
-      "carrier": "DPD UK",
-      "trackingNumber": "DPD-1599-2849102",
-      "shippingCostMinor": 520,
+      "carrier": "DHL Express Worldwide",
+      "trackingNumber": "DHL-GB-892021",
+      "shippingCostMinor": 1250,
       "lines": [
         {
-          "id": "ordl_1002_1",
-          "orderId": "ord_1002",
+          "id": "ordl_ord_gen_1002_1",
+          "orderId": "ord_gen_1002",
           "productId": "prd_002",
           "sku": "NX-CAM-002",
           "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
-          "quantity": 1,
+          "quantity": 3,
           "unitPriceMinor": 5999,
-          "taxAmountMinor": 1000,
-          "totalPriceMinor": 5999,
-          "isBackordered": false,
-          "reservedQuantity": 0
-        },
-        {
-          "id": "ordl_1002_2",
-          "orderId": "ord_1002",
-          "productId": "prd_003",
-          "sku": "NX-MOU-003",
-          "productName": "Nexus Precision Ergonomic Bluetooth Mouse",
-          "quantity": 1,
-          "unitPriceMinor": 3499,
-          "taxAmountMinor": 583,
-          "totalPriceMinor": 3499,
+          "taxAmountMinor": 3599,
+          "totalPriceMinor": 17997,
           "isBackordered": false,
           "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-06T12:25:17.524Z",
-      "updatedAt": "2026-11-06T12:25:17.524Z"
+      "createdAt": "2026-11-01T09:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
-      "id": "ord_1003",
+      "id": "ord_gen_1003",
       "orderNumber": "NX-ORD-2026-003",
       "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09419-77102",
+      "externalOrderId": "19-09413-2051",
       "salesSource": "EBAY",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
@@ -821,37 +655,40 @@
         "street": "12 Deansgate Arcade",
         "city": "Manchester",
         "postalCode": "M3 2BW",
-        "country": "United Kingdom"
+        "country": "GB"
       },
-      "status": "Picked",
+      "status": "Delivered",
       "paymentState": "PAID",
-      "totalMinor": 5998,
-      "taxMinor": 1000,
-      "shippingChargeMinor": 0,
+      "totalMinor": 3499,
+      "taxMinor": 700,
+      "shippingChargeMinor": 499,
       "currency": "GBP",
+      "carrier": "FedEx Priority",
+      "trackingNumber": "FEDEX-GB-892022",
+      "shippingCostMinor": 950,
       "lines": [
         {
-          "id": "ordl_1003_1",
-          "orderId": "ord_1003",
-          "productId": "prd_005",
-          "sku": "NX-HUB-005",
-          "productName": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
-          "quantity": 2,
-          "unitPriceMinor": 2999,
-          "taxAmountMinor": 500,
-          "totalPriceMinor": 5998,
+          "id": "ordl_ord_gen_1003_1",
+          "orderId": "ord_gen_1003",
+          "productId": "prd_003",
+          "sku": "NX-MOU-003",
+          "productName": "Nexus Precision Ergonomic Bluetooth Mouse",
+          "quantity": 1,
+          "unitPriceMinor": 3499,
+          "taxAmountMinor": 700,
+          "totalPriceMinor": 3499,
           "isBackordered": false,
-          "reservedQuantity": 2
+          "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-06T12:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-11-01T14:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
-      "id": "ord_1004",
+      "id": "ord_gen_1004",
       "orderNumber": "NX-ORD-2026-004",
       "marketplaceAccountId": "mkt_ebay_us",
-      "externalOrderId": "19-10820-55019",
+      "externalOrderId": "19-09414-2068",
       "salesSource": "EBAY",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
@@ -861,39 +698,41 @@
         "name": "Michael Chang",
         "street": "742 Evergreen Terrace",
         "city": "Springfield",
-        "county": "OR",
         "postalCode": "97477",
-        "country": "United States"
+        "country": "US"
       },
-      "status": "Allocated",
+      "status": "Delivered",
       "paymentState": "PAID",
-      "totalMinor": 7499,
-      "taxMinor": 0,
-      "shippingChargeMinor": 999,
+      "totalMinor": 14998,
+      "taxMinor": 3000,
+      "shippingChargeMinor": 0,
       "currency": "GBP",
+      "carrier": "Evri Standard Parcel",
+      "trackingNumber": "EVRI-GB-892023",
+      "shippingCostMinor": 320,
       "lines": [
         {
-          "id": "ordl_1004_1",
-          "orderId": "ord_1004",
+          "id": "ordl_ord_gen_1004_1",
+          "orderId": "ord_gen_1004",
           "productId": "prd_004",
           "sku": "NX-KEY-004",
           "productName": "Nexus RGB Mechanical Gaming Keyboard - Brown Switches",
-          "quantity": 1,
+          "quantity": 2,
           "unitPriceMinor": 7499,
-          "taxAmountMinor": 0,
-          "totalPriceMinor": 7499,
+          "taxAmountMinor": 3000,
+          "totalPriceMinor": 14998,
           "isBackordered": false,
-          "reservedQuantity": 1
+          "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-07T07:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-11-01T19:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
-      "id": "ord_1005",
+      "id": "ord_gen_1005",
       "orderNumber": "NX-ORD-2026-005",
-      "marketplaceAccountId": "mkt_ebay_uk",
-      "externalOrderId": "19-09431-10294",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "externalOrderId": "19-09415-2085",
       "salesSource": "EBAY",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
@@ -904,38 +743,173 @@
         "street": "5 Victoria Square",
         "city": "Birmingham",
         "postalCode": "B1 1BD",
-        "country": "United Kingdom"
+        "country": "GB"
       },
-      "status": "Confirmed",
+      "status": "Delivered",
       "paymentState": "PAID",
-      "totalMinor": 8999,
-      "taxMinor": 1500,
+      "totalMinor": 8997,
+      "taxMinor": 1799,
       "shippingChargeMinor": 0,
       "currency": "GBP",
+      "carrier": "Royal Mail 24 Tracked",
+      "trackingNumber": "RM-GB-892024",
+      "shippingCostMinor": 450,
       "lines": [
         {
-          "id": "ordl_1005_1",
-          "orderId": "ord_1005",
-          "productId": "prd_001",
-          "sku": "NX-AUD-001",
-          "productName": "Nexus Pro Active Noise-Cancelling Headphones",
-          "quantity": 1,
-          "unitPriceMinor": 8999,
-          "taxAmountMinor": 1500,
-          "totalPriceMinor": 8999,
+          "id": "ordl_ord_gen_1005_1",
+          "orderId": "ord_gen_1005",
+          "productId": "prd_005",
+          "sku": "NX-HUB-005",
+          "productName": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
+          "quantity": 3,
+          "unitPriceMinor": 2999,
+          "taxAmountMinor": 1799,
+          "totalPriceMinor": 8997,
           "isBackordered": false,
-          "reservedQuantity": 1
+          "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-07T10:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-11-02T00:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     },
     {
-      "id": "ord_1006",
+      "id": "ord_gen_1006",
       "orderNumber": "NX-ORD-2026-006",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09416-2102",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Hans Gruber",
+      "customerEmail": "h.gruber@berlin-tech.de",
+      "shippingAddress": {
+        "name": "Hans Gruber",
+        "street": "Friedrichstraße 43",
+        "city": "Berlin",
+        "postalCode": "10117",
+        "country": "DE"
+      },
+      "status": "Shipped",
+      "paymentState": "PAID",
+      "totalMinor": 9999,
+      "taxMinor": 2000,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "carrier": "DPD UK Next Day",
+      "trackingNumber": "DPD-GB-892025",
+      "shippingCostMinor": 580,
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1006_1",
+          "orderId": "ord_gen_1006",
+          "productId": "prd_006",
+          "sku": "NX-MIC-006",
+          "productName": "Nexus Studio Broadcast USB Condenser Microphone",
+          "quantity": 1,
+          "unitPriceMinor": 9999,
+          "taxAmountMinor": 2000,
+          "totalPriceMinor": 9999,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-02T05:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1007",
+      "orderNumber": "NX-ORD-2026-007",
       "salesSource": "MANUAL",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Sarah O'Connor",
+      "customerEmail": "sarah.oc@dublin.ie",
+      "shippingAddress": {
+        "name": "Sarah O'Connor",
+        "street": "22 Grafton Street",
+        "city": "Dublin",
+        "postalCode": "D02 K832",
+        "country": "IE"
+      },
+      "status": "Shipped",
+      "paymentState": "PAID",
+      "totalMinor": 7998,
+      "taxMinor": 1600,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "carrier": "DHL Express Worldwide",
+      "trackingNumber": "DHL-GB-892026",
+      "shippingCostMinor": 1250,
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1007_1",
+          "orderId": "ord_gen_1007",
+          "productId": "prd_007",
+          "sku": "NX-STAND-007",
+          "productName": "Nexus Ergonomic Aluminum Laptop Riser Stand",
+          "quantity": 2,
+          "unitPriceMinor": 3999,
+          "taxAmountMinor": 1600,
+          "totalPriceMinor": 7998,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-02T10:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1008",
+      "orderNumber": "NX-ORD-2026-008",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09418-2136",
+      "salesSource": "EBAY",
       "ownerType": "CLIENT",
       "ownerId": "client_apex",
+      "customerName": "Thomas Davies",
+      "customerEmail": "t.davies@cardiff.co.uk",
+      "shippingAddress": {
+        "name": "Thomas Davies",
+        "street": "18 St Mary Street",
+        "city": "Cardiff",
+        "postalCode": "CF10 1AU",
+        "country": "GB"
+      },
+      "status": "Shipped",
+      "paymentState": "PAID",
+      "totalMinor": 7497,
+      "taxMinor": 1499,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "carrier": "FedEx Priority",
+      "trackingNumber": "FEDEX-GB-892027",
+      "shippingCostMinor": 950,
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1008_1",
+          "orderId": "ord_gen_1008",
+          "productId": "prd_008",
+          "sku": "NX-CHG-008",
+          "productName": "Nexus 65W GaN Fast Charger Dual USB-C",
+          "quantity": 3,
+          "unitPriceMinor": 2499,
+          "taxAmountMinor": 1499,
+          "totalPriceMinor": 7497,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-02T15:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1009",
+      "orderNumber": "NX-ORD-2026-009",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09419-2153",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
       "customerName": "TechHub Retail Stores",
       "customerEmail": "purchasing@techhub.co.uk",
       "shippingAddress": {
@@ -943,116 +917,1528 @@
         "street": "9 Wharf Road",
         "city": "Leeds",
         "postalCode": "LS1 5QZ",
-        "country": "United Kingdom"
+        "country": "GB"
       },
-      "status": "New",
-      "paymentState": "PENDING",
-      "totalMinor": 19996,
-      "taxMinor": 3332,
-      "shippingChargeMinor": 1200,
+      "status": "Shipped",
+      "paymentState": "PAID",
+      "totalMinor": 1999,
+      "taxMinor": 400,
+      "shippingChargeMinor": 499,
       "currency": "GBP",
+      "carrier": "Evri Standard Parcel",
+      "trackingNumber": "EVRI-GB-892028",
+      "shippingCostMinor": 320,
       "lines": [
         {
-          "id": "ordl_1006_1",
-          "orderId": "ord_1006",
-          "productId": "prd_apex_01",
-          "sku": "APX-SPK-100",
-          "productName": "Apex SoundPulse Rugged Waterproof Speaker",
-          "quantity": 4,
-          "unitPriceMinor": 4999,
-          "taxAmountMinor": 833,
-          "totalPriceMinor": 19996,
+          "id": "ordl_ord_gen_1009_1",
+          "orderId": "ord_gen_1009",
+          "productId": "prd_009",
+          "sku": "NX-CAB-009",
+          "productName": "Nexus Thunderbolt 4 High Speed Braided Cable 1M",
+          "quantity": 1,
+          "unitPriceMinor": 1999,
+          "taxAmountMinor": 400,
+          "totalPriceMinor": 1999,
           "isBackordered": false,
           "reservedQuantity": 0
         }
       ],
-      "createdAt": "2026-11-07T11:25:17.524Z",
-      "updatedAt": "2026-11-07T12:25:17.524Z"
+      "createdAt": "2026-11-02T20:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1010",
+      "orderNumber": "NX-ORD-2026-010",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "externalOrderId": "19-09420-2170",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Alexander Rossi",
+      "customerEmail": "a.rossi@milano.it",
+      "shippingAddress": {
+        "name": "Alexander Rossi",
+        "street": "Corso Buenos Aires 12",
+        "city": "Milano",
+        "postalCode": "20124",
+        "country": "IT"
+      },
+      "status": "Shipped",
+      "paymentState": "PAID",
+      "totalMinor": 15998,
+      "taxMinor": 3200,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "carrier": "Royal Mail 24 Tracked",
+      "trackingNumber": "RM-GB-892029",
+      "shippingCostMinor": 450,
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1010_1",
+          "orderId": "ord_gen_1010",
+          "productId": "prd_010",
+          "sku": "NX-LIGHT-010",
+          "productName": "Nexus Studio LED Key Light with Desk Clamp",
+          "quantity": 2,
+          "unitPriceMinor": 7999,
+          "taxAmountMinor": 3200,
+          "totalPriceMinor": 15998,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-03T01:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1011",
+      "orderNumber": "NX-ORD-2026-011",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09421-2187",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Fiona MacLeod",
+      "customerEmail": "f.macleod@glasgow.ac.uk",
+      "shippingAddress": {
+        "name": "Fiona MacLeod",
+        "street": "54 Buchanan Street",
+        "city": "Glasgow",
+        "postalCode": "G1 3HA",
+        "country": "GB"
+      },
+      "status": "Packed",
+      "paymentState": "PAID",
+      "totalMinor": 32997,
+      "taxMinor": 6599,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1011_1",
+          "orderId": "ord_gen_1011",
+          "productId": "prd_011",
+          "sku": "NX-SSD-011",
+          "productName": "Nexus Rugged 1TB Portable NVMe External SSD",
+          "quantity": 3,
+          "unitPriceMinor": 10999,
+          "taxAmountMinor": 6599,
+          "totalPriceMinor": 32997,
+          "isBackordered": false,
+          "reservedQuantity": 3
+        }
+      ],
+      "createdAt": "2026-11-03T06:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1012",
+      "orderNumber": "NX-ORD-2026-012",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09422-2204",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Liam Murphy",
+      "customerEmail": "liam.m@belfast.co.uk",
+      "shippingAddress": {
+        "name": "Liam Murphy",
+        "street": "7 Donegall Square",
+        "city": "Belfast",
+        "postalCode": "BT1 5HD",
+        "country": "GB"
+      },
+      "status": "Packed",
+      "paymentState": "PAID",
+      "totalMinor": 1799,
+      "taxMinor": 360,
+      "shippingChargeMinor": 499,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1012_1",
+          "orderId": "ord_gen_1012",
+          "productId": "prd_012",
+          "sku": "NX-PAD-012",
+          "productName": "Nexus XL Spill-Proof Gaming Desk Mat (900x400mm)",
+          "quantity": 1,
+          "unitPriceMinor": 1799,
+          "taxAmountMinor": 360,
+          "totalPriceMinor": 1799,
+          "isBackordered": false,
+          "reservedQuantity": 1
+        }
+      ],
+      "createdAt": "2026-11-03T11:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1013",
+      "orderNumber": "NX-ORD-2026-013",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09423-2221",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Oliver Smith",
+      "customerEmail": "oliver.smith.gb@example.co.uk",
+      "shippingAddress": {
+        "name": "Oliver Smith",
+        "street": "14 Kensington Church Street",
+        "city": "London",
+        "postalCode": "W8 4EP",
+        "country": "GB"
+      },
+      "status": "Packed",
+      "paymentState": "PAID",
+      "totalMinor": 9998,
+      "taxMinor": 2000,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1013_1",
+          "orderId": "ord_gen_1013",
+          "productId": "prd_apex_01",
+          "sku": "APX-SPK-100",
+          "productName": "Apex SoundPulse Rugged Waterproof Speaker",
+          "quantity": 2,
+          "unitPriceMinor": 4999,
+          "taxAmountMinor": 2000,
+          "totalPriceMinor": 9998,
+          "isBackordered": false,
+          "reservedQuantity": 2
+        }
+      ],
+      "createdAt": "2026-11-03T16:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1014",
+      "orderNumber": "NX-ORD-2026-014",
+      "salesSource": "MANUAL",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Emily Watson",
+      "customerEmail": "emily.watson@example.co.uk",
+      "shippingAddress": {
+        "name": "Emily Watson",
+        "street": "88 George Street",
+        "city": "Edinburgh",
+        "postalCode": "EH2 3BU",
+        "country": "GB"
+      },
+      "status": "Packed",
+      "paymentState": "PAID",
+      "totalMinor": 16497,
+      "taxMinor": 3299,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1014_1",
+          "orderId": "ord_gen_1014",
+          "productId": "prd_apex_02",
+          "sku": "APX-EAR-200",
+          "productName": "Apex PureBass Wireless Earbuds with ANC",
+          "quantity": 3,
+          "unitPriceMinor": 5499,
+          "taxAmountMinor": 3299,
+          "totalPriceMinor": 16497,
+          "isBackordered": false,
+          "reservedQuantity": 3
+        }
+      ],
+      "createdAt": "2026-11-03T21:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1015",
+      "orderNumber": "NX-ORD-2026-015",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "externalOrderId": "19-09425-2255",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "James Henderson",
+      "customerEmail": "j.henderson@example.co.uk",
+      "shippingAddress": {
+        "name": "James Henderson",
+        "street": "12 Deansgate Arcade",
+        "city": "Manchester",
+        "postalCode": "M3 2BW",
+        "country": "GB"
+      },
+      "status": "Picked",
+      "paymentState": "PAID",
+      "totalMinor": 12999,
+      "taxMinor": 2600,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1015_1",
+          "orderId": "ord_gen_1015",
+          "productId": "prd_bolt_01",
+          "sku": "BLT-SND-10",
+          "productName": "Bolt CinemaSound 120W Compact TV Soundbar",
+          "quantity": 1,
+          "unitPriceMinor": 12999,
+          "taxAmountMinor": 2600,
+          "totalPriceMinor": 12999,
+          "isBackordered": false,
+          "reservedQuantity": 1
+        }
+      ],
+      "createdAt": "2026-11-04T02:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1016",
+      "orderNumber": "NX-ORD-2026-016",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09426-2272",
+      "salesSource": "EBAY",
+      "ownerType": "CLIENT",
+      "ownerId": "client_apex",
+      "customerName": "Michael Chang",
+      "customerEmail": "mchang@example.com",
+      "shippingAddress": {
+        "name": "Michael Chang",
+        "street": "742 Evergreen Terrace",
+        "city": "Springfield",
+        "postalCode": "97477",
+        "country": "US"
+      },
+      "status": "Picked",
+      "paymentState": "PAID",
+      "totalMinor": 8598,
+      "taxMinor": 1720,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1016_1",
+          "orderId": "ord_gen_1016",
+          "productId": "prd_luma_01",
+          "sku": "LUM-CAM-01",
+          "productName": "Luma Smart 2K Pan & Tilt Indoor WiFi Camera",
+          "quantity": 2,
+          "unitPriceMinor": 4299,
+          "taxAmountMinor": 1720,
+          "totalPriceMinor": 8598,
+          "isBackordered": false,
+          "reservedQuantity": 2
+        }
+      ],
+      "createdAt": "2026-11-04T07:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1017",
+      "orderNumber": "NX-ORD-2026-017",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09427-2289",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Chloe Bennett",
+      "customerEmail": "chloe.b@example.co.uk",
+      "shippingAddress": {
+        "name": "Chloe Bennett",
+        "street": "5 Victoria Square",
+        "city": "Birmingham",
+        "postalCode": "B1 1BD",
+        "country": "GB"
+      },
+      "status": "Picked",
+      "paymentState": "PAID",
+      "totalMinor": 23997,
+      "taxMinor": 4799,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1017_1",
+          "orderId": "ord_gen_1017",
+          "productId": "prd_nordic_01",
+          "sku": "NRD-WRM-01",
+          "productName": "Nordic Eco Wool Heated Smart Throw Blanket",
+          "quantity": 3,
+          "unitPriceMinor": 7999,
+          "taxAmountMinor": 4799,
+          "totalPriceMinor": 23997,
+          "isBackordered": false,
+          "reservedQuantity": 3
+        }
+      ],
+      "createdAt": "2026-11-04T12:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1018",
+      "orderNumber": "NX-ORD-2026-018",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09428-2306",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Hans Gruber",
+      "customerEmail": "h.gruber@berlin-tech.de",
+      "shippingAddress": {
+        "name": "Hans Gruber",
+        "street": "Friedrichstraße 43",
+        "city": "Berlin",
+        "postalCode": "10117",
+        "country": "DE"
+      },
+      "status": "Picked",
+      "paymentState": "PAID",
+      "totalMinor": 8999,
+      "taxMinor": 1800,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1018_1",
+          "orderId": "ord_gen_1018",
+          "productId": "prd_001",
+          "sku": "NX-AUD-001",
+          "productName": "Nexus Pro Active Noise-Cancelling Headphones",
+          "quantity": 1,
+          "unitPriceMinor": 8999,
+          "taxAmountMinor": 1800,
+          "totalPriceMinor": 8999,
+          "isBackordered": false,
+          "reservedQuantity": 1
+        }
+      ],
+      "createdAt": "2026-11-04T17:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1019",
+      "orderNumber": "NX-ORD-2026-019",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09429-2323",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Sarah O'Connor",
+      "customerEmail": "sarah.oc@dublin.ie",
+      "shippingAddress": {
+        "name": "Sarah O'Connor",
+        "street": "22 Grafton Street",
+        "city": "Dublin",
+        "postalCode": "D02 K832",
+        "country": "IE"
+      },
+      "status": "Allocated",
+      "paymentState": "PAID",
+      "totalMinor": 11998,
+      "taxMinor": 2400,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1019_1",
+          "orderId": "ord_gen_1019",
+          "productId": "prd_002",
+          "sku": "NX-CAM-002",
+          "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
+          "quantity": 2,
+          "unitPriceMinor": 5999,
+          "taxAmountMinor": 2400,
+          "totalPriceMinor": 11998,
+          "isBackordered": false,
+          "reservedQuantity": 2
+        }
+      ],
+      "createdAt": "2026-11-04T22:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1020",
+      "orderNumber": "NX-ORD-2026-020",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09430-2340",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Thomas Davies",
+      "customerEmail": "t.davies@cardiff.co.uk",
+      "shippingAddress": {
+        "name": "Thomas Davies",
+        "street": "18 St Mary Street",
+        "city": "Cardiff",
+        "postalCode": "CF10 1AU",
+        "country": "GB"
+      },
+      "status": "Allocated",
+      "paymentState": "PAID",
+      "totalMinor": 10497,
+      "taxMinor": 2099,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1020_1",
+          "orderId": "ord_gen_1020",
+          "productId": "prd_003",
+          "sku": "NX-MOU-003",
+          "productName": "Nexus Precision Ergonomic Bluetooth Mouse",
+          "quantity": 3,
+          "unitPriceMinor": 3499,
+          "taxAmountMinor": 2099,
+          "totalPriceMinor": 10497,
+          "isBackordered": false,
+          "reservedQuantity": 3
+        }
+      ],
+      "createdAt": "2026-11-05T03:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1021",
+      "orderNumber": "NX-ORD-2026-021",
+      "salesSource": "MANUAL",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "TechHub Retail Stores",
+      "customerEmail": "purchasing@techhub.co.uk",
+      "shippingAddress": {
+        "name": "TechHub Central Inbound",
+        "street": "9 Wharf Road",
+        "city": "Leeds",
+        "postalCode": "LS1 5QZ",
+        "country": "GB"
+      },
+      "status": "Allocated",
+      "paymentState": "PAID",
+      "totalMinor": 7499,
+      "taxMinor": 1500,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1021_1",
+          "orderId": "ord_gen_1021",
+          "productId": "prd_004",
+          "sku": "NX-KEY-004",
+          "productName": "Nexus RGB Mechanical Gaming Keyboard - Brown Switches",
+          "quantity": 1,
+          "unitPriceMinor": 7499,
+          "taxAmountMinor": 1500,
+          "totalPriceMinor": 7499,
+          "isBackordered": false,
+          "reservedQuantity": 1
+        }
+      ],
+      "createdAt": "2026-11-05T08:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1022",
+      "orderNumber": "NX-ORD-2026-022",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09432-2374",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Alexander Rossi",
+      "customerEmail": "a.rossi@milano.it",
+      "shippingAddress": {
+        "name": "Alexander Rossi",
+        "street": "Corso Buenos Aires 12",
+        "city": "Milano",
+        "postalCode": "20124",
+        "country": "IT"
+      },
+      "status": "Allocated",
+      "paymentState": "PAID",
+      "totalMinor": 5998,
+      "taxMinor": 1200,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1022_1",
+          "orderId": "ord_gen_1022",
+          "productId": "prd_005",
+          "sku": "NX-HUB-005",
+          "productName": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
+          "quantity": 2,
+          "unitPriceMinor": 2999,
+          "taxAmountMinor": 1200,
+          "totalPriceMinor": 5998,
+          "isBackordered": false,
+          "reservedQuantity": 2
+        }
+      ],
+      "createdAt": "2026-11-05T13:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1023",
+      "orderNumber": "NX-ORD-2026-023",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09433-2391",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Fiona MacLeod",
+      "customerEmail": "f.macleod@glasgow.ac.uk",
+      "shippingAddress": {
+        "name": "Fiona MacLeod",
+        "street": "54 Buchanan Street",
+        "city": "Glasgow",
+        "postalCode": "G1 3HA",
+        "country": "GB"
+      },
+      "status": "Confirmed",
+      "paymentState": "PAID",
+      "totalMinor": 29997,
+      "taxMinor": 5999,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1023_1",
+          "orderId": "ord_gen_1023",
+          "productId": "prd_006",
+          "sku": "NX-MIC-006",
+          "productName": "Nexus Studio Broadcast USB Condenser Microphone",
+          "quantity": 3,
+          "unitPriceMinor": 9999,
+          "taxAmountMinor": 5999,
+          "totalPriceMinor": 29997,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-05T18:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1024",
+      "orderNumber": "NX-ORD-2026-024",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09434-2408",
+      "salesSource": "EBAY",
+      "ownerType": "CLIENT",
+      "ownerId": "client_apex",
+      "customerName": "Liam Murphy",
+      "customerEmail": "liam.m@belfast.co.uk",
+      "shippingAddress": {
+        "name": "Liam Murphy",
+        "street": "7 Donegall Square",
+        "city": "Belfast",
+        "postalCode": "BT1 5HD",
+        "country": "GB"
+      },
+      "status": "Confirmed",
+      "paymentState": "PAID",
+      "totalMinor": 3999,
+      "taxMinor": 800,
+      "shippingChargeMinor": 499,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1024_1",
+          "orderId": "ord_gen_1024",
+          "productId": "prd_007",
+          "sku": "NX-STAND-007",
+          "productName": "Nexus Ergonomic Aluminum Laptop Riser Stand",
+          "quantity": 1,
+          "unitPriceMinor": 3999,
+          "taxAmountMinor": 800,
+          "totalPriceMinor": 3999,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-05T23:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1025",
+      "orderNumber": "NX-ORD-2026-025",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "externalOrderId": "19-09435-2425",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Oliver Smith",
+      "customerEmail": "oliver.smith.gb@example.co.uk",
+      "shippingAddress": {
+        "name": "Oliver Smith",
+        "street": "14 Kensington Church Street",
+        "city": "London",
+        "postalCode": "W8 4EP",
+        "country": "GB"
+      },
+      "status": "Confirmed",
+      "paymentState": "PAID",
+      "totalMinor": 4998,
+      "taxMinor": 1000,
+      "shippingChargeMinor": 499,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1025_1",
+          "orderId": "ord_gen_1025",
+          "productId": "prd_008",
+          "sku": "NX-CHG-008",
+          "productName": "Nexus 65W GaN Fast Charger Dual USB-C",
+          "quantity": 2,
+          "unitPriceMinor": 2499,
+          "taxAmountMinor": 1000,
+          "totalPriceMinor": 4998,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-06T04:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1026",
+      "orderNumber": "NX-ORD-2026-026",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09436-2442",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Emily Watson",
+      "customerEmail": "emily.watson@example.co.uk",
+      "shippingAddress": {
+        "name": "Emily Watson",
+        "street": "88 George Street",
+        "city": "Edinburgh",
+        "postalCode": "EH2 3BU",
+        "country": "GB"
+      },
+      "status": "Confirmed",
+      "paymentState": "PAID",
+      "totalMinor": 5997,
+      "taxMinor": 1199,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1026_1",
+          "orderId": "ord_gen_1026",
+          "productId": "prd_009",
+          "sku": "NX-CAB-009",
+          "productName": "Nexus Thunderbolt 4 High Speed Braided Cable 1M",
+          "quantity": 3,
+          "unitPriceMinor": 1999,
+          "taxAmountMinor": 1199,
+          "totalPriceMinor": 5997,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-06T09:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1027",
+      "orderNumber": "NX-ORD-2026-027",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09437-2459",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "James Henderson",
+      "customerEmail": "j.henderson@example.co.uk",
+      "shippingAddress": {
+        "name": "James Henderson",
+        "street": "12 Deansgate Arcade",
+        "city": "Manchester",
+        "postalCode": "M3 2BW",
+        "country": "GB"
+      },
+      "status": "Confirmed",
+      "paymentState": "PAID",
+      "totalMinor": 7999,
+      "taxMinor": 1600,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1027_1",
+          "orderId": "ord_gen_1027",
+          "productId": "prd_010",
+          "sku": "NX-LIGHT-010",
+          "productName": "Nexus Studio LED Key Light with Desk Clamp",
+          "quantity": 1,
+          "unitPriceMinor": 7999,
+          "taxAmountMinor": 1600,
+          "totalPriceMinor": 7999,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-06T14:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1028",
+      "orderNumber": "NX-ORD-2026-028",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09438-2476",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Michael Chang",
+      "customerEmail": "mchang@example.com",
+      "shippingAddress": {
+        "name": "Michael Chang",
+        "street": "742 Evergreen Terrace",
+        "city": "Springfield",
+        "postalCode": "97477",
+        "country": "US"
+      },
+      "status": "Cancelled",
+      "paymentState": "VOIDED",
+      "totalMinor": 21998,
+      "taxMinor": 4400,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1028_1",
+          "orderId": "ord_gen_1028",
+          "productId": "prd_011",
+          "sku": "NX-SSD-011",
+          "productName": "Nexus Rugged 1TB Portable NVMe External SSD",
+          "quantity": 2,
+          "unitPriceMinor": 10999,
+          "taxAmountMinor": 4400,
+          "totalPriceMinor": 21998,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-06T19:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1029",
+      "orderNumber": "NX-ORD-2026-029",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09439-2493",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Chloe Bennett",
+      "customerEmail": "chloe.b@example.co.uk",
+      "shippingAddress": {
+        "name": "Chloe Bennett",
+        "street": "5 Victoria Square",
+        "city": "Birmingham",
+        "postalCode": "B1 1BD",
+        "country": "GB"
+      },
+      "status": "Returned",
+      "paymentState": "PAID",
+      "totalMinor": 5397,
+      "taxMinor": 1079,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1029_1",
+          "orderId": "ord_gen_1029",
+          "productId": "prd_012",
+          "sku": "NX-PAD-012",
+          "productName": "Nexus XL Spill-Proof Gaming Desk Mat (900x400mm)",
+          "quantity": 3,
+          "unitPriceMinor": 1799,
+          "taxAmountMinor": 1079,
+          "totalPriceMinor": 5397,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "notes": "Customer reported defective audio jack.",
+      "createdAt": "2026-11-07T00:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1030",
+      "orderNumber": "NX-ORD-2026-030",
+      "marketplaceAccountId": "mkt_ebay_de",
+      "externalOrderId": "19-09440-2510",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Hans Gruber",
+      "customerEmail": "h.gruber@berlin-tech.de",
+      "shippingAddress": {
+        "name": "Hans Gruber",
+        "street": "Friedrichstraße 43",
+        "city": "Berlin",
+        "postalCode": "10117",
+        "country": "DE"
+      },
+      "status": "New",
+      "paymentState": "PAID",
+      "totalMinor": 4999,
+      "taxMinor": 1000,
+      "shippingChargeMinor": 499,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1030_1",
+          "orderId": "ord_gen_1030",
+          "productId": "prd_apex_01",
+          "sku": "APX-SPK-100",
+          "productName": "Apex SoundPulse Rugged Waterproof Speaker",
+          "quantity": 1,
+          "unitPriceMinor": 4999,
+          "taxAmountMinor": 1000,
+          "totalPriceMinor": 4999,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-07T05:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1031",
+      "orderNumber": "NX-ORD-2026-031",
+      "marketplaceAccountId": "mkt_ebay_uk",
+      "externalOrderId": "19-09441-2527",
+      "salesSource": "EBAY",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "customerName": "Sarah O'Connor",
+      "customerEmail": "sarah.oc@dublin.ie",
+      "shippingAddress": {
+        "name": "Sarah O'Connor",
+        "street": "22 Grafton Street",
+        "city": "Dublin",
+        "postalCode": "D02 K832",
+        "country": "IE"
+      },
+      "status": "New",
+      "paymentState": "PAID",
+      "totalMinor": 10998,
+      "taxMinor": 2200,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1031_1",
+          "orderId": "ord_gen_1031",
+          "productId": "prd_apex_02",
+          "sku": "APX-EAR-200",
+          "productName": "Apex PureBass Wireless Earbuds with ANC",
+          "quantity": 2,
+          "unitPriceMinor": 5499,
+          "taxAmountMinor": 2200,
+          "totalPriceMinor": 10998,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-07T10:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "ord_gen_1032",
+      "orderNumber": "NX-ORD-2026-032",
+      "marketplaceAccountId": "mkt_ebay_us",
+      "externalOrderId": "19-09442-2544",
+      "salesSource": "EBAY",
+      "ownerType": "CLIENT",
+      "ownerId": "client_apex",
+      "customerName": "Thomas Davies",
+      "customerEmail": "t.davies@cardiff.co.uk",
+      "shippingAddress": {
+        "name": "Thomas Davies",
+        "street": "18 St Mary Street",
+        "city": "Cardiff",
+        "postalCode": "CF10 1AU",
+        "country": "GB"
+      },
+      "status": "New",
+      "paymentState": "PAID",
+      "totalMinor": 38997,
+      "taxMinor": 7799,
+      "shippingChargeMinor": 0,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "ordl_ord_gen_1032_1",
+          "orderId": "ord_gen_1032",
+          "productId": "prd_bolt_01",
+          "sku": "BLT-SND-10",
+          "productName": "Bolt CinemaSound 120W Compact TV Soundbar",
+          "quantity": 3,
+          "unitPriceMinor": 12999,
+          "taxAmountMinor": 7799,
+          "totalPriceMinor": 38997,
+          "isBackordered": false,
+          "reservedQuantity": 0
+        }
+      ],
+      "createdAt": "2026-11-07T15:21:20.992Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
     }
   ],
   "orderHistories": [
     {
-      "id": "hist_001",
-      "orderId": "ord_1001",
-      "fromStatus": "New",
-      "toStatus": "Confirmed",
-      "changedBy": "System (eBay Auto-import)",
-      "note": "Order imported with paid checkout",
-      "timestamp": "2026-11-05T12:25:17.524Z"
+      "id": "hst_ord_gen_1001_1",
+      "orderId": "ord_gen_1001",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-01T04:21:20.991Z",
+      "notes": "Order captured via marketplace synchronization API."
     },
     {
-      "id": "hist_002",
-      "orderId": "ord_1001",
-      "fromStatus": "Confirmed",
-      "toStatus": "Allocated",
-      "changedBy": "System (Inventory Engine)",
-      "note": "Stock reserved from Zone A / A1 / S01 / B01",
-      "timestamp": "2026-11-05T12:25:17.524Z"
+      "id": "hst_ord_gen_1001_2",
+      "orderId": "ord_gen_1001",
+      "previousStatus": "New",
+      "newStatus": "Delivered",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-01T06:21:20.991Z",
+      "notes": "Order transitioned to Delivered."
     },
     {
-      "id": "hist_003",
-      "orderId": "ord_1001",
-      "fromStatus": "Allocated",
-      "toStatus": "Picked",
-      "changedBy": "jack.miller@nexusops.com",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "id": "hst_ord_gen_1002_1",
+      "orderId": "ord_gen_1002",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-01T09:21:20.991Z",
+      "notes": "Order captured via marketplace synchronization API."
     },
     {
-      "id": "hist_004",
-      "orderId": "ord_1001",
-      "fromStatus": "Picked",
-      "toStatus": "Packed",
-      "changedBy": "jack.miller@nexusops.com",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "id": "hst_ord_gen_1002_2",
+      "orderId": "ord_gen_1002",
+      "previousStatus": "New",
+      "newStatus": "Delivered",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-01T11:21:20.991Z",
+      "notes": "Order transitioned to Delivered."
     },
     {
-      "id": "hist_005",
-      "orderId": "ord_1001",
-      "fromStatus": "Packed",
-      "toStatus": "Shipped",
-      "changedBy": "jack.miller@nexusops.com",
-      "note": "Royal Mail tracking GB982103841RM attached",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "id": "hst_ord_gen_1003_1",
+      "orderId": "ord_gen_1003",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-01T14:21:20.991Z",
+      "notes": "Order captured via marketplace synchronization API."
     },
     {
-      "id": "hist_006",
-      "orderId": "ord_1001",
-      "fromStatus": "Shipped",
-      "toStatus": "Delivered",
-      "changedBy": "System (Carrier Callback)",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "id": "hst_ord_gen_1003_2",
+      "orderId": "ord_gen_1003",
+      "previousStatus": "New",
+      "newStatus": "Delivered",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-01T16:21:20.991Z",
+      "notes": "Order transitioned to Delivered."
     },
     {
-      "id": "hist_1794054340981_vq6m",
-      "orderId": "ord_1794054340981_3zab",
-      "toStatus": "Confirmed",
-      "changedBy": "eBay Sync (Nexus Tech Direct (UK))",
-      "note": "Imported via Sell Fulfillment API. Idempotent key: mkt_ebay_uk/19-09499-33499",
-      "timestamp": "2026-11-07T12:25:40.981Z"
+      "id": "hst_ord_gen_1004_1",
+      "orderId": "ord_gen_1004",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-01T19:21:20.991Z",
+      "notes": "Order captured via marketplace synchronization API."
     },
     {
-      "id": "hist_1794054340981_tdf6",
-      "orderId": "ord_1794054340981_jsci",
-      "toStatus": "New",
-      "changedBy": "eBay Sync (Nexus Tech Direct (UK))",
-      "note": "Imported via Sell Fulfillment API. Idempotent key: mkt_ebay_uk/19-09555-97445",
-      "timestamp": "2026-11-07T12:25:40.981Z"
+      "id": "hst_ord_gen_1004_2",
+      "orderId": "ord_gen_1004",
+      "previousStatus": "New",
+      "newStatus": "Delivered",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-01T21:21:20.991Z",
+      "notes": "Order transitioned to Delivered."
     },
     {
-      "id": "hist_1794054345066_pkti",
-      "orderId": "ord_1794054345066_ry4d",
-      "toStatus": "Confirmed",
-      "changedBy": "eBay Sync (Nexus Tech Direct (UK))",
-      "note": "Imported via Sell Fulfillment API. Idempotent key: mkt_ebay_uk/19-09499-83015",
-      "timestamp": "2026-11-07T12:25:45.066Z"
+      "id": "hst_ord_gen_1005_1",
+      "orderId": "ord_gen_1005",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-02T00:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
     },
     {
-      "id": "hist_1794054345066_j7qa",
-      "orderId": "ord_1794054345066_bl12",
-      "toStatus": "New",
-      "changedBy": "eBay Sync (Nexus Tech Direct (UK))",
-      "note": "Imported via Sell Fulfillment API. Idempotent key: mkt_ebay_uk/19-09555-32823",
-      "timestamp": "2026-11-07T12:25:45.066Z"
+      "id": "hst_ord_gen_1005_2",
+      "orderId": "ord_gen_1005",
+      "previousStatus": "New",
+      "newStatus": "Delivered",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-02T02:21:20.992Z",
+      "notes": "Order transitioned to Delivered."
+    },
+    {
+      "id": "hst_ord_gen_1006_1",
+      "orderId": "ord_gen_1006",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-02T05:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1006_2",
+      "orderId": "ord_gen_1006",
+      "previousStatus": "New",
+      "newStatus": "Shipped",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-02T07:21:20.992Z",
+      "notes": "Order transitioned to Shipped."
+    },
+    {
+      "id": "hst_ord_gen_1007_1",
+      "orderId": "ord_gen_1007",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-02T10:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1007_2",
+      "orderId": "ord_gen_1007",
+      "previousStatus": "New",
+      "newStatus": "Shipped",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-02T12:21:20.992Z",
+      "notes": "Order transitioned to Shipped."
+    },
+    {
+      "id": "hst_ord_gen_1008_1",
+      "orderId": "ord_gen_1008",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-02T15:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1008_2",
+      "orderId": "ord_gen_1008",
+      "previousStatus": "New",
+      "newStatus": "Shipped",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-02T17:21:20.992Z",
+      "notes": "Order transitioned to Shipped."
+    },
+    {
+      "id": "hst_ord_gen_1009_1",
+      "orderId": "ord_gen_1009",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-02T20:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1009_2",
+      "orderId": "ord_gen_1009",
+      "previousStatus": "New",
+      "newStatus": "Shipped",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-02T22:21:20.992Z",
+      "notes": "Order transitioned to Shipped."
+    },
+    {
+      "id": "hst_ord_gen_1010_1",
+      "orderId": "ord_gen_1010",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-03T01:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1010_2",
+      "orderId": "ord_gen_1010",
+      "previousStatus": "New",
+      "newStatus": "Shipped",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-03T03:21:20.992Z",
+      "notes": "Order transitioned to Shipped."
+    },
+    {
+      "id": "hst_ord_gen_1011_1",
+      "orderId": "ord_gen_1011",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-03T06:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1011_2",
+      "orderId": "ord_gen_1011",
+      "previousStatus": "New",
+      "newStatus": "Packed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-03T08:21:20.992Z",
+      "notes": "Order transitioned to Packed."
+    },
+    {
+      "id": "hst_ord_gen_1012_1",
+      "orderId": "ord_gen_1012",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-03T11:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1012_2",
+      "orderId": "ord_gen_1012",
+      "previousStatus": "New",
+      "newStatus": "Packed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-03T13:21:20.992Z",
+      "notes": "Order transitioned to Packed."
+    },
+    {
+      "id": "hst_ord_gen_1013_1",
+      "orderId": "ord_gen_1013",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-03T16:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1013_2",
+      "orderId": "ord_gen_1013",
+      "previousStatus": "New",
+      "newStatus": "Packed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-03T18:21:20.992Z",
+      "notes": "Order transitioned to Packed."
+    },
+    {
+      "id": "hst_ord_gen_1014_1",
+      "orderId": "ord_gen_1014",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-03T21:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1014_2",
+      "orderId": "ord_gen_1014",
+      "previousStatus": "New",
+      "newStatus": "Packed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-03T23:21:20.992Z",
+      "notes": "Order transitioned to Packed."
+    },
+    {
+      "id": "hst_ord_gen_1015_1",
+      "orderId": "ord_gen_1015",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-04T02:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1015_2",
+      "orderId": "ord_gen_1015",
+      "previousStatus": "New",
+      "newStatus": "Picked",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-04T04:21:20.992Z",
+      "notes": "Order transitioned to Picked."
+    },
+    {
+      "id": "hst_ord_gen_1016_1",
+      "orderId": "ord_gen_1016",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-04T07:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1016_2",
+      "orderId": "ord_gen_1016",
+      "previousStatus": "New",
+      "newStatus": "Picked",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-04T09:21:20.992Z",
+      "notes": "Order transitioned to Picked."
+    },
+    {
+      "id": "hst_ord_gen_1017_1",
+      "orderId": "ord_gen_1017",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-04T12:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1017_2",
+      "orderId": "ord_gen_1017",
+      "previousStatus": "New",
+      "newStatus": "Picked",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-04T14:21:20.992Z",
+      "notes": "Order transitioned to Picked."
+    },
+    {
+      "id": "hst_ord_gen_1018_1",
+      "orderId": "ord_gen_1018",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-04T17:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1018_2",
+      "orderId": "ord_gen_1018",
+      "previousStatus": "New",
+      "newStatus": "Picked",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-04T19:21:20.992Z",
+      "notes": "Order transitioned to Picked."
+    },
+    {
+      "id": "hst_ord_gen_1019_1",
+      "orderId": "ord_gen_1019",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-04T22:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1019_2",
+      "orderId": "ord_gen_1019",
+      "previousStatus": "New",
+      "newStatus": "Allocated",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-05T00:21:20.992Z",
+      "notes": "Order transitioned to Allocated."
+    },
+    {
+      "id": "hst_ord_gen_1020_1",
+      "orderId": "ord_gen_1020",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-05T03:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1020_2",
+      "orderId": "ord_gen_1020",
+      "previousStatus": "New",
+      "newStatus": "Allocated",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-05T05:21:20.992Z",
+      "notes": "Order transitioned to Allocated."
+    },
+    {
+      "id": "hst_ord_gen_1021_1",
+      "orderId": "ord_gen_1021",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-05T08:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1021_2",
+      "orderId": "ord_gen_1021",
+      "previousStatus": "New",
+      "newStatus": "Allocated",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-05T10:21:20.992Z",
+      "notes": "Order transitioned to Allocated."
+    },
+    {
+      "id": "hst_ord_gen_1022_1",
+      "orderId": "ord_gen_1022",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-05T13:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1022_2",
+      "orderId": "ord_gen_1022",
+      "previousStatus": "New",
+      "newStatus": "Allocated",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-05T15:21:20.992Z",
+      "notes": "Order transitioned to Allocated."
+    },
+    {
+      "id": "hst_ord_gen_1023_1",
+      "orderId": "ord_gen_1023",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-05T18:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1023_2",
+      "orderId": "ord_gen_1023",
+      "previousStatus": "New",
+      "newStatus": "Confirmed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-05T20:21:20.992Z",
+      "notes": "Order transitioned to Confirmed."
+    },
+    {
+      "id": "hst_ord_gen_1024_1",
+      "orderId": "ord_gen_1024",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-05T23:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1024_2",
+      "orderId": "ord_gen_1024",
+      "previousStatus": "New",
+      "newStatus": "Confirmed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-06T01:21:20.992Z",
+      "notes": "Order transitioned to Confirmed."
+    },
+    {
+      "id": "hst_ord_gen_1025_1",
+      "orderId": "ord_gen_1025",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-06T04:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1025_2",
+      "orderId": "ord_gen_1025",
+      "previousStatus": "New",
+      "newStatus": "Confirmed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-06T06:21:20.992Z",
+      "notes": "Order transitioned to Confirmed."
+    },
+    {
+      "id": "hst_ord_gen_1026_1",
+      "orderId": "ord_gen_1026",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-06T09:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1026_2",
+      "orderId": "ord_gen_1026",
+      "previousStatus": "New",
+      "newStatus": "Confirmed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-06T11:21:20.992Z",
+      "notes": "Order transitioned to Confirmed."
+    },
+    {
+      "id": "hst_ord_gen_1027_1",
+      "orderId": "ord_gen_1027",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-06T14:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1027_2",
+      "orderId": "ord_gen_1027",
+      "previousStatus": "New",
+      "newStatus": "Confirmed",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-06T16:21:20.992Z",
+      "notes": "Order transitioned to Confirmed."
+    },
+    {
+      "id": "hst_ord_gen_1028_1",
+      "orderId": "ord_gen_1028",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-06T19:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1028_2",
+      "orderId": "ord_gen_1028",
+      "previousStatus": "New",
+      "newStatus": "Cancelled",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-06T21:21:20.992Z",
+      "notes": "Order transitioned to Cancelled."
+    },
+    {
+      "id": "hst_ord_gen_1029_1",
+      "orderId": "ord_gen_1029",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-07T00:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1029_2",
+      "orderId": "ord_gen_1029",
+      "previousStatus": "New",
+      "newStatus": "Returned",
+      "changedBy": "usr_opsmanager",
+      "timestamp": "2026-11-07T02:21:20.992Z",
+      "notes": "Order transitioned to Returned."
+    },
+    {
+      "id": "hst_ord_gen_1030_1",
+      "orderId": "ord_gen_1030",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-07T05:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1031_1",
+      "orderId": "ord_gen_1031",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-07T10:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
+    },
+    {
+      "id": "hst_ord_gen_1032_1",
+      "orderId": "ord_gen_1032",
+      "previousStatus": "None",
+      "newStatus": "New",
+      "changedBy": "ebay_sync_worker",
+      "timestamp": "2026-11-07T15:21:20.992Z",
+      "notes": "Order captured via marketplace synchronization API."
     }
   ],
   "warehouses": [
@@ -1062,187 +2448,468 @@
       "code": "WH-01",
       "address": "Unit 4, Gateway Logistics Park, Milton Keynes, MK17 8EB, UK",
       "isActive": true
+    },
+    {
+      "id": "wh_north",
+      "name": "Nexus Northern Distribution Centre",
+      "code": "WH-02",
+      "address": "Bay 12, Trafford Industrial Estate, Manchester, M17 1TN, UK",
+      "isActive": true
+    },
+    {
+      "id": "wh_south",
+      "name": "Nexus Express London Cross-Dock",
+      "code": "WH-03",
+      "address": "Heathrow Cargo Point, Hounslow, TW6 3RT, UK",
+      "isActive": true
     }
   ],
   "locations": [
     {
-      "id": "loc_def",
+      "id": "loc_a1",
       "warehouseId": "wh_main",
       "zone": "Zone A",
       "aisle": "A1",
       "shelf": "S01",
       "bin": "B01",
       "type": "SHELF",
-      "capacityUnits": 500,
+      "capacityUnits": 600,
       "isActive": true
     },
     {
-      "id": "loc_bulk_01",
+      "id": "loc_a2",
+      "warehouseId": "wh_main",
+      "zone": "Zone A",
+      "aisle": "A1",
+      "shelf": "S02",
+      "bin": "B02",
+      "type": "SHELF",
+      "capacityUnits": 600,
+      "isActive": true
+    },
+    {
+      "id": "loc_a3",
+      "warehouseId": "wh_main",
+      "zone": "Zone A",
+      "aisle": "A2",
+      "shelf": "S01",
+      "bin": "B03",
+      "type": "SHELF",
+      "capacityUnits": 800,
+      "isActive": true
+    },
+    {
+      "id": "loc_a4",
+      "warehouseId": "wh_main",
+      "zone": "Zone A",
+      "aisle": "A2",
+      "shelf": "S02",
+      "bin": "B04",
+      "type": "SHELF",
+      "capacityUnits": 800,
+      "isActive": true
+    },
+    {
+      "id": "loc_b1",
+      "warehouseId": "wh_main",
+      "zone": "Zone B",
+      "aisle": "B1",
+      "shelf": "S01",
+      "bin": "P01",
+      "type": "PALLET",
+      "capacityUnits": 2500,
+      "isActive": true
+    },
+    {
+      "id": "loc_b2",
       "warehouseId": "wh_main",
       "zone": "Zone B",
       "aisle": "B2",
-      "shelf": "S03",
-      "bin": "P01",
+      "shelf": "S01",
+      "bin": "P02",
       "type": "PALLET",
-      "capacityUnits": 2000,
+      "capacityUnits": 2500,
       "isActive": true
     },
     {
-      "id": "loc_damaged",
+      "id": "loc_b3",
+      "warehouseId": "wh_main",
+      "zone": "Zone B",
+      "aisle": "B3",
+      "shelf": "S01",
+      "bin": "P03",
+      "type": "PALLET",
+      "capacityUnits": 3000,
+      "isActive": true
+    },
+    {
+      "id": "loc_c1",
+      "warehouseId": "wh_north",
+      "zone": "Bulk Mezzanine",
+      "aisle": "M1",
+      "shelf": "S01",
+      "bin": "BM01",
+      "type": "SHELF",
+      "capacityUnits": 1500,
+      "isActive": true
+    },
+    {
+      "id": "loc_c2",
+      "warehouseId": "wh_north",
+      "zone": "Bulk Mezzanine",
+      "aisle": "M2",
+      "shelf": "S01",
+      "bin": "BM02",
+      "type": "SHELF",
+      "capacityUnits": 1500,
+      "isActive": true
+    },
+    {
+      "id": "loc_dmg",
       "warehouseId": "wh_main",
       "zone": "Quarantine",
       "aisle": "Q1",
       "shelf": "S01",
       "bin": "Q-DMG",
       "type": "BIN",
-      "capacityUnits": 150,
+      "capacityUnits": 200,
+      "isActive": true
+    },
+    {
+      "id": "loc_ret",
+      "warehouseId": "wh_main",
+      "zone": "Returns Bay",
+      "aisle": "R1",
+      "shelf": "S01",
+      "bin": "R-INSP",
+      "type": "BIN",
+      "capacityUnits": 300,
       "isActive": true
     }
   ],
   "stockLedger": [
     {
-      "id": "stk_001",
-      "skuId": "prd_001",
+      "id": "led_prd_001_initial",
+      "productId": "prd_001",
       "sku": "NX-AUD-001",
-      "productName": "Nexus Pro Active Noise-Cancelling Headphones",
-      "locationId": "loc_def",
-      "locationCode": "Zone A / A1 / S01 / B01",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
-      "qtyDelta": 65,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_001",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 50,
       "unitCostMinor": 3800,
-      "note": "Opening stock count verified",
-      "createdBy": "sarah.jenkins@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_002",
-      "skuId": "prd_002",
+      "id": "led_prd_002_initial",
+      "productId": "prd_002",
       "sku": "NX-CAM-002",
-      "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
-      "locationId": "loc_def",
-      "locationCode": "Zone A / A1 / S01 / B01",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
-      "qtyDelta": 18,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_002",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 55,
       "unitCostMinor": 2400,
-      "note": "Opening stock count verified",
-      "createdBy": "sarah.jenkins@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_003",
-      "skuId": "prd_003",
+      "id": "led_prd_003_initial",
+      "productId": "prd_003",
       "sku": "NX-MOU-003",
-      "productName": "Nexus Precision Ergonomic Bluetooth Mouse",
-      "locationId": "loc_def",
-      "locationCode": "Zone A / A1 / S01 / B01",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
-      "qtyDelta": 85,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_003",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 60,
       "unitCostMinor": 1250,
-      "note": "Opening stock count verified",
-      "createdBy": "sarah.jenkins@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_004",
-      "skuId": "prd_004",
+      "id": "led_prd_004_initial",
+      "productId": "prd_004",
       "sku": "NX-KEY-004",
-      "productName": "Nexus RGB Mechanical Gaming Keyboard - Brown Switches",
-      "locationId": "loc_bulk_01",
-      "locationCode": "Zone B / B2 / S03 / P01",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
-      "qtyDelta": 9,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_004",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 65,
       "unitCostMinor": 3100,
-      "note": "Opening stock count verified",
-      "createdBy": "sarah.jenkins@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_005",
-      "skuId": "prd_005",
+      "id": "led_prd_005_initial",
+      "productId": "prd_005",
       "sku": "NX-HUB-005",
-      "productName": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
-      "locationId": "loc_def",
-      "locationCode": "Zone A / A1 / S01 / B01",
       "ownerType": "OPERATOR",
       "ownerId": "operator",
-      "qtyDelta": 120,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_005",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 70,
       "unitCostMinor": 1100,
-      "note": "Opening stock count verified",
-      "createdBy": "sarah.jenkins@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_006",
-      "skuId": "prd_apex_01",
+      "id": "led_prd_006_initial",
+      "productId": "prd_006",
+      "sku": "NX-MIC-006",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 75,
+      "unitCostMinor": 4200,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_007_initial",
+      "productId": "prd_007",
+      "sku": "NX-STAND-007",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 80,
+      "unitCostMinor": 1450,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_008_initial",
+      "productId": "prd_008",
+      "sku": "NX-CHG-008",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 85,
+      "unitCostMinor": 950,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_009_initial",
+      "productId": "prd_009",
+      "sku": "NX-CAB-009",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 90,
+      "unitCostMinor": 680,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_010_initial",
+      "productId": "prd_010",
+      "sku": "NX-LIGHT-010",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 95,
+      "unitCostMinor": 3400,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_011_initial",
+      "productId": "prd_011",
+      "sku": "NX-SSD-011",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 100,
+      "unitCostMinor": 4800,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_012_initial",
+      "productId": "prd_012",
+      "sku": "NX-PAD-012",
+      "ownerType": "OPERATOR",
+      "ownerId": "operator",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 105,
+      "unitCostMinor": 580,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_apex_01_initial",
+      "productId": "prd_apex_01",
       "sku": "APX-SPK-100",
-      "productName": "Apex SoundPulse Rugged Waterproof Speaker",
-      "locationId": "loc_def",
-      "locationCode": "Zone A / A1 / S01 / B01",
       "ownerType": "CLIENT",
       "ownerId": "client_apex",
-      "qtyDelta": 45,
-      "state": "ON_HAND",
-      "sourceType": "PO_RECEIPT",
-      "sourceId": "rcpt_init_apex",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 110,
       "unitCostMinor": 1950,
-      "note": "Client inbound delivery",
-      "createdBy": "jack.miller@nexusops.com",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_007",
-      "skuId": "prd_001",
-      "sku": "NX-AUD-001",
-      "productName": "Nexus Pro Active Noise-Cancelling Headphones",
-      "locationId": "loc_damaged",
-      "locationCode": "Quarantine / Q1 / S01 / Q-DMG",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "qtyDelta": 2,
-      "state": "DAMAGED",
-      "sourceType": "RETURN_DISPOSITION",
-      "sourceId": "ret_001",
-      "unitCostMinor": 3800,
-      "note": "Customer return inspected - broken hinge",
-      "createdBy": "jack.miller@nexusops.com",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "led_prd_apex_02_initial",
+      "productId": "prd_apex_02",
+      "sku": "APX-EAR-200",
+      "ownerType": "CLIENT",
+      "ownerId": "client_apex",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 115,
+      "unitCostMinor": 2100,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "stk_adj_appr_1794054369133",
-      "skuId": "prd_004",
-      "sku": "NX-KEY-004",
-      "productName": "Nexus RGB Mechanical Gaming Keyboard - Brown Switches",
-      "locationId": "loc_bulk_01",
-      "locationCode": "P01",
-      "ownerType": "OPERATOR",
-      "ownerId": "operator",
-      "qtyDelta": 15,
-      "state": "ON_HAND",
-      "sourceType": "ADJUSTMENT",
-      "sourceId": "adj_002",
+      "id": "led_prd_bolt_01_initial",
+      "productId": "prd_bolt_01",
+      "sku": "BLT-SND-10",
+      "ownerType": "CLIENT",
+      "ownerId": "client_bolt",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 120,
+      "unitCostMinor": 5200,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_luma_01_initial",
+      "productId": "prd_luma_01",
+      "sku": "LUM-CAM-01",
+      "ownerType": "CLIENT",
+      "ownerId": "client_luma",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 125,
+      "unitCostMinor": 1650,
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "led_prd_nordic_01_initial",
+      "productId": "prd_nordic_01",
+      "sku": "NRD-WRM-01",
+      "ownerType": "CLIENT",
+      "ownerId": "client_nordic",
+      "transactionType": "OPENING_BALANCE",
+      "stateFrom": "NONE",
+      "stateTo": "ON_HAND",
+      "quantity": 130,
       "unitCostMinor": 3100,
-      "note": "Manager approved adjustment ADJ-2026-002: found - Found full unlabelled master box in mezzanine rack during cycle count.",
-      "createdBy": "marcus.reid@nexusops.com",
-      "createdAt": "2026-11-07T12:26:09.133Z"
+      "sourceDocumentType": "INITIAL_IMPORT",
+      "sourceDocumentId": "SYS_BOOT",
+      "performedByUserId": "usr_superadmin",
+      "warehouseId": "wh_main",
+      "locationId": "loc_a1",
+      "notes": "Opening stock ledger baseline balance.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     }
   ],
   "stockAdjustments": [
@@ -1251,168 +2918,396 @@
       "adjustmentNumber": "ADJ-2026-001",
       "productId": "prd_001",
       "sku": "NX-AUD-001",
-      "locationId": "loc_def",
       "quantityDelta": -2,
-      "targetState": "DAMAGED",
-      "reasonCode": "damage",
-      "note": "Transit damage discovered during unboxing of returned carton.",
-      "requestedBy": "jack.miller@nexusops.com",
-      "requiresApproval": false,
+      "stateTarget": "DAMAGED",
+      "reasonCode": "DAMAGED_IN_TRANSIT",
       "status": "APPROVED",
-      "approvedBy": "System (Auto-approved under threshold)",
-      "approvalNote": "Value £76.00 below £250.00 approval gate",
-      "evaluatedValueMinor": 7600,
-      "createdAt": "2026-11-06T12:25:17.524Z",
-      "updatedAt": "2026-11-06T12:25:17.524Z"
+      "requestedByUserId": "usr_warehouse",
+      "reviewedByUserId": "usr_opsmanager",
+      "reviewedAt": "2026-11-04T15:21:20.991Z",
+      "approvalNote": "Approved: Scratched chassis on warehouse pallet transit.",
+      "createdAt": "2026-11-03T15:21:20.991Z"
     },
     {
       "id": "adj_002",
       "adjustmentNumber": "ADJ-2026-002",
+      "productId": "prd_002",
+      "sku": "NX-CAM-002",
+      "quantityDelta": 5,
+      "stateTarget": "ON_HAND",
+      "reasonCode": "COUNT_DISCREPANCY_SURPLUS",
+      "status": "PENDING_APPROVAL",
+      "requestedByUserId": "usr_warehouse",
+      "createdAt": "2026-11-06T15:21:20.991Z"
+    },
+    {
+      "id": "adj_003",
+      "adjustmentNumber": "ADJ-2026-003",
       "productId": "prd_004",
       "sku": "NX-KEY-004",
-      "locationId": "loc_bulk_01",
-      "quantityDelta": 15,
-      "targetState": "ON_HAND",
-      "reasonCode": "found",
-      "note": "Found full unlabelled master box in mezzanine rack during cycle count.",
-      "requestedBy": "jack.miller@nexusops.com",
-      "requiresApproval": true,
+      "quantityDelta": -1,
+      "stateTarget": "DAMAGED",
+      "reasonCode": "QUALITY_ASSURANCE_REJECT",
       "status": "APPROVED",
-      "evaluatedValueMinor": 46500,
-      "createdAt": "2026-11-07T08:25:17.524Z",
-      "updatedAt": "2026-11-07T12:26:09.133Z",
-      "approvedBy": "Marcus Reid (Operations Manager)",
-      "approvalNote": "Approved verified carton count"
+      "requestedByUserId": "usr_warehouse",
+      "reviewedByUserId": "usr_opsmanager",
+      "reviewedAt": "2026-11-06T15:21:20.991Z",
+      "approvalNote": "Spacebar key switch sticky, sent to scrap write-off.",
+      "createdAt": "2026-11-06T15:21:20.991Z"
     }
   ],
   "suppliers": [
     {
-      "id": "sup_001",
-      "name": "Shenzhen Sonic Acoustic Electronics Co.",
-      "code": "SONIC-AUDIO",
-      "contactName": "Wei Zhang",
-      "email": "orders@sonicacoustic.cn",
-      "phone": "+86 755 8399 1022",
+      "id": "sup_anker",
+      "name": "Anker Innovations Technology Ltd",
+      "code": "SUP-ANK",
+      "contactName": "Kevin Zhang",
+      "email": "orders.eu@anker-innovations.com",
+      "phone": "+44 800 031 8188",
       "paymentTermsDays": 30,
-      "currency": "USD",
-      "leadTimeDays": 21,
-      "isActive": true
+      "leadTimeDays": 7,
+      "currency": "GBP",
+      "address": "Building 3, Chiswick Park, London, W4 5YA",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "sup_002",
-      "name": "Precision Optics & CamTech Ltd",
-      "code": "PREC-CAM",
-      "contactName": "Alistair Ross",
-      "email": "sales@precisioncam.co.uk",
-      "phone": "+44 121 772 9011",
-      "paymentTermsDays": 45,
+      "id": "sup_ugreen",
+      "name": "Ugreen Group International",
+      "code": "SUP-UGR",
+      "contactName": "Linda Liu",
+      "email": "b2b.uk@ugreen.com",
+      "phone": "+44 20 8921 5500",
+      "paymentTermsDays": 30,
+      "leadTimeDays": 5,
       "currency": "GBP",
-      "leadTimeDays": 10,
-      "isActive": true
+      "address": "Unit 9, Northfield Industrial Estate, Wembley, HA0 1NW",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "sup_logitech",
+      "name": "Logitech Europe S.A.",
+      "code": "SUP-LOG",
+      "contactName": "Martin Dubois",
+      "email": "uk-distro@logitech.com",
+      "phone": "+44 1753 870900",
+      "paymentTermsDays": 45,
+      "leadTimeDays": 4,
+      "currency": "GBP",
+      "address": "St Martins House, The Crescent, Slough, SL1 2FL",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-01T15:21:20.991Z"
+    },
+    {
+      "id": "sup_baseus",
+      "name": "Baseus Global Supply Co",
+      "code": "SUP-BAS",
+      "contactName": "Chloe Wang",
+      "email": "eu-sales@baseus.com",
+      "phone": "+44 20 7183 9920",
+      "paymentTermsDays": 14,
+      "leadTimeDays": 8,
+      "currency": "GBP",
+      "address": "Eastgate Business Park, Bristol, BS5 6XX",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-02T15:21:20.991Z"
+    },
+    {
+      "id": "sup_belkin",
+      "name": "Belkin International UK",
+      "code": "SUP-BEL",
+      "contactName": "Simon Wright",
+      "email": "ukorders@belkin.com",
+      "phone": "+44 1933 678888",
+      "paymentTermsDays": 30,
+      "leadTimeDays": 6,
+      "currency": "GBP",
+      "address": "Express Park, Shipton Way, Rushden, NN10 6GL",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-02T15:21:20.991Z"
+    },
+    {
+      "id": "sup_corsair",
+      "name": "Corsair Gaming UK Ltd",
+      "code": "SUP-COR",
+      "contactName": "Alex Mercer",
+      "email": "orders.uk@corsair.com",
+      "phone": "+44 118 977 4000",
+      "paymentTermsDays": 30,
+      "leadTimeDays": 5,
+      "currency": "GBP",
+      "address": "100 Longwater Avenue, Green Park, Reading, RG2 6GP",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "sup_tplink",
+      "name": "TP-Link UK Technology Co",
+      "code": "SUP-TPL",
+      "contactName": "Jason Reed",
+      "email": "b2b.uk@tp-link.com",
+      "phone": "+44 845 147 0017",
+      "paymentTermsDays": 30,
+      "leadTimeDays": 3,
+      "currency": "GBP",
+      "address": "Building 2, Riverdale Office Park, Reading, RG6 1PT",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "sup_samsung",
+      "name": "Samsung Electronics UK B2B",
+      "code": "SUP-SAM",
+      "contactName": "David Evans",
+      "email": "distro.uk@samsung.com",
+      "phone": "+44 330 726 7864",
+      "paymentTermsDays": 60,
+      "leadTimeDays": 4,
+      "currency": "GBP",
+      "address": "Samsung House, 2000 Hillswood Drive, Chertsey, KT16 0RS",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-04T15:21:20.991Z"
     }
   ],
   "purchaseOrders": [
     {
-      "id": "po_2026_01",
-      "poNumber": "PO-2026-001",
-      "supplierId": "sup_002",
-      "supplierName": "Precision Optics & CamTech Ltd",
-      "status": "PARTIALLY_RECEIVED",
+      "id": "po_001",
+      "poNumber": "NX-PO-2026-001",
+      "supplierId": "sup_anker",
+      "supplierName": "Anker Innovations Technology Ltd",
+      "destinationWarehouseId": "wh_main",
+      "status": "RECEIVED",
+      "totalMinor": 190000,
       "currency": "GBP",
-      "subtotalMinor": 120000,
-      "taxMinor": 24000,
-      "totalMinor": 144000,
-      "expectedDate": "2026-11-11T12:25:17.524Z",
-      "createdAt": "2026-11-05T12:25:17.524Z",
-      "approvedBy": "sarah.jenkins@nexusops.com",
-      "updatedAt": "2026-11-06T12:25:17.524Z",
       "lines": [
         {
-          "id": "pol_01_1",
-          "poId": "po_2026_01",
-          "productId": "prd_002",
-          "sku": "NX-CAM-002",
-          "productName": "Nexus 4K Ultra Wide StreamCam with Stereo Mic",
-          "orderedQty": 50,
-          "receivedQty": 30,
-          "unitCostMinor": 2400,
-          "totalCostMinor": 120000
-        }
-      ]
-    },
-    {
-      "id": "po_2026_02",
-      "poNumber": "PO-2026-002",
-      "supplierId": "sup_001",
-      "supplierName": "Shenzhen Sonic Acoustic Electronics Co.",
-      "status": "APPROVED",
-      "currency": "GBP",
-      "subtotalMinor": 380000,
-      "taxMinor": 0,
-      "totalMinor": 380000,
-      "expectedDate": "2026-11-21T12:25:17.524Z",
-      "createdAt": "2026-11-06T12:25:17.524Z",
-      "approvedBy": "sarah.jenkins@nexusops.com",
-      "updatedAt": "2026-11-06T12:25:17.524Z",
-      "lines": [
-        {
-          "id": "pol_02_1",
-          "poId": "po_2026_02",
+          "id": "pol_1",
+          "poId": "po_001",
           "productId": "prd_001",
           "sku": "NX-AUD-001",
           "productName": "Nexus Pro Active Noise-Cancelling Headphones",
-          "orderedQty": 100,
-          "receivedQty": 0,
+          "orderedQty": 50,
+          "receivedQty": 50,
           "unitCostMinor": 3800,
-          "totalCostMinor": 380000
-        }
-      ]
-    }
-  ],
-  "goodsReceipts": [
-    {
-      "id": "rcpt_001",
-      "receiptNumber": "GRN-2026-001",
-      "poId": "po_2026_01",
-      "poNumber": "PO-2026-001",
-      "receivedBy": "jack.miller@nexusops.com",
-      "receivedAt": "2026-11-06T12:25:17.524Z",
-      "lines": [
-        {
-          "productId": "prd_002",
-          "sku": "NX-CAM-002",
-          "receivedQty": 30,
-          "shortageQty": 20,
-          "damagedQty": 0,
-          "locationId": "loc_def"
+          "lineTotalMinor": 190000
         }
       ],
-      "discrepancyNote": "Partial pallet shipment received. Vendor back-ordering remaining 20 units."
+      "expectedDeliveryDate": "2026-11-02T15:21:20.991Z",
+      "actualDeliveryDate": "2026-11-03T15:21:20.991Z",
+      "createdAt": "2026-10-31T15:21:20.991Z",
+      "updatedAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "po_002",
+      "poNumber": "NX-PO-2026-002",
+      "supplierId": "sup_ugreen",
+      "supplierName": "Ugreen Group International",
+      "destinationWarehouseId": "wh_main",
+      "status": "PARTIAL_RECEIVED",
+      "totalMinor": 82500,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "pol_2",
+          "poId": "po_002",
+          "productId": "prd_005",
+          "sku": "NX-HUB-005",
+          "productName": "Nexus 8-in-1 Aluminum USB-C Hub 100W PD",
+          "orderedQty": 75,
+          "receivedQty": 50,
+          "unitCostMinor": 1100,
+          "lineTotalMinor": 82500
+        }
+      ],
+      "expectedDeliveryDate": "2026-11-06T15:21:20.991Z",
+      "actualDeliveryDate": "2026-11-07T15:21:20.991Z",
+      "createdAt": "2026-11-02T15:21:20.991Z",
+      "updatedAt": "2026-11-07T15:21:20.991Z"
+    },
+    {
+      "id": "po_003",
+      "poNumber": "NX-PO-2026-003",
+      "supplierId": "sup_logitech",
+      "supplierName": "Logitech Europe S.A.",
+      "destinationWarehouseId": "wh_main",
+      "status": "APPROVED",
+      "totalMinor": 125000,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "pol_3",
+          "poId": "po_003",
+          "productId": "prd_003",
+          "sku": "NX-MOU-003",
+          "productName": "Nexus Precision Ergonomic Bluetooth Mouse",
+          "orderedQty": 100,
+          "receivedQty": 0,
+          "unitCostMinor": 1250,
+          "lineTotalMinor": 125000
+        }
+      ],
+      "expectedDeliveryDate": "2026-11-10T15:21:20.992Z",
+      "createdAt": "2026-11-04T15:21:20.991Z",
+      "updatedAt": "2026-11-05T15:21:20.991Z"
+    },
+    {
+      "id": "po_004",
+      "poNumber": "NX-PO-2026-004",
+      "supplierId": "sup_baseus",
+      "supplierName": "Baseus Global Supply Co",
+      "destinationWarehouseId": "wh_main",
+      "status": "DRAFT",
+      "totalMinor": 47500,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "pol_4",
+          "poId": "po_004",
+          "productId": "prd_008",
+          "sku": "NX-CHG-008",
+          "productName": "Nexus 65W GaN Fast Charger Dual USB-C",
+          "orderedQty": 50,
+          "receivedQty": 0,
+          "unitCostMinor": 950,
+          "lineTotalMinor": 47500
+        }
+      ],
+      "expectedDeliveryDate": "2026-11-14T15:21:20.992Z",
+      "createdAt": "2026-11-06T15:21:20.991Z",
+      "updatedAt": "2026-11-06T15:21:20.991Z"
+    },
+    {
+      "id": "po_005",
+      "poNumber": "NX-PO-2026-005",
+      "supplierId": "sup_corsair",
+      "supplierName": "Corsair Gaming UK Ltd",
+      "destinationWarehouseId": "wh_north",
+      "status": "SUBMITTED",
+      "totalMinor": 93000,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "pol_5",
+          "poId": "po_005",
+          "productId": "prd_004",
+          "sku": "NX-KEY-004",
+          "productName": "Nexus RGB Mechanical Gaming Keyboard - Brown Switches",
+          "orderedQty": 30,
+          "receivedQty": 0,
+          "unitCostMinor": 3100,
+          "lineTotalMinor": 93000
+        }
+      ],
+      "expectedDeliveryDate": "2026-11-12T15:21:20.992Z",
+      "createdAt": "2026-11-05T15:21:20.991Z",
+      "updatedAt": "2026-11-05T15:21:20.991Z"
+    },
+    {
+      "id": "po_006",
+      "poNumber": "NX-PO-2026-006",
+      "supplierId": "sup_samsung",
+      "supplierName": "Samsung Electronics UK B2B",
+      "destinationWarehouseId": "wh_main",
+      "status": "APPROVED",
+      "totalMinor": 240000,
+      "currency": "GBP",
+      "lines": [
+        {
+          "id": "pol_6",
+          "poId": "po_006",
+          "productId": "prd_011",
+          "sku": "NX-SSD-011",
+          "productName": "Nexus Rugged 1TB Portable NVMe External SSD",
+          "orderedQty": 50,
+          "receivedQty": 0,
+          "unitCostMinor": 4800,
+          "lineTotalMinor": 240000
+        }
+      ],
+      "expectedDeliveryDate": "2026-11-11T15:21:20.992Z",
+      "createdAt": "2026-11-04T15:21:20.991Z",
+      "updatedAt": "2026-11-05T15:21:20.991Z"
     }
   ],
+  "goodsReceipts": [],
   "returns": [
     {
       "id": "ret_001",
-      "returnNumber": "RET-2026-001",
-      "orderId": "ord_1001",
+      "returnNumber": "NX-RET-2026-001",
+      "orderId": "ord_gen_1001",
       "orderNumber": "NX-ORD-2026-001",
       "customerName": "Oliver Smith",
-      "reasonCode": "DAMAGED_TRANSIT",
       "status": "INSPECTED",
+      "refundStatus": "REFUNDED",
+      "totalRefundMinor": 8999,
       "lines": [
         {
-          "id": "retl_001_1",
+          "id": "retl_1",
+          "returnId": "ret_001",
           "productId": "prd_001",
           "sku": "NX-AUD-001",
           "quantity": 1,
-          "disposition": "DAMAGED",
-          "notes": "Headband cracked upon unboxing by customer."
+          "reason": "Customer reported sound distortion in left ear cup",
+          "disposition": "DAMAGED_WRITE_OFF",
+          "refundAmountMinor": 8999
         }
       ],
-      "refundAmountMinor": 8999,
-      "refundStatus": "ISSUED",
-      "createdAt": "2026-11-06T12:25:17.524Z",
-      "inspectedAt": "2026-11-06T12:25:17.524Z"
+      "receivedAt": "2026-11-03T15:21:20.991Z",
+      "inspectedAt": "2026-11-04T15:21:20.991Z",
+      "inspectionNotes": "Verified internal driver crack. Written off to damaged inventory.",
+      "createdAt": "2026-11-02T15:21:20.991Z"
+    },
+    {
+      "id": "ret_002",
+      "returnNumber": "NX-RET-2026-002",
+      "orderId": "ord_gen_1002",
+      "orderNumber": "NX-ORD-2026-002",
+      "customerName": "Emily Watson",
+      "status": "RESTOCKED",
+      "refundStatus": "REFUNDED",
+      "totalRefundMinor": 3499,
+      "lines": [
+        {
+          "id": "retl_2",
+          "returnId": "ret_002",
+          "productId": "prd_003",
+          "sku": "NX-MOU-003",
+          "quantity": 1,
+          "reason": "Unopened - Buyer changed mind",
+          "disposition": "RESTOCK",
+          "refundAmountMinor": 3499
+        }
+      ],
+      "receivedAt": "2026-11-04T15:21:20.991Z",
+      "inspectedAt": "2026-11-05T15:21:20.991Z",
+      "inspectionNotes": "Sealed factory packaging. Re-stocked to Zone A bin B03.",
+      "createdAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "ret_003",
+      "returnNumber": "NX-RET-2026-003",
+      "orderId": "ord_gen_1003",
+      "orderNumber": "NX-ORD-2026-003",
+      "customerName": "James Henderson",
+      "status": "RECEIVED",
+      "refundStatus": "PENDING",
+      "totalRefundMinor": 2999,
+      "lines": [
+        {
+          "id": "retl_3",
+          "returnId": "ret_003",
+          "productId": "prd_005",
+          "sku": "NX-HUB-005",
+          "quantity": 1,
+          "reason": "HDMI port not displaying 4K 60Hz",
+          "disposition": "QUARANTINE",
+          "refundAmountMinor": 2999
+        }
+      ],
+      "receivedAt": "2026-11-06T15:21:20.991Z",
+      "inspectionNotes": "Awaiting technical bench QA test.",
+      "createdAt": "2026-11-05T15:21:20.991Z"
     }
   ],
   "clients": [
@@ -1426,11 +3321,35 @@
       "billingPeriod": "MONTHLY",
       "rateCardId": "rc_std_3pl",
       "accountStatus": "ACTIVE",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "client_bolt",
+      "companyName": "Bolt Sound & Vision Ltd",
+      "code": "BOLT",
+      "contactEmail": "operations@boltsound.co.uk",
+      "contactPhone": "+44 121 496 0382",
+      "billingAddress": "88 Colmore Row, Birmingham, B3 2BB",
+      "billingPeriod": "MONTHLY",
+      "rateCardId": "rc_premium_3pl",
+      "accountStatus": "ACTIVE",
+      "createdAt": "2026-10-31T15:21:20.991Z"
+    },
+    {
+      "id": "client_luma",
+      "companyName": "Luma Smart Home Devices",
+      "code": "LUMA",
+      "contactEmail": "supply@lumahome.com",
+      "contactPhone": "+44 113 496 0841",
+      "billingAddress": "15 Wellington Place, Leeds, LS1 4AP",
+      "billingPeriod": "MONTHLY",
+      "rateCardId": "rc_std_3pl",
+      "accountStatus": "ACTIVE",
+      "createdAt": "2026-11-01T15:21:20.991Z"
     },
     {
       "id": "client_nordic",
-      "companyName": "Nordic Goods Trading",
+      "companyName": "Nordic Goods Trading Oy",
       "code": "NORD",
       "contactEmail": "contact@nordicgoods.co.uk",
       "contactPhone": "+44 161 496 0188",
@@ -1438,7 +3357,19 @@
       "billingPeriod": "MONTHLY",
       "rateCardId": "rc_std_3pl",
       "accountStatus": "ACTIVE",
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "createdAt": "2026-11-02T15:21:20.991Z"
+    },
+    {
+      "id": "client_stellar",
+      "companyName": "Stellar Gadgets Europe B.V.",
+      "code": "STEL",
+      "contactEmail": "fulfilment@stellargadgets.eu",
+      "contactPhone": "+31 20 794 8812",
+      "billingAddress": "Keizersgracht 421, 1016 EK Amsterdam, Netherlands",
+      "billingPeriod": "MONTHLY",
+      "rateCardId": "rc_premium_3pl",
+      "accountStatus": "ACTIVE",
+      "createdAt": "2026-11-03T15:21:20.991Z"
     }
   ],
   "rateCards": [
@@ -1452,351 +3383,351 @@
       "storageShelfPerMonthMinor": 600,
       "storageBinPerMonthMinor": 250,
       "minimumMonthlyChargeMinor": 15000
-    }
-  ],
-  "storageSnapshots": [
+    },
     {
-      "id": "snap_001",
-      "clientId": "client_apex",
-      "clientName": "Apex Electronics Ltd",
-      "snapshotDate": "2026-10-31T12:25:17.524Z",
-      "occupiedPallets": 4,
-      "occupiedShelves": 6,
-      "occupiedBins": 12,
-      "estimatedCostMinor": 13800
+      "id": "rc_premium_3pl",
+      "name": "Premium High-Velocity Rate Card v2026",
+      "pickFeeMinor": 120,
+      "packFeeMinor": 80,
+      "extraItemFeeMinor": 30,
+      "storagePalletPerMonthMinor": 1500,
+      "storageShelfPerMonthMinor": 500,
+      "storageBinPerMonthMinor": 200,
+      "minimumMonthlyChargeMinor": 30000
     }
   ],
+  "storageSnapshots": [],
   "invoices": [
     {
       "id": "inv_001",
       "invoiceNumber": "INV-2026-001",
-      "type": "3PL_SERVICE",
-      "recipientType": "CLIENT",
-      "recipientId": "client_apex",
-      "recipientName": "Apex Electronics Ltd",
-      "issueDate": "2026-11-06T12:25:17.524Z",
-      "dueDate": "2026-12-06T12:25:17.524Z",
-      "subtotalMinor": 24500,
-      "vatRatePercent": 20,
-      "vatAmountMinor": 4900,
-      "totalMinor": 29400,
-      "paidAmountMinor": 15000,
-      "status": "PART_PAID",
-      "isImmutable": true,
+      "clientId": "client_apex",
+      "clientName": "Apex Electronics Ltd",
+      "issueDate": "2026-11-02T15:21:20.991Z",
+      "dueDate": "2026-12-02T15:21:20.992Z",
+      "subtotalMinor": 30000,
+      "vatMinor": 6000,
+      "totalMinor": 36000,
+      "status": "PAID",
       "lines": [
         {
-          "description": "Order Fulfilment - Pick & Pack fee (50 dispatches)",
-          "quantity": 50,
-          "unitPriceMinor": 250,
-          "totalMinor": 12500
+          "description": "3PL Pick & Pack Fulfilment Services (120 parcels)",
+          "quantity": 120,
+          "unitPriceMinor": 150,
+          "totalMinor": 18000
         },
         {
-          "description": "Warehouse Storage Rental - Zone B Shelf occupancy",
-          "quantity": 2,
-          "unitPriceMinor": 6000,
+          "description": "Monthly Pallet Storage (Zone B Racking - 5 pallets)",
+          "quantity": 5,
+          "unitPriceMinor": 2400,
           "totalMinor": 12000
         }
       ],
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "currency": "GBP",
+      "createdAt": "2026-11-02T15:21:20.991Z"
     },
     {
       "id": "inv_002",
       "invoiceNumber": "INV-2026-002",
-      "type": "STORAGE",
-      "recipientType": "CLIENT",
-      "recipientId": "client_nordic",
-      "recipientName": "Nordic Goods Trading",
-      "issueDate": "2026-11-05T12:25:17.524Z",
-      "dueDate": "2026-11-05T12:25:17.524Z",
-      "subtotalMinor": 18000,
-      "vatRatePercent": 20,
-      "vatAmountMinor": 3600,
-      "totalMinor": 21600,
-      "paidAmountMinor": 0,
-      "status": "OVERDUE",
-      "isImmutable": true,
+      "clientId": "client_bolt",
+      "clientName": "Bolt Sound & Vision Ltd",
+      "issueDate": "2026-11-03T15:21:20.991Z",
+      "dueDate": "2026-11-27T15:21:20.992Z",
+      "subtotalMinor": 48000,
+      "vatMinor": 9600,
+      "totalMinor": 57600,
+      "status": "ISSUED",
       "lines": [
         {
-          "description": "Pallet bay monthly reserve (1 bay)",
-          "quantity": 1,
-          "unitPriceMinor": 18000,
-          "totalMinor": 18000
+          "description": "Soundbar Fulfilment & Heavy Courier Dispatch (40 units)",
+          "quantity": 40,
+          "unitPriceMinor": 600,
+          "totalMinor": 24000
+        },
+        {
+          "description": "Bulk Pallet Space (Zone B - 10 Pallet bays)",
+          "quantity": 10,
+          "unitPriceMinor": 2400,
+          "totalMinor": 24000
         }
       ],
-      "createdAt": "2026-11-05T12:25:17.524Z"
+      "currency": "GBP",
+      "createdAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "inv_003",
+      "invoiceNumber": "INV-2026-003",
+      "clientId": "client_luma",
+      "clientName": "Luma Smart Home Devices",
+      "issueDate": "2026-11-04T15:21:20.991Z",
+      "dueDate": "2026-11-22T15:21:20.992Z",
+      "subtotalMinor": 18000,
+      "vatMinor": 3600,
+      "totalMinor": 21600,
+      "status": "ISSUED",
+      "lines": [
+        {
+          "description": "Smart Camera Pick & Custom Serial Scan (80 units)",
+          "quantity": 80,
+          "unitPriceMinor": 150,
+          "totalMinor": 12000
+        },
+        {
+          "description": "Small Bin Secure Storage (6 Bins)",
+          "quantity": 6,
+          "unitPriceMinor": 1000,
+          "totalMinor": 6000
+        }
+      ],
+      "currency": "GBP",
+      "createdAt": "2026-11-04T15:21:20.991Z"
+    },
+    {
+      "id": "inv_004",
+      "invoiceNumber": "INV-2026-004",
+      "clientId": "client_nordic",
+      "clientName": "Nordic Goods Trading Oy",
+      "issueDate": "2026-11-05T15:21:20.991Z",
+      "dueDate": "2026-12-05T15:21:20.992Z",
+      "subtotalMinor": 22000,
+      "vatMinor": 4400,
+      "totalMinor": 26400,
+      "status": "ISSUED",
+      "lines": [
+        {
+          "description": "Eco Throw Blanket Fulfilment & Polybagging (50 units)",
+          "quantity": 50,
+          "unitPriceMinor": 200,
+          "totalMinor": 10000
+        },
+        {
+          "description": "High-Bay Pallet Reserve (5 Pallets)",
+          "quantity": 5,
+          "unitPriceMinor": 2400,
+          "totalMinor": 12000
+        }
+      ],
+      "currency": "GBP",
+      "createdAt": "2026-11-05T15:21:20.991Z"
     }
   ],
   "payments": [
     {
       "id": "pay_001",
       "paymentNumber": "PAY-2026-001",
-      "amountMinor": 15000,
-      "paymentMethod": "BANK_TRANSFER",
-      "paymentDate": "2026-11-06T12:25:17.524Z",
-      "reference": "BACS-REF-APEX-8812",
-      "payerName": "Apex Electronics Ltd",
-      "recordedBy": "elena.rostova@nexusops.com",
-      "unallocatedCreditMinor": 0,
-      "allocations": [
-        {
-          "invoiceId": "inv_001",
-          "invoiceNumber": "INV-2026-001",
-          "amountMinor": 15000
-        }
-      ],
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "invoiceId": "inv_001",
+      "amountMinor": 36000,
+      "paymentDate": "2026-11-03T15:21:20.991Z",
+      "method": "BANK_TRANSFER",
+      "reference": "BACS-APEX-INV001",
+      "currency": "GBP",
+      "createdAt": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "pay_002",
+      "paymentNumber": "PAY-2026-002",
+      "invoiceId": "inv_002",
+      "amountMinor": 25000,
+      "paymentDate": "2026-11-05T15:21:20.991Z",
+      "method": "BANK_TRANSFER",
+      "reference": "CHAPS-BOLT-PARTIAL",
+      "currency": "GBP",
+      "createdAt": "2026-11-05T15:21:20.991Z"
     }
   ],
   "expenses": [
     {
       "id": "exp_001",
-      "expenseNumber": "EXP-2026-001",
-      "category": "PACKAGING",
-      "supplierName": "EcoPack Boxes & Bubblewrap Ltd",
-      "date": "2026-11-06T12:25:17.524Z",
-      "amountMinor": 18500,
-      "vatMinor": 3700,
-      "allocatedTo": "ORDERS",
-      "status": "APPROVED",
-      "approvedBy": "sarah.jenkins@nexusops.com",
-      "note": "Batch purchase of FSC certified corrugated boxes for Q4."
+      "category": "CARRIER_POSTAGE",
+      "description": "Royal Mail Wholesale Account Weekly Dispatch Statement",
+      "amountMinor": 145000,
+      "vatMinor": 0,
+      "date": "2026-11-02T15:21:20.991Z",
+      "paymentMethod": "DIRECT_DEBIT",
+      "reference": "RM-INV-881920"
     },
     {
       "id": "exp_002",
-      "expenseNumber": "EXP-2026-002",
-      "category": "SHIPPING_CARRIER",
-      "supplierName": "Royal Mail Wholesale Account",
-      "date": "2026-11-06T12:25:17.524Z",
-      "amountMinor": 42000,
+      "category": "PACKAGING",
+      "description": "Rajapack Recycled Cardboard Boxes & Bubble Mailers",
+      "amountMinor": 48000,
+      "vatMinor": 9600,
+      "date": "2026-11-03T15:21:20.991Z",
+      "paymentMethod": "CREDIT_CARD",
+      "reference": "RAJA-UK-44192"
+    },
+    {
+      "id": "exp_003",
+      "category": "MARKETPLACE_FEES",
+      "description": "eBay UK Monthly Final Value & Ad Promotion Fees",
+      "amountMinor": 89200,
       "vatMinor": 0,
-      "allocatedTo": "ORDERS",
-      "status": "APPROVED",
-      "approvedBy": "sarah.jenkins@nexusops.com",
-      "note": "Weekly tracked postage prepaid postage block."
+      "date": "2026-11-04T15:21:20.991Z",
+      "paymentMethod": "AUTO_SETTLEMENT",
+      "reference": "EBAY-STMT-2026-11"
+    },
+    {
+      "id": "exp_004",
+      "category": "FACILITIES",
+      "description": "Milton Keynes Central Warehouse Unit 4 Power & Heating",
+      "amountMinor": 65000,
+      "vatMinor": 13000,
+      "date": "2026-11-05T15:21:20.991Z",
+      "paymentMethod": "DIRECT_DEBIT",
+      "reference": "BRIT-GAS-COM-991"
     }
   ],
   "financialLedger": [
     {
-      "id": "fin_001",
-      "accountId": "1300",
+      "id": "fled_01",
+      "accountCode": "1200",
       "accountName": "Inventory Asset",
-      "debitMinor": 72000,
-      "creditMinor": 0,
-      "sourceType": "RECEIPT",
-      "sourceId": "rcpt_001",
-      "note": "GRN-2026-001 Receipt of 30 NX-CAM-002",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "entryType": "DEBIT",
+      "amountMinor": 580000,
+      "referenceType": "PURCHASE_RECEIPT",
+      "referenceId": "po_001",
+      "timestamp": "2026-11-03T15:21:20.991Z"
     },
     {
-      "id": "fin_002",
-      "accountId": "2050",
-      "accountName": "Goods Received Not Invoiced (GRNI)",
-      "debitMinor": 0,
-      "creditMinor": 72000,
-      "sourceType": "RECEIPT",
-      "sourceId": "rcpt_001",
-      "note": "GRN-2026-001 Accrued inventory liability",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_02",
+      "accountCode": "2100",
+      "accountName": "Trade Accounts Payable",
+      "entryType": "CREDIT",
+      "amountMinor": 580000,
+      "referenceType": "PURCHASE_RECEIPT",
+      "referenceId": "po_001",
+      "timestamp": "2026-11-03T15:21:20.991Z"
     },
     {
-      "id": "fin_003",
-      "accountId": "5000",
-      "accountName": "Cost of Goods Sold (COGS)",
-      "debitMinor": 3800,
-      "creditMinor": 0,
-      "sourceType": "SHIPMENT",
-      "sourceId": "ord_1001",
-      "note": "Dispatch of NX-ORD-2026-001 (1x NX-AUD-001)",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_03",
+      "accountCode": "1100",
+      "accountName": "Accounts Receivable",
+      "entryType": "DEBIT",
+      "amountMinor": 36000,
+      "referenceType": "3PL_INVOICE",
+      "referenceId": "inv_001",
+      "timestamp": "2026-11-02T15:21:20.991Z"
     },
     {
-      "id": "fin_004",
-      "accountId": "1300",
-      "accountName": "Inventory Asset",
-      "debitMinor": 0,
-      "creditMinor": 3800,
-      "sourceType": "SHIPMENT",
-      "sourceId": "ord_1001",
-      "note": "Stock relief for dispatch of NX-ORD-2026-001",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_04",
+      "accountCode": "4000",
+      "accountName": "Fulfilment Revenue",
+      "entryType": "CREDIT",
+      "amountMinor": 30000,
+      "referenceType": "3PL_INVOICE",
+      "referenceId": "inv_001",
+      "timestamp": "2026-11-02T15:21:20.991Z"
     },
     {
-      "id": "fin_005",
-      "accountId": "1100",
-      "accountName": "Marketplace Clearing (eBay UK)",
-      "debitMinor": 8999,
-      "creditMinor": 0,
-      "sourceType": "SHIPMENT",
-      "sourceId": "ord_1001",
-      "note": "Revenue recognized from eBay Order 19-09412-88211",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_05",
+      "accountCode": "2200",
+      "accountName": "VAT Output Liability",
+      "entryType": "CREDIT",
+      "amountMinor": 6000,
+      "referenceType": "3PL_INVOICE",
+      "referenceId": "inv_001",
+      "timestamp": "2026-11-02T15:21:20.991Z"
     },
     {
-      "id": "fin_006",
-      "accountId": "4000",
-      "accountName": "Sales Revenue",
-      "debitMinor": 0,
-      "creditMinor": 7499,
-      "sourceType": "SHIPMENT",
-      "sourceId": "ord_1001",
-      "note": "Sales net of tax",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_06",
+      "accountCode": "1000",
+      "accountName": "Barclays Operating Bank Account",
+      "entryType": "DEBIT",
+      "amountMinor": 36000,
+      "referenceType": "CLIENT_PAYMENT",
+      "referenceId": "pay_001",
+      "timestamp": "2026-11-03T15:21:20.991Z"
     },
     {
-      "id": "fin_007",
-      "accountId": "2100",
-      "accountName": "VAT Output Tax Payable",
-      "debitMinor": 0,
-      "creditMinor": 1500,
-      "sourceType": "SHIPMENT",
-      "sourceId": "ord_1001",
-      "note": "VAT 20% on retail sales",
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "id": "fled_07",
+      "accountCode": "1100",
+      "accountName": "Accounts Receivable",
+      "entryType": "CREDIT",
+      "amountMinor": 36000,
+      "referenceType": "CLIENT_PAYMENT",
+      "referenceId": "pay_001",
+      "timestamp": "2026-11-03T15:21:20.991Z"
     }
   ],
   "auditLogs": [
     {
-      "id": "aud_1794054369134",
-      "actorId": "usr_opsmanager",
-      "actorName": "Marcus Reid (Operations Manager)",
-      "action": "APPROVE",
-      "entity": "StockAdjustment",
-      "entityId": "adj_002",
-      "afterSnapshot": {
-        "id": "adj_002",
-        "adjustmentNumber": "ADJ-2026-002",
-        "productId": "prd_004",
-        "sku": "NX-KEY-004",
-        "locationId": "loc_bulk_01",
-        "quantityDelta": 15,
-        "targetState": "ON_HAND",
-        "reasonCode": "found",
-        "note": "Found full unlabelled master box in mezzanine rack during cycle count.",
-        "requestedBy": "jack.miller@nexusops.com",
-        "requiresApproval": true,
-        "status": "APPROVED",
-        "evaluatedValueMinor": 46500,
-        "createdAt": "2026-11-07T08:25:17.524Z",
-        "updatedAt": "2026-11-07T12:26:09.133Z",
-        "approvedBy": "Marcus Reid (Operations Manager)",
-        "approvalNote": "Approved verified carton count"
-      },
-      "notes": "Adjustment ADJ-2026-002 was APPROVED by Marcus Reid (Operations Manager). Note: Approved verified carton count",
-      "timestamp": "2026-11-07T12:26:09.133Z"
-    },
-    {
-      "id": "aud_001",
+      "id": "aud_01",
       "actorId": "usr_superadmin",
       "actorName": "Sarah Jenkins",
-      "action": "CREATE",
+      "action": "SYSTEM_BOOT",
       "entity": "SystemConfig",
-      "entityId": "cfg_init",
-      "afterSnapshot": {
-        "baseCurrency": "GBP",
-        "businessTimezone": "Europe/London"
-      },
-      "notes": "Initial production system configuration setup.",
-      "timestamp": "2026-11-05T12:25:17.524Z"
+      "entityId": "cfg_001",
+      "notes": "Configured business currency GBP and VAT rate 20%",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "aud_002",
-      "actorId": "usr_superadmin",
-      "actorName": "Sarah Jenkins",
-      "action": "SYNC",
+      "id": "aud_02",
+      "actorId": "usr_opsmanager",
+      "actorName": "Marcus Reid",
+      "action": "CONNECT_ACCOUNT",
       "entity": "MarketplaceAccount",
       "entityId": "mkt_ebay_uk",
-      "afterSnapshot": {
-        "syncResult": "SUCCESS",
-        "count": 14
-      },
-      "notes": "Manual trigger of eBay UK order polling adapter.",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "notes": "Connected eBay UK production seller credentials.",
+      "timestamp": "2026-10-31T15:21:20.991Z"
     },
     {
-      "id": "aud_003",
+      "id": "aud_03",
+      "actorId": "usr_opsmanager",
+      "actorName": "Marcus Reid",
+      "action": "APPROVE_PO",
+      "entity": "PurchaseOrder",
+      "entityId": "po_001",
+      "notes": "Approved purchase order for Anker headphones £1,900.00",
+      "timestamp": "2026-11-02T15:21:20.991Z"
+    },
+    {
+      "id": "aud_04",
       "actorId": "usr_warehouse",
       "actorName": "Jack Miller",
-      "action": "UPDATE",
-      "entity": "Order",
-      "entityId": "ord_1001",
-      "beforeSnapshot": {
-        "status": "Packed"
-      },
-      "afterSnapshot": {
-        "status": "Shipped",
-        "carrier": "Royal Mail",
-        "trackingNumber": "GB982103841RM"
-      },
-      "notes": "Dispatched order and updated stock ledger deduction.",
-      "timestamp": "2026-11-06T12:25:17.524Z"
+      "action": "GOODS_RECEIPT",
+      "entity": "GoodsReceipt",
+      "entityId": "grn_001",
+      "notes": "Completed full goods receipt for 50 units NX-AUD-001",
+      "timestamp": "2026-11-03T15:21:20.991Z"
+    },
+    {
+      "id": "aud_05",
+      "actorId": "usr_opsmanager",
+      "actorName": "Marcus Reid",
+      "action": "APPROVE_ADJUSTMENT",
+      "entity": "StockAdjustment",
+      "entityId": "adj_001",
+      "notes": "Approved -2 damaged adjustment for NX-AUD-001",
+      "timestamp": "2026-11-04T15:21:20.991Z"
     }
   ],
   "notifications": [
     {
-      "id": "notif_exc_1794054345066",
-      "type": "UNMAPPED_SKU",
-      "title": "Unmapped SKU: EBAY-UNMAPPED-USB-CABLE",
-      "message": "External listing SKU \"EBAY-UNMAPPED-USB-CABLE\" on Order 19-09555-32823 requires manual catalog mapping.",
-      "severity": "WARNING",
-      "referenceUrl": "/sales/ebay-accounts",
-      "isRead": false,
-      "isDismissed": false,
-      "createdAt": "2026-11-07T12:25:45.066Z"
-    },
-    {
-      "id": "notif_exc_1794054340981",
-      "type": "UNMAPPED_SKU",
-      "title": "Unmapped SKU: EBAY-UNMAPPED-USB-CABLE",
-      "message": "External listing SKU \"EBAY-UNMAPPED-USB-CABLE\" on Order 19-09555-97445 requires manual catalog mapping.",
-      "severity": "WARNING",
-      "referenceUrl": "/sales/ebay-accounts",
-      "isRead": false,
-      "isDismissed": false,
-      "createdAt": "2026-11-07T12:25:40.981Z"
-    },
-    {
-      "id": "notif_001",
+      "id": "not_01",
       "type": "LOW_STOCK",
-      "title": "Low Stock Alert: NX-KEY-004",
-      "message": "SKU NX-KEY-004 is at 9 available units (low stock threshold is 12).",
       "severity": "WARNING",
-      "referenceUrl": "/stock/products",
-      "isRead": false,
+      "title": "Low Stock Alert: NX-AUD-001",
+      "message": "Nexus Pro Headphones available quantity is at or below the reorder threshold (15 units).",
       "isDismissed": false,
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "createdAt": "2026-11-06T15:21:20.991Z"
     },
     {
-      "id": "notif_002",
-      "type": "UNMAPPED_SKU",
-      "title": "Unmapped eBay SKU Detected",
-      "message": "External SKU \"EB-WIRE-EXT-RED\" received on US store order requires mapping.",
-      "severity": "WARNING",
-      "referenceUrl": "/sales/ebay-accounts",
-      "isRead": false,
-      "isDismissed": false,
-      "createdAt": "2026-11-07T11:55:17.524Z"
-    },
-    {
-      "id": "notif_003",
-      "type": "ADJUSTMENT_AWAITING_APPROVAL",
-      "title": "Stock Adjustment Pending Approval",
-      "message": "Adjustment ADJ-2026-002 (+15 units NX-KEY-004, value £465.00) awaits Manager sign-off.",
+      "id": "not_02",
+      "type": "STOCK_ADJUSTMENT",
       "severity": "INFO",
-      "referenceUrl": "/stock/adjustments",
-      "isRead": false,
+      "title": "Stock Adjustment Pending Review",
+      "message": "Warehouse logged surplus +5 units on NX-CAM-002 requiring manager sign-off.",
       "isDismissed": false,
-      "createdAt": "2026-11-07T08:25:17.524Z"
+      "createdAt": "2026-11-06T15:21:20.991Z"
     },
     {
-      "id": "notif_004",
-      "type": "OVERDUE_INVOICE",
-      "title": "Overdue 3PL Invoice: INV-2026-002",
-      "message": "Invoice INV-2026-002 for Nordic Goods Trading (£216.00) is past its due date.",
-      "severity": "CRITICAL",
-      "referenceUrl": "/finance/invoices",
-      "isRead": false,
+      "id": "not_03",
+      "type": "EBAY_SYNC",
+      "severity": "SUCCESS",
+      "title": "eBay Multi-Account Sync Complete",
+      "message": "3 new orders imported into pipeline. Duplicate prevention verified.",
       "isDismissed": false,
-      "createdAt": "2026-11-06T12:25:17.524Z"
+      "createdAt": "2026-11-07T14:21:20.991Z"
     }
   ],
   "config": {

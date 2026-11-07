@@ -44,6 +44,12 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
+
+  useEffect(() => {
     loadFinanceData();
   }, [currentUser.id]);
 

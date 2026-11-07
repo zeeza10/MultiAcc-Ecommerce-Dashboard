@@ -1026,6 +1026,11 @@ apiRouter.post('/system/reset-demo', (_req: Request, res: Response) => {
   res.json({ success: true, message: 'Database reset to verified baseline seed data.' });
 });
 
+apiRouter.post('/system/reload', (_req: Request, res: Response) => {
+  db.reload();
+  res.json({ success: true, message: 'Database reloaded from disk.' });
+});
+
 // Common alias endpoints
 apiRouter.get('/users', (_req: Request, res: Response) => {
   const raw = db.getRawData();

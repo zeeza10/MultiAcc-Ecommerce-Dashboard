@@ -372,12 +372,28 @@ export default function App() {
           )}
 
           {(activeTab === 'warehouse' || activeTab === 'locations') && (
-            <WarehouseLocationsView currentUser={currentUser} config={config} />
+            <WarehouseLocationsView
+              currentUser={currentUser}
+              config={config}
+              defaultTab={activeTab === 'locations' ? 'LOCATIONS' : 'WAREHOUSES'}
+            />
           )}
 
           {/* Phase 3 Modules */}
           {(activeTab === '3pl-clients' || activeTab === 'fulfilment' || activeTab === 'shipping' || activeTab === 'storage') && (
-            <Clients3PLView currentUser={currentUser} config={config} />
+            <Clients3PLView
+              currentUser={currentUser}
+              config={config}
+              defaultSubTab={
+                activeTab === 'fulfilment'
+                  ? 'FULFILMENT'
+                  : activeTab === 'shipping'
+                  ? 'SHIPPING'
+                  : activeTab === 'storage'
+                  ? 'STORAGE'
+                  : 'CLIENTS'
+              }
+            />
           )}
 
           {/* Phase 4 Modules */}

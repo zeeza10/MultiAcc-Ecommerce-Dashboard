@@ -40,6 +40,12 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (defaultSubTab) {
+      setSubTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
+
+  useEffect(() => {
     loadData();
   }, [currentUser.id]);
 
