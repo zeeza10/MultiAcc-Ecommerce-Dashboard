@@ -21,6 +21,8 @@ import {
   SystemConfig,
 } from '../types';
 
+import { handleClientDbRequest } from './clientDb';
+
 let currentUserId = localStorage.getItem('nexus_active_user_id') || 'usr_superadmin';
 
 export const setStoredUserId = (id: string) => {
@@ -37,21 +39,22 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.set('Content-Type', 'application/json');
   }
 
-  const res = await fetch(`/api/v1${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const res = await fetch(`/api/v1${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  if (!res.ok) {
-    let errMsg = `Request failed: ${res.status} ${res.statusText}`;
-    try {
-      const errJson = await res.json();
-      if (errJson.error) errMsg = errJson.error;
-    } catch {}
-    throw new Error(errMsg);
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
+      return (await res.json()) as T;
+    }
+  } catch (err) {
+    // Backend API unavailable (e.g. Cloudflare Pages / GitHub Pages static hosting)
   }
 
-  return res.json() as Promise<T>;
+  // Client-side fallback engine for Cloudflare Pages / Static Hosting
+  return handleClientDbRequest<T>(endpoint, options);
 }
 
 export const api = {
