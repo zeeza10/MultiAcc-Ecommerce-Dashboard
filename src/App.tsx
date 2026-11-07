@@ -21,10 +21,32 @@ import { api, setStoredUserId, getStoredUserId } from './services/api';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
 
+const DEFAULT_USER: User = {
+  id: 'usr_superadmin',
+  email: 'sarah.jenkins@nexusops.com',
+  name: 'Sarah Jenkins (Super Admin)',
+  role: 'SUPER_ADMIN',
+  isActive: true,
+  twoFactorEnabled: true,
+  failedLoginAttempts: 0,
+  createdAt: new Date().toISOString(),
+};
+
+const DEFAULT_CONFIG: SystemConfig = {
+  baseCurrency: 'GBP',
+  businessTimezone: 'Europe/London',
+  defaultVatRatePercent: 20,
+  adjustmentApprovalThresholdValueMinor: 25000,
+  adjustmentApprovalThresholdQuantity: 10,
+  activeReleasePhase: 'P1',
+  allowNegativeStock: false,
+  autoSyncEnabled: true,
+};
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
+  const [users, setUsers] = useState<User[]>([DEFAULT_USER]);
+  const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
@@ -37,7 +59,7 @@ export default function App() {
   });
   const [showNewAdjustmentModal, setShowNewAdjustmentModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     initApp();
@@ -150,17 +172,7 @@ export default function App() {
     }
   };
 
-  if (loading || !currentUser || !config) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
-        <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-2xl animate-pulse">
-          N
-        </div>
-        <div className="mt-4 font-bold text-lg tracking-tight">NexusOps Operating Platform</div>
-        <div className="text-xs text-slate-400 mt-1">Bootstrapping append-only ledgers and eBay adapters...</div>
-      </div>
-    );
-  }
+
 
   // Phase gate notification banner for future modules
   const isFutureModule =

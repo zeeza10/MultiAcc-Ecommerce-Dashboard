@@ -1025,3 +1025,27 @@ apiRouter.post('/system/reset-demo', (_req: Request, res: Response) => {
   db.resetToSeed();
   res.json({ success: true, message: 'Database reset to verified baseline seed data.' });
 });
+
+// Common alias endpoints
+apiRouter.get('/users', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ users: raw.users });
+});
+apiRouter.get('/config', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ config: raw.config });
+});
+apiRouter.get('/me', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  res.json({ user });
+});
+apiRouter.get('/exceptions', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ exceptions: raw.exceptions });
+});
+
+// 404 for unhandled API calls
+apiRouter.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
