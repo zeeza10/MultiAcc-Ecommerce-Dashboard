@@ -1,0 +1,6 @@
+{
+  "name": "NexusOps - Integrated E-commerce Operations Platform",
+  "description": "Enterprise-grade E-commerce Operations & Management Platform integrating eBay multi-account orders, append-only stock ledger, 3PL fulfilment, warehouse locations, finance, and reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
