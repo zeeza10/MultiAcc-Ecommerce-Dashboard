@@ -367,7 +367,15 @@ export default function App() {
             <BuyingReturnsView
               currentUser={currentUser}
               config={config}
-              defaultSubTab={activeTab === 'returns' ? 'RETURNS' : activeTab === 'suppliers' ? 'SUPPLIERS' : 'POS'}
+              defaultSubTab={
+                activeTab === 'returns'
+                  ? 'RETURNS'
+                  : activeTab === 'suppliers'
+                  ? 'SUPPLIERS'
+                  : activeTab === 'customers'
+                  ? 'CUSTOMERS'
+                  : 'POS'
+              }
             />
           )}
 

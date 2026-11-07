@@ -3296,8 +3296,10 @@ const SEED_DATA: any = {
       "orderId": "ord_gen_1001",
       "orderNumber": "NX-ORD-2026-001",
       "customerName": "Oliver Smith",
+      "reasonCode": "DEFECTIVE",
       "status": "INSPECTED",
-      "refundStatus": "REFUNDED",
+      "refundStatus": "ISSUED",
+      "refundAmountMinor": 8999,
       "totalRefundMinor": 8999,
       "lines": [
         {
@@ -3307,7 +3309,7 @@ const SEED_DATA: any = {
           "sku": "NX-AUD-001",
           "quantity": 1,
           "reason": "Customer reported sound distortion in left ear cup",
-          "disposition": "DAMAGED_WRITE_OFF",
+          "disposition": "DAMAGED",
           "refundAmountMinor": 8999
         }
       ],
@@ -3322,8 +3324,10 @@ const SEED_DATA: any = {
       "orderId": "ord_gen_1002",
       "orderNumber": "NX-ORD-2026-002",
       "customerName": "Emily Watson",
-      "status": "RESTOCKED",
-      "refundStatus": "REFUNDED",
+      "reasonCode": "CHANGED_MIND",
+      "status": "CLOSED",
+      "refundStatus": "ISSUED",
+      "refundAmountMinor": 3499,
       "totalRefundMinor": 3499,
       "lines": [
         {
@@ -3348,8 +3352,10 @@ const SEED_DATA: any = {
       "orderId": "ord_gen_1003",
       "orderNumber": "NX-ORD-2026-003",
       "customerName": "James Henderson",
+      "reasonCode": "DAMAGED_TRANSIT",
       "status": "RECEIVED",
       "refundStatus": "PENDING",
+      "refundAmountMinor": 2999,
       "totalRefundMinor": 2999,
       "lines": [
         {
