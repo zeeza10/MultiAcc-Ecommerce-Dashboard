@@ -5,10 +5,11 @@ import {
   Save,
   Plus,
   Trash2,
-  Lock,
   FileText,
   DollarSign,
   ShieldAlert,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 import { Order, Product, User } from '../types';
 import { api } from '../services/api';
@@ -35,7 +36,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const isLocked = ['Shipped', 'Delivered'].includes(order.status);
+  const isDispatched = ['Shipped', 'Delivered'].includes(order.status);
+  const [adminOverride, setAdminOverride] = useState<boolean>(true);
 
   // Form State
   const [customerName, setCustomerName] = useState(order.customerName || '');
@@ -46,7 +48,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [country, setCountry] = useState(order.shippingAddress?.country || 'GB');
   const [status, setStatus] = useState<string>(order.status);
   const [notes, setNotes] = useState(order.notes || '');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Order details corrected by authorized administrator');
   const [shippingFeeMinor, setShippingFeeMinor] = useState(order.shippingChargeMinor || 0);
 
   const [lines, setLines] = useState<EditableLine[]>(
@@ -59,7 +61,11 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   );
 
   const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Can line items, prices, and status be edited?
+  const canEditLines = !isDispatched || adminOverride;
 
   // Calculations
   const subtotalMinor = lines.reduce((acc, l) => acc + l.quantity * l.unitPriceMinor, 0);
@@ -67,7 +73,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const totalMinor = subtotalMinor + shippingFeeMinor;
 
   const handleAddLine = () => {
-    if (isLocked) return;
+    if (!canEditLines) return;
     const firstProd = products[0];
     if (firstProd) {
       setLines([
@@ -83,7 +89,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   };
 
   const handleRemoveLine = (idx: number) => {
-    if (isLocked || lines.length <= 1) return;
+    if (!canEditLines || lines.length <= 1) return;
     setLines(lines.filter((_, i) => i !== idx));
   };
 
@@ -113,14 +119,16 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     setLines(newLines);
   };
 
+  const handleApplyPresetReason = (preset: string) => {
+    setReason(preset);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
-    if (!reason.trim()) {
-      setError('Audit reason is required for compliance recording.');
-      return;
-    }
+    const auditReason = reason.trim() || `Administrative modification by ${currentUser?.name || 'Administrator'}`;
 
     if (lines.length === 0) {
       setError('Order must contain at least one line item.');
@@ -141,43 +149,44 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
         },
         shippingFeeMinor,
         notes,
-        reason,
+        reason: auditReason,
         status,
-      };
-
-      if (!isLocked) {
-        payload.items = lines.map((l) => ({
+        allowOverride: adminOverride,
+        items: lines.map((l) => ({
           sku: l.sku,
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
-        }));
-      }
+        })),
+      };
 
       const res = await api.editOrder(order.id, payload);
-      onSuccess(res.order);
-      onClose();
+      setSuccessMsg(`Order ${order.orderNumber} successfully updated and ledger audit recorded!`);
+
+      setTimeout(() => {
+        onSuccess(res.order);
+        onClose();
+      }, 700);
     } catch (err: any) {
       setError(err.message || 'Failed to update order.');
-    } finally {
       setSaving(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-3xl w-full shadow-2xl max-h-[90vh] flex flex-col my-auto text-slate-100">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-3xl w-full shadow-2xl max-h-[92vh] flex flex-col my-auto text-slate-100 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 sticky top-0 rounded-t-xl z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/95 sticky top-0 rounded-t-xl z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                Edit Order <span className="text-indigo-400 font-mono text-sm">{order.orderNumber}</span>
+                Edit Order <span className="text-amber-400 font-mono text-base font-bold">{order.orderNumber}</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Audited modification • Actor: {currentUser?.name || 'Administrator'}
+                Audited modification • Actor: <span className="text-slate-200">{currentUser?.name || 'Sarah Jenkins (Super Admin)'}</span>
               </p>
             </div>
           </div>
@@ -198,22 +207,42 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             </div>
           )}
 
-          {isLocked && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-3 text-amber-300 text-sm">
-              <Lock className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-400" />
-              <div>
-                <p className="font-medium">Order Dispatched / Delivered</p>
-                <p className="text-xs text-amber-300/80 mt-0.5">
-                  Physical stock relief has posted to the immutable ledger. Line items, quantities, and financial postings are locked to protect GAAP accounting. Customer contact details and delivery notes may still be amended.
-                </p>
+          {successMsg && (
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-3 text-emerald-300 text-sm">
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+              <div>{successMsg}</div>
+            </div>
+          )}
+
+          {isDispatched && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3 text-amber-300 text-xs">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-200">
+                    Order is currently marked as {order.status}
+                  </p>
+                  <p className="text-amber-300/80 mt-0.5">
+                    Admin correction mode is enabled. Changes to lines, unit prices, shipping, or status will post as an audited correction entry in the compliance ledger.
+                  </p>
+                </div>
               </div>
+              <label className="flex items-center gap-2 cursor-pointer text-amber-100 font-semibold select-none bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/30 self-start md:self-auto hover:bg-amber-500/30 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={adminOverride}
+                  onChange={(e) => setAdminOverride(e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-amber-400"
+                />
+                Admin Override Active
+              </label>
             </div>
           )}
 
           {/* Section: Customer Information */}
           <div className="space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-              Customer & Recipient
+              Customer & Recipient Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -282,15 +311,15 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                Order Items & Quantity {isLocked && <Lock className="w-3.5 h-3.5 text-amber-400" />}
+                Order Items & Quantities
               </h3>
-              {!isLocked && (
+              {canEditLines && (
                 <button
                   type="button"
                   onClick={handleAddLine}
-                  className="text-xs font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  className="text-xs font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add Item
+                  <Plus className="w-3.5 h-3.5" /> Add Product Line
                 </button>
               )}
             </div>
@@ -300,26 +329,21 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-800/40 text-slate-400 text-left">
                     <th className="py-2.5 px-3">Product / SKU</th>
-                    <th className="py-2.5 px-3 w-20 text-center">Qty</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Unit Price</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Total</th>
-                    {!isLocked && <th className="py-2.5 px-3 w-10"></th>}
+                    <th className="py-2.5 px-3 w-24 text-center">Qty</th>
+                    <th className="py-2.5 px-3 w-32 text-right">Unit Price</th>
+                    <th className="py-2.5 px-3 w-32 text-right">Line Total</th>
+                    {canEditLines && <th className="py-2.5 px-3 w-10"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {lines.map((l, idx) => (
                     <tr key={idx} className="hover:bg-slate-800/20">
                       <td className="py-2.5 px-3">
-                        {isLocked ? (
-                          <div>
-                            <div className="font-medium text-slate-200">{l.productName}</div>
-                            <div className="text-slate-500 font-mono text-[11px]">{l.sku}</div>
-                          </div>
-                        ) : (
+                        {canEditLines ? (
                           <select
                             value={l.sku}
                             onChange={(e) => handleProductChange(idx, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                           >
                             {products.map((p) => (
                               <option key={p.id} value={p.sku}>
@@ -327,48 +351,54 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                               </option>
                             ))}
                           </select>
+                        ) : (
+                          <div>
+                            <div className="font-medium text-slate-200">{l.productName}</div>
+                            <div className="text-slate-500 font-mono text-[11px]">{l.sku}</div>
+                          </div>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        {isLocked ? (
-                          <span className="font-semibold text-slate-200">{l.quantity}</span>
-                        ) : (
+                        {canEditLines ? (
                           <input
                             type="number"
                             min="1"
                             value={l.quantity}
                             onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 1)}
-                            className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-center text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-center text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                           />
+                        ) : (
+                          <span className="font-semibold text-slate-200">{l.quantity}</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {isLocked ? (
-                          <span className="text-slate-300">£{(l.unitPriceMinor / 100).toFixed(2)}</span>
-                        ) : (
-                          <div className="relative">
-                            <span className="absolute left-2 top-1.5 text-slate-500">£</span>
+                        {canEditLines ? (
+                          <div className="relative inline-block">
+                            <span className="absolute left-2.5 top-1.5 text-slate-500">£</span>
                             <input
                               type="number"
                               step="0.01"
                               min="0"
                               value={(l.unitPriceMinor / 100).toFixed(2)}
                               onChange={(e) => handlePriceChange(idx, parseFloat(e.target.value) || 0)}
-                              className="w-24 bg-slate-900 border border-slate-700 rounded pl-5 pr-2 py-1.5 text-right text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                              className="w-28 bg-slate-900 border border-slate-700 rounded pl-6 pr-2 py-1.5 text-right text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                             />
                           </div>
+                        ) : (
+                          <span className="text-slate-300">£{(l.unitPriceMinor / 100).toFixed(2)}</span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-medium text-slate-200">
+                      <td className="py-2.5 px-3 text-right font-medium text-slate-200 font-mono">
                         £{((l.quantity * l.unitPriceMinor) / 100).toFixed(2)}
                       </td>
-                      {!isLocked && (
+                      {canEditLines && (
                         <td className="py-2.5 px-3 text-center">
                           {lines.length > 1 && (
                             <button
                               type="button"
                               onClick={() => handleRemoveLine(idx)}
                               className="text-slate-500 hover:text-rose-400 p-1 transition-colors"
+                              title="Remove item"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -388,10 +418,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Order Status</label>
                 <select
-                  disabled={isLocked}
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="New">New</option>
                   <option value="Confirmed">Confirmed</option>
@@ -410,10 +439,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   type="number"
                   step="0.01"
                   min="0"
-                  disabled={isLocked}
                   value={(shippingFeeMinor / 100).toFixed(2)}
                   onChange={(e) => setShippingFeeMinor(Math.round((parseFloat(e.target.value) || 0) * 100))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -449,14 +477,14 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <span className="font-mono text-slate-200">£{(shippingFeeMinor / 100).toFixed(2)}</span>
                   </div>
                   <div className="border-t border-slate-800 pt-2 flex justify-between font-semibold text-sm">
-                    <span className="text-slate-200">Grand Total:</span>
+                    <span className="text-slate-200">Total Order Amount:</span>
                     <span className="font-mono text-emerald-400">£{(totalMinor / 100).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400">
-                <span>Inventory Reservation: </span>
+              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Total Quantity:</span>
                 <span className="text-indigo-300 font-medium">
                   {lines.reduce((acc, l) => acc + l.quantity, 0)} units total
                 </span>
@@ -465,21 +493,39 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
           </div>
 
           {/* Mandatory Reason for Audit Log */}
-          <div className="pt-2 border-t border-slate-800">
-            <label className="block text-xs font-medium text-amber-300 mb-1 flex items-center gap-1.5">
+          <div className="pt-2 border-t border-slate-800 space-y-2">
+            <label className="block text-xs font-medium text-amber-300 flex items-center gap-1.5">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-              Reason for Amendment <span className="text-rose-400">*</span>
+              Reason for Amendment & Compliance Audit Note
             </label>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'Customer requested SKU change',
+                'Quantity adjustment before dispatch',
+                'Delivery address correction',
+                'Status correction by supervisor',
+                'Shipping fee recalculation',
+              ].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => handleApplyPresetReason(preset)}
+                  className="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
             <input
               type="text"
               required
-              placeholder="e.g., Customer requested SKU upgrade, address corrected before dispatch..."
+              placeholder="e.g., Customer requested SKU upgrade, address corrected..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full bg-slate-950 border border-amber-500/30 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
             />
-            <p className="text-[11px] text-slate-500 mt-1">
-              Required for compliance. This reason will be stamped into the permanent immutable audit log with your user identity.
+            <p className="text-[11px] text-slate-500">
+              This note is stamped into the audit ledger with your identity and timestamp.
             </p>
           </div>
 
@@ -496,13 +542,13 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-colors"
+              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold rounded-lg flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-colors"
             >
               {saving ? (
                 <>Saving & Posting...</>
               ) : (
                 <>
-                  <Save className="w-3.5 h-3.5" /> Save Changes
+                  <Save className="w-4 h-4" /> Save Changes
                 </>
               )}
             </button>

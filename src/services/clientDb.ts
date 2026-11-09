@@ -28,7 +28,8 @@ import {
   SystemConfig,
 } from '../types';
 
-const STORAGE_KEY = 'nexusops_client_db_v1';
+const STORAGE_KEY = 'nexusops_client_db_v2';
+const LEGACY_STORAGE_KEY = 'nexusops_client_db_v1';
 
 export interface ClientDatabaseState {
   users: User[];
@@ -3850,7 +3851,7 @@ class ClientDatabaseManager {
   private load(): ClientDatabaseState {
     let result: ClientDatabaseState;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (stored) {
         result = JSON.parse(stored);
       } else {
@@ -3859,6 +3860,11 @@ class ClientDatabaseManager {
     } catch (e) {
       console.warn('Failed to load client db from localStorage:', e);
       result = JSON.parse(JSON.stringify(SEED_DATA));
+    }
+
+    // Ensure orders collection exists and is populated
+    if (!result.orders || result.orders.length === 0) {
+      result.orders = JSON.parse(JSON.stringify(SEED_DATA.orders));
     }
 
     // Ensure all phase 1-5 collections exist
@@ -4266,7 +4272,18 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   const [pathPart, queryPart] = endpoint.split('?');
   const params = new URLSearchParams(queryPart || '');
   const method = (options.method || 'GET').toUpperCase();
-  const body = options.body && typeof options.body === 'string' ? JSON.parse(options.body) : {};
+  let body: any = {};
+  if (options.body) {
+    if (typeof options.body === 'string') {
+      try {
+        body = JSON.parse(options.body);
+      } catch (e) {
+        body = {};
+      }
+    } else if (typeof options.body === 'object') {
+      body = options.body;
+    }
+  }
 
   // 1. Auth
   if (pathPart === '/auth/users' || pathPart === '/users') {
@@ -4404,27 +4421,20 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
 
   if (pathPart.startsWith('/orders/')) {
     const orderId = pathPart.split('/')[2];
-    const order = data.orders.find((o) => o.id === orderId);
+    const order = data.orders.find((o) => o.id === orderId || o.orderNumber === orderId);
 
     if (method === 'PUT') {
       if (!order) {
         throw new Error(`Order ${orderId} not found.`);
       }
 
-      // Check if order is already dispatched or completed
-      const isDispatchedOrDelivered = ['Shipped', 'Delivered'].includes(order.status);
-      if (isDispatchedOrDelivered && body.items) {
-        throw new Error(`Order ${order.orderNumber} is already ${order.status}. Line items and inventory allocations are immutable once dispatched.`);
-      }
-
-      const oldLines = [...order.lines];
-
       // Update lines and recalculate totals if items provided
       if (body.items && Array.isArray(body.items)) {
         order.lines = body.items.map((item: any, idx: number) => {
           const matchedProd = data.products.find((p) => p.sku === item.sku);
-          const unitPrice = item.unitPriceMinor !== undefined ? item.unitPriceMinor : (matchedProd?.sellingPriceMinor || 2000);
-          const totalLinePrice = unitPrice * item.quantity;
+          const unitPrice = item.unitPriceMinor !== undefined ? Number(item.unitPriceMinor) : (matchedProd?.sellingPriceMinor || 2000);
+          const qty = Math.max(1, Number(item.quantity) || 1);
+          const totalLinePrice = unitPrice * qty;
           const taxLine = Math.round(totalLinePrice * 0.2);
           return {
             id: `ordl_${order.id}_${idx + 1}`,
@@ -4432,26 +4442,26 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
             productId: matchedProd?.id || 'prd_custom',
             sku: item.sku,
             productName: matchedProd?.name || `Item ${item.sku}`,
-            quantity: item.quantity,
+            quantity: qty,
             unitPriceMinor: unitPrice,
             taxAmountMinor: taxLine,
             totalPriceMinor: totalLinePrice,
             isBackordered: false,
-            reservedQuantity: item.quantity,
+            reservedQuantity: qty,
           };
         });
 
         const subtotal = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
         const vat = Math.round(subtotal * 0.2);
-        const shippingFee = body.shippingFeeMinor !== undefined ? body.shippingFeeMinor : order.shippingChargeMinor;
+        const shippingFee = body.shippingFeeMinor !== undefined ? Number(body.shippingFeeMinor) : (order.shippingChargeMinor || 0);
 
         order.totalMinor = subtotal + shippingFee;
         order.taxMinor = vat;
         order.shippingChargeMinor = shippingFee;
       } else if (body.shippingFeeMinor !== undefined) {
         const subtotal = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
-        order.shippingChargeMinor = body.shippingFeeMinor;
-        order.totalMinor = subtotal + body.shippingFeeMinor;
+        order.shippingChargeMinor = Number(body.shippingFeeMinor);
+        order.totalMinor = subtotal + order.shippingChargeMinor;
       }
 
       // Customer and shipping address fields
@@ -4461,11 +4471,11 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
         order.shippingAddress = {
           ...order.shippingAddress,
           ...body.shippingAddress,
-          name: body.customerName || order.shippingAddress.name,
+          name: body.customerName || order.shippingAddress?.name || body.shippingAddress.name,
         };
       }
       if (body.notes !== undefined) order.notes = body.notes;
-      if (body.status && !isDispatchedOrDelivered) order.status = body.status;
+      if (body.status) order.status = body.status;
 
       order.updatedAt = new Date().toISOString();
 
@@ -4475,7 +4485,7 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
         orderId: order.id,
         fromStatus: order.status,
         toStatus: order.status,
-        reason: body.reason || 'Order details amended by authorized administrator.',
+        reason: body.reason || body.editReason || 'Order details amended by authorized administrator.',
         changedByUserId: 'usr_superadmin',
         timestamp: new Date().toISOString(),
       };
@@ -4490,7 +4500,7 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
         action: 'UPDATE',
         entity: 'ORDER',
         entityId: order.id,
-        notes: `Order ${order.orderNumber} updated: ${body.reason || 'Admin modification'}. New Total: £${(order.totalMinor / 100).toFixed(2)}`,
+        notes: `Order ${order.orderNumber} updated: ${body.reason || body.editReason || 'Admin modification'}. New Total: £${(order.totalMinor / 100).toFixed(2)}`,
         timestamp: new Date().toISOString(),
       };
       if (!data.auditLogs) data.auditLogs = [];
@@ -4500,9 +4510,10 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
       return { order } as unknown as T;
     }
 
+    const matchedOrder = order || data.orders[0];
     return {
-      order: order || data.orders[0],
-      histories: (data.orderHistories || []).filter((h: any) => h.orderId === orderId),
+      order: matchedOrder,
+      histories: (data.orderHistories || []).filter((h: any) => h.orderId === matchedOrder.id || h.orderId === orderId),
     } as unknown as T;
   }
 

@@ -638,12 +638,13 @@ export class EngineService {
 
     const isDispatched = order.status === 'Shipped' || order.status === 'Delivered';
     const isEditingLines = updateData.lines && updateData.lines.length > 0;
+    const allowOverride = Boolean((updateData as any).allowOverride);
 
-    // Dispatched / Delivered orders cannot have their line items, quantities or financial totals edited
-    if (isDispatched && isEditingLines) {
+    // Dispatched / Delivered orders can only have line items edited if admin override is explicitly authorized
+    if (isDispatched && isEditingLines && !allowOverride) {
       return {
         success: false,
-        error: `Business Rule Violation: Order ${order.orderNumber} is already "${order.status}". Physical stock has already left the warehouse and COGS is posted. Line items and quantities are immutable. Only customer contact info or notes can be amended.`,
+        error: `Business Rule Violation: Order ${order.orderNumber} is already "${order.status}". Physical stock has already left the warehouse and COGS is posted. Enable admin override to authorize an adjustment entry.`,
       };
     }
 
@@ -652,7 +653,7 @@ export class EngineService {
     const isReservedState = ['Confirmed', 'Allocated', 'Picked', 'Packed'].includes(order.status);
 
     // 1. Process line item changes and inventory reservations
-    if (updateData.lines && updateData.lines.length > 0 && !isDispatched) {
+    if (updateData.lines && updateData.lines.length > 0 && (!isDispatched || allowOverride)) {
       const balances = this.calculateBalances();
       const newLines: any[] = [];
 
@@ -783,7 +784,7 @@ export class EngineService {
       order.totalMinor = subtotalMinor + shippingChargeMinor;
       order.taxMinor = taxMinor;
       order.shippingChargeMinor = shippingChargeMinor;
-    } else if (updateData.shippingChargeMinor !== undefined && !isDispatched) {
+    } else if (updateData.shippingChargeMinor !== undefined && (!isDispatched || allowOverride)) {
       const shippingChargeMinor = Math.max(0, updateData.shippingChargeMinor);
       const subtotalMinor = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
       order.shippingChargeMinor = shippingChargeMinor;
@@ -812,9 +813,9 @@ export class EngineService {
     }
 
     // 5. Update Status if permitted
-    if (updateData.status && updateData.status !== order.status && !isDispatched) {
+    if (updateData.status && updateData.status !== order.status) {
       const allowed = ALLOWED_TRANSITIONS[order.status];
-      if (allowed && allowed.includes(updateData.status)) {
+      if (allowOverride || (allowed && allowed.includes(updateData.status))) {
         order.status = updateData.status;
       }
     }

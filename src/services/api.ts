@@ -38,11 +38,34 @@ export const setStoredUserId = (id: string) => {
 
 export const getStoredUserId = () => currentUserId;
 
+// Detect if running on a static hosting provider (e.g. Cloudflare Pages, GitHub Pages)
+const isKnownStaticHost = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return (
+    host.includes('.pages.dev') ||
+    host.includes('.github.io') ||
+    host.includes('.netlify.app') ||
+    host.includes('.vercel.app') ||
+    host.includes('cloudflare') ||
+    (!host.includes('localhost') && !host.includes('127.0.0.1') && !window.location.port)
+  );
+};
+
+let staticModeDetected: boolean | null = null;
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   headers.set('x-user-id', currentUserId);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
+  }
+
+  // If we know this is a static hosting environment (like Cloudflare Pages), bypass fetch
+  // to avoid HTTP 405 Method Not Allowed / 404 network errors and execute cleanly in-browser
+  if (staticModeDetected === true || (staticModeDetected === null && isKnownStaticHost())) {
+    staticModeDetected = true;
+    return handleClientDbRequest<T>(endpoint, options);
   }
 
   try {
@@ -55,8 +78,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     if (res.ok && contentType.includes('application/json')) {
       return (await res.json()) as T;
     }
+
+    // Backend returned non-JSON / 404 / 405 (static CDN hosting fallback)
+    staticModeDetected = true;
   } catch (err) {
     // Backend API unavailable (e.g. Cloudflare Pages / GitHub Pages static hosting)
+    staticModeDetected = true;
   }
 
   // Client-side fallback engine for Cloudflare Pages / Static Hosting
@@ -196,6 +223,7 @@ export const api = {
       notes?: string;
       reason: string;
       status?: any;
+      allowOverride?: boolean;
     }
   ) =>
     request<{ order: Order }>(`/orders/${id}`, {

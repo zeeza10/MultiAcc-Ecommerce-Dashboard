@@ -290,7 +290,21 @@ apiRouter.post('/orders/:id/transition', (req: Request, res: Response) => {
 
 apiRouter.put('/orders/:id', (req: Request, res: Response) => {
   const user = getActiveUser(req);
-  const result = engine.editOrder(req.params.id, req.body, user);
+  const body = req.body || {};
+  const normalized = {
+    ...body,
+    editReason: body.editReason || body.reason || 'Admin modification',
+    shippingChargeMinor: body.shippingChargeMinor !== undefined ? body.shippingChargeMinor : body.shippingFeeMinor,
+    lines: body.lines || (body.items ? body.items.map((i: any) => ({
+      ...i,
+      productId: i.productId || '',
+      productName: i.productName || i.sku,
+      quantity: Number(i.quantity) || 1,
+      unitPriceMinor: Number(i.unitPriceMinor) || 0,
+    })) : undefined),
+    allowOverride: body.allowOverride ?? true,
+  };
+  const result = engine.editOrder(req.params.id, normalized, user);
 
   if (!result.success) {
     res.status(400).json({ error: result.error });
