@@ -588,6 +588,267 @@ export class EngineService {
       activePhase: raw.config.activeReleasePhase,
     };
   }
+
+  /**
+   * Complete Order Editing with validation, stock reservation adjustment, and immutable audit logs.
+   */
+  public editOrder(
+    orderId: string,
+    updateData: {
+      customerName?: string;
+      customerEmail?: string;
+      customerPhone?: string;
+      shippingAddress?: {
+        name?: string;
+        street?: string;
+        city?: string;
+        county?: string;
+        postalCode?: string;
+        country?: string;
+      };
+      shippingChargeMinor?: number;
+      lines?: {
+        productId: string;
+        sku: string;
+        productName: string;
+        quantity: number;
+        unitPriceMinor: number;
+      }[];
+      status?: OrderStatus;
+      notes?: string;
+      editReason: string;
+    },
+    actor: User
+  ): { success: boolean; order?: Order; error?: string } {
+    const raw = db.getRawData();
+    const order = raw.orders.find((o) => o.id === orderId);
+
+    if (!order) {
+      return { success: false, error: 'Order not found' };
+    }
+
+    // Role check: Only Super Admin and Ops Manager can edit orders
+    if (actor.role !== 'SUPER_ADMIN' && actor.role !== 'OPS_MANAGER') {
+      return { success: false, error: 'Unauthorized: Order editing requires Super Admin or Operations Manager privileges.' };
+    }
+
+    if (!updateData.editReason || !updateData.editReason.trim()) {
+      return { success: false, error: 'Validation Error: A mandatory audit reason is required when editing an order.' };
+    }
+
+    const isDispatched = order.status === 'Shipped' || order.status === 'Delivered';
+    const isEditingLines = updateData.lines && updateData.lines.length > 0;
+
+    // Dispatched / Delivered orders cannot have their line items, quantities or financial totals edited
+    if (isDispatched && isEditingLines) {
+      return {
+        success: false,
+        error: `Business Rule Violation: Order ${order.orderNumber} is already "${order.status}". Physical stock has already left the warehouse and COGS is posted. Line items and quantities are immutable. Only customer contact info or notes can be amended.`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const beforeSnapshot = JSON.parse(JSON.stringify(order));
+    const isReservedState = ['Confirmed', 'Allocated', 'Picked', 'Packed'].includes(order.status);
+
+    // 1. Process line item changes and inventory reservations
+    if (updateData.lines && updateData.lines.length > 0 && !isDispatched) {
+      const balances = this.calculateBalances();
+      const newLines: any[] = [];
+
+      for (const reqLine of updateData.lines) {
+        const prod = raw.products.find((p) => p.id === reqLine.productId || p.sku === reqLine.sku);
+        if (!prod) {
+          return { success: false, error: `Invalid line: Product SKU "${reqLine.sku}" does not exist in catalog.` };
+        }
+
+        const qty = Math.max(1, Number(reqLine.quantity) || 1);
+        const unitPriceMinor = Math.max(0, Number(reqLine.unitPriceMinor) || prod.sellingPriceMinor);
+        const taxAmountMinor = Math.round(unitPriceMinor * (raw.config.defaultVatRatePercent / 100));
+
+        // Find existing line if any to calculate delta
+        const existingLine = order.lines.find((l) => l.productId === prod.id || l.sku === prod.sku);
+        const oldQty = existingLine ? existingLine.quantity : 0;
+        const oldReserved = existingLine ? existingLine.reservedQuantity : 0;
+        const delta = qty - oldQty;
+
+        let reservedQuantity = oldReserved;
+        let isBackordered = false;
+
+        if (isReservedState) {
+          if (delta > 0) {
+            // Need to reserve additional units: check available
+            const bal = balances.find((b) => b.productId === prod.id);
+            const avail = bal ? bal.available : 0;
+
+            if (delta > avail && !raw.config.allowNegativeStock) {
+              return {
+                success: false,
+                error: `Stock Error for ${prod.sku}: Cannot increase quantity by +${delta}. Only ${avail} units are currently available in the warehouse without negative stock.`,
+              };
+            }
+
+            // Reserve the delta in the stock ledger
+            raw.stockLedger.push({
+              id: `stk_res_edit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              skuId: prod.id,
+              sku: prod.sku,
+              productName: prod.name,
+              locationId: raw.locations[0]?.id || 'loc_def',
+              locationCode: 'Zone A / A1 / S01 / B01',
+              ownerType: order.ownerType,
+              ownerId: order.ownerId,
+              qtyDelta: delta,
+              state: 'RESERVED',
+              sourceType: 'ORDER_EDIT',
+              sourceId: order.id,
+              note: `Reservation increase (+${delta}) due to Order ${order.orderNumber} edit by ${actor.name}`,
+              createdBy: actor.email,
+              createdAt: now,
+            });
+            reservedQuantity = qty;
+          } else if (delta < 0) {
+            // Releasing units back to available
+            const releaseDelta = Math.abs(delta);
+            raw.stockLedger.push({
+              id: `stk_rel_edit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              skuId: prod.id,
+              sku: prod.sku,
+              productName: prod.name,
+              locationId: raw.locations[0]?.id || 'loc_def',
+              locationCode: 'Zone A / A1 / S01 / B01',
+              ownerType: order.ownerType,
+              ownerId: order.ownerId,
+              qtyDelta: -releaseDelta,
+              state: 'RESERVED',
+              sourceType: 'ORDER_EDIT',
+              sourceId: order.id,
+              note: `Reservation release (-${releaseDelta}) due to Order ${order.orderNumber} edit by ${actor.name}`,
+              createdBy: actor.email,
+              createdAt: now,
+            });
+            reservedQuantity = qty;
+          }
+        }
+
+        newLines.push({
+          id: existingLine ? existingLine.id : `ordl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          orderId: order.id,
+          productId: prod.id,
+          sku: prod.sku,
+          productName: prod.name,
+          quantity: qty,
+          unitPriceMinor,
+          taxAmountMinor,
+          totalPriceMinor: unitPriceMinor * qty,
+          isBackordered,
+          reservedQuantity,
+        });
+      }
+
+      // If any old line was completely removed, release its full reservation
+      if (isReservedState) {
+        for (const oldLine of order.lines) {
+          const stillPresent = newLines.some((nl) => nl.productId === oldLine.productId);
+          if (!stillPresent && oldLine.reservedQuantity > 0) {
+            raw.stockLedger.push({
+              id: `stk_rel_rm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              skuId: oldLine.productId,
+              sku: oldLine.sku,
+              productName: oldLine.productName,
+              locationId: raw.locations[0]?.id || 'loc_def',
+              locationCode: 'Zone A / A1 / S01 / B01',
+              ownerType: order.ownerType,
+              ownerId: order.ownerId,
+              qtyDelta: -oldLine.reservedQuantity,
+              state: 'RESERVED',
+              sourceType: 'ORDER_EDIT',
+              sourceId: order.id,
+              note: `Line ${oldLine.sku} removed during Order ${order.orderNumber} edit: released ${oldLine.reservedQuantity} reserved units`,
+              createdBy: actor.email,
+              createdAt: now,
+            });
+          }
+        }
+      }
+
+      order.lines = newLines;
+      const subtotalMinor = newLines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
+      const taxMinor = newLines.reduce((acc, l) => acc + l.taxAmountMinor, 0);
+      const shippingChargeMinor =
+        updateData.shippingChargeMinor !== undefined
+          ? Math.max(0, updateData.shippingChargeMinor)
+          : order.shippingChargeMinor || 0;
+
+      order.totalMinor = subtotalMinor + shippingChargeMinor;
+      order.taxMinor = taxMinor;
+      order.shippingChargeMinor = shippingChargeMinor;
+    } else if (updateData.shippingChargeMinor !== undefined && !isDispatched) {
+      const shippingChargeMinor = Math.max(0, updateData.shippingChargeMinor);
+      const subtotalMinor = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
+      order.shippingChargeMinor = shippingChargeMinor;
+      order.totalMinor = subtotalMinor + shippingChargeMinor;
+    }
+
+    // 2. Update Customer Information
+    if (updateData.customerName) order.customerName = updateData.customerName.trim();
+    if (updateData.customerEmail) order.customerEmail = updateData.customerEmail.trim();
+
+    // 3. Update Shipping Address
+    if (updateData.shippingAddress) {
+      order.shippingAddress = {
+        name: updateData.shippingAddress.name || order.customerName,
+        street: updateData.shippingAddress.street || order.shippingAddress.street,
+        city: updateData.shippingAddress.city || order.shippingAddress.city,
+        county: updateData.shippingAddress.county || order.shippingAddress.county,
+        postalCode: updateData.shippingAddress.postalCode || order.shippingAddress.postalCode,
+        country: updateData.shippingAddress.country || order.shippingAddress.country,
+      };
+    }
+
+    // 4. Update Notes
+    if (updateData.notes !== undefined) {
+      order.notes = updateData.notes;
+    }
+
+    // 5. Update Status if permitted
+    if (updateData.status && updateData.status !== order.status && !isDispatched) {
+      const allowed = ALLOWED_TRANSITIONS[order.status];
+      if (allowed && allowed.includes(updateData.status)) {
+        order.status = updateData.status;
+      }
+    }
+
+    order.updatedAt = now;
+
+    // 6. Record in Order History
+    raw.orderHistories.push({
+      id: `hist_edit_${Date.now()}`,
+      orderId: order.id,
+      toStatus: order.status,
+      changedBy: `${actor.name} (${actor.role})`,
+      note: `Order modified: ${updateData.editReason}`,
+      timestamp: now,
+    });
+
+    // 7. Immutable Audit Log
+    raw.auditLogs.unshift({
+      id: `aud_edit_${Date.now()}`,
+      actorId: actor.id,
+      actorName: actor.name,
+      action: 'UPDATE',
+      entity: 'Order',
+      entityId: order.id,
+      beforeSnapshot,
+      afterSnapshot: JSON.parse(JSON.stringify(order)),
+      notes: `Order ${order.orderNumber} updated. Reason: ${updateData.editReason}`,
+      timestamp: now,
+    });
+
+    db.save();
+    return { success: true, order };
+  }
 }
 
 export const engine = new EngineService();
+

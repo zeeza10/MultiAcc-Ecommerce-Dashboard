@@ -29,6 +29,8 @@ interface NavbarProps {
   isSyncing: boolean;
   globalSearch: string;
   setGlobalSearch: (s: string) => void;
+  selectedStoreId?: string;
+  onStoreChange?: (storeId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -46,8 +48,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSyncing,
   globalSearch,
   setGlobalSearch,
+  selectedStoreId = 'ALL',
+  onStoreChange,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
 
@@ -145,19 +150,34 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Global Search Bar (FR-SRCH-01) */}
-        <div className="flex-1 max-w-md relative hidden md:block">
-          <div className="relative">
+        {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
+        <div className="flex-1 max-w-lg items-center gap-2 hidden md:flex">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               placeholder="Global Search (Orders, SKUs, Tracking #, Buyers)..."
-              className="w-full pl-9 pr-4 py-1.5 text-sm bg-gray-50 border border-gray-300 rounded-md focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-md focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
+
+          <div className="w-48 shrink-0">
+            <select
+              value={selectedStoreId}
+              onChange={(e) => onStoreChange && onStoreChange(e.target.value)}
+              title="Global Store Context Filter"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">🏪 All Stores Combined</option>
+              <option value="mkt_ebay_uk">🇬🇧 Nexus Tech Direct (UK)</option>
+              <option value="mkt_ebay_us">🇺🇸 Nexus Global Outlet (US)</option>
+              <option value="mkt_ebay_de">🇩🇪 Nexus Tech Europe (DE)</option>
+            </select>
+          </div>
         </div>
+
 
         {/* Action Controls & Role Switcher */}
         <div className="flex items-center space-x-3">

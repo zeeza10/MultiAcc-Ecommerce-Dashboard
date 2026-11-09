@@ -28,6 +28,11 @@ import {
   AuditLogEntry,
   NotificationItem,
   SystemConfig,
+  EbayPayout,
+  FinancialReconciliation,
+  WarehousePackagingJob,
+  WarehouseShippingJob,
+  DropshippingCalculation,
 } from './types';
 
 export interface DatabaseSchema {
@@ -57,6 +62,12 @@ export interface DatabaseSchema {
   auditLogs: AuditLogEntry[];
   notifications: NotificationItem[];
   config: SystemConfig;
+  payouts: EbayPayout[];
+  reconciliations: FinancialReconciliation[];
+  packagingJobs: WarehousePackagingJob[];
+  shippingJobs: WarehouseShippingJob[];
+  dropshippingCalculations: DropshippingCalculation[];
+  [key: string]: any;
 }
 
 const DB_FILE_PATH = path.resolve(process.cwd(), 'data', 'database.json');
@@ -78,14 +89,406 @@ class DatabaseService {
       if (fs.existsSync(DB_FILE_PATH)) {
         const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
         this.data = JSON.parse(raw);
+        this.ensureNewCollections();
       } else {
         this.seedInitialData();
+        this.ensureNewCollections();
         this.save();
       }
     } catch (err) {
       console.warn('Failed to load database from file, re-initializing with seed data:', err);
       this.seedInitialData();
+      this.ensureNewCollections();
       this.save();
+    }
+  }
+
+  private ensureNewCollections() {
+    if (!this.data.config) {
+      this.data.config = {
+        baseCurrency: 'GBP',
+        businessTimezone: 'Europe/London',
+        defaultVatRatePercent: 20,
+        adjustmentApprovalThresholdValueMinor: 5000,
+        adjustmentApprovalThresholdQuantity: 10,
+        activeReleasePhase: 'ALL',
+        allowNegativeStock: false,
+        autoSyncEnabled: true,
+      };
+    }
+    // Always unlock all phases per requirement 2
+    this.data.config.activeReleasePhase = 'ALL';
+
+    if (!this.data.payouts || this.data.payouts.length === 0) {
+      this.data.payouts = [
+        {
+          id: 'pay_uk_01',
+          payoutId: 'EP-2026-UK-081',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          totalSalesMinor: 489000,
+          totalFeesMinor: 62592,
+          refundsMinor: 8999,
+          shippingAdjustmentsMinor: 1500,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 415909,
+          currency: 'GBP',
+          payoutDate: '2026-11-04T12:00:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-UK-99201',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'BARCLAYS-DEP-88419',
+          orderIds: ['ord_gen_1001', 'ord_gen_1002', 'ord_gen_1003'],
+          notes: 'Settled to Barclays UK Business Account. Reconciled with bank feed.',
+        },
+        {
+          id: 'pay_uk_02',
+          payoutId: 'EP-2026-UK-082',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          totalSalesMinor: 234050,
+          totalFeesMinor: 29958,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 204092,
+          currency: 'GBP',
+          payoutDate: '2026-11-06T12:00:00.000Z',
+          status: 'PAID',
+          transactionId: 'TX-EBAY-UK-99208',
+          bankDepositStatus: 'CLEARED',
+          bankReference: 'BARCLAYS-DEP-88502',
+          orderIds: ['ord_gen_1004', 'ord_gen_1005'],
+          notes: 'Dispatched from eBay Payments. Awaiting end-of-week ledger match.',
+        },
+        {
+          id: 'pay_us_01',
+          payoutId: 'EP-2026-US-041',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          totalSalesMinor: 493846,
+          totalFeesMinor: 63212,
+          refundsMinor: 9230,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 421404,
+          currency: 'USD',
+          payoutDate: '2026-11-03T14:30:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-US-41829',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'CHASE-WIRE-55102',
+          orderIds: ['ord_gen_1006', 'ord_gen_1007'],
+          notes: 'International disbursement via Chase Commercial FX conversion.',
+        },
+        {
+          id: 'pay_us_02',
+          payoutId: 'EP-2026-US-042',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          totalSalesMinor: 244615,
+          totalFeesMinor: 31310,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 213305,
+          currency: 'USD',
+          payoutDate: '2026-11-08T15:00:00.000Z',
+          status: 'PROCESSING',
+          transactionId: 'TX-EBAY-US-41904',
+          bankDepositStatus: 'PENDING',
+          orderIds: ['ord_gen_1008'],
+          notes: 'Processing batch payout in US Automated Clearing House (ACH).',
+        },
+        {
+          id: 'pay_de_01',
+          payoutId: 'EP-2026-DE-019',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          totalSalesMinor: 329060,
+          totalFeesMinor: 41132,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 287928,
+          currency: 'EUR',
+          payoutDate: '2026-11-05T10:15:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-DE-11029',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'DEUTSCHE-SEPA-9931',
+          orderIds: ['ord_gen_1009'],
+          notes: 'SEPA Euro settlement completed to European treasury account.',
+        },
+        {
+          id: 'pay_de_02',
+          payoutId: 'EP-2026-DE-020',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          totalSalesMinor: 121368,
+          totalFeesMinor: 15171,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 106197,
+          currency: 'EUR',
+          payoutDate: '2026-11-09T08:00:00.000Z',
+          status: 'INITIATED',
+          transactionId: 'TX-EBAY-DE-11088',
+          bankDepositStatus: 'PENDING',
+          orderIds: ['ord_gen_1010'],
+          notes: 'eBay initiated payout transfer. Pending SEPA bank processing.',
+        },
+      ];
+    }
+
+    if (!this.data.reconciliations || this.data.reconciliations.length === 0) {
+      this.data.reconciliations = [
+        {
+          id: 'rec_uk_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          expectedPayoutMinor: 620001,
+          actualPayoutMinor: 620001,
+          differenceMinor: 0,
+          unmatchedTransactionsCount: 0,
+          status: 'RECONCILED',
+          lastReconciledAt: '2026-11-07T16:00:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: '100% verified against Barclays statement and eBay transaction report.',
+          breakdown: {
+            ordersGrossMinor: 723050,
+            marketplaceFeesMinor: 92550,
+            refundsMinor: 8999,
+            shippingPostageMinor: 1500,
+            bankConfirmedMinor: 620001,
+          },
+        },
+        {
+          id: 'rec_us_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          expectedPayoutMinor: 634709,
+          actualPayoutMinor: 634709,
+          differenceMinor: 0,
+          unmatchedTransactionsCount: 0,
+          status: 'RECONCILED',
+          lastReconciledAt: '2026-11-07T16:15:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: 'Chase Wire transfer matched against US sales ledger.',
+          breakdown: {
+            ordersGrossMinor: 738461,
+            marketplaceFeesMinor: 94522,
+            refundsMinor: 9230,
+            shippingPostageMinor: 0,
+            bankConfirmedMinor: 634709,
+          },
+        },
+        {
+          id: 'rec_de_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          expectedPayoutMinor: 394125,
+          actualPayoutMinor: 287928,
+          differenceMinor: 106197,
+          unmatchedTransactionsCount: 1,
+          status: 'IN_REVIEW',
+          lastReconciledAt: '2026-11-09T07:00:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: 'EUR 1,242.50 (£1,061.97) initiated by eBay on Nov 9, awaiting final SEPA bank arrival.',
+          breakdown: {
+            ordersGrossMinor: 450428,
+            marketplaceFeesMinor: 56303,
+            refundsMinor: 0,
+            shippingPostageMinor: 0,
+            bankConfirmedMinor: 287928,
+          },
+        },
+      ];
+    }
+
+    if (!this.data.packagingJobs || this.data.packagingJobs.length === 0) {
+      this.data.packagingJobs = [
+        {
+          id: 'pkg_001',
+          jobNumber: 'PKG-2026-001',
+          clientId: 'client_apex',
+          clientName: 'Apex Electronics Ltd',
+          date: '2026-11-03T11:00:00.000Z',
+          packagingType: 'CUSTOM_BOX',
+          quantity: 120,
+          materialCostMinor: 7200,
+          serviceChargeMinor: 14400,
+          totalChargeMinor: 21600,
+          status: 'INVOICED',
+          invoiceId: 'inv_001',
+          orderNumber: 'NX-ORD-2026-001',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Double-walled carton with ESD electrostatic shielding bags.',
+        },
+        {
+          id: 'pkg_002',
+          jobNumber: 'PKG-2026-002',
+          clientId: 'client_bolt',
+          clientName: 'Bolt Gear Ltd',
+          date: '2026-11-05T09:30:00.000Z',
+          packagingType: 'PALLET_WRAP',
+          quantity: 14,
+          materialCostMinor: 3500,
+          serviceChargeMinor: 10500,
+          totalChargeMinor: 14000,
+          status: 'INVOICED',
+          invoiceId: 'inv_002',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Full pallet machine shrink-wrap & corner reinforcement brackets.',
+        },
+        {
+          id: 'pkg_003',
+          jobNumber: 'PKG-2026-003',
+          clientId: 'client_zenith',
+          clientName: 'Zenith Retail Partners',
+          date: '2026-11-06T14:15:00.000Z',
+          packagingType: 'BUBBLE_MAILER',
+          quantity: 85,
+          materialCostMinor: 2550,
+          serviceChargeMinor: 6800,
+          totalChargeMinor: 9350,
+          status: 'COMPLETED',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Eco-recycled bubble mailers with tamper-evident security tape.',
+        },
+        {
+          id: 'pkg_004',
+          jobNumber: 'PKG-2026-004',
+          clientId: 'client_cloud',
+          clientName: 'CloudLogix Direct',
+          date: '2026-11-08T16:00:00.000Z',
+          packagingType: 'FRAGILE_PREP',
+          quantity: 45,
+          materialCostMinor: 4050,
+          serviceChargeMinor: 9000,
+          totalChargeMinor: 13050,
+          status: 'IN_PROGRESS',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Suspended air foam packaging for delicate camera sensors.',
+        },
+      ];
+    }
+
+    if (!this.data.shippingJobs || this.data.shippingJobs.length === 0) {
+      this.data.shippingJobs = [
+        {
+          id: 'shp_001',
+          dispatchId: 'DSP-2026-001',
+          clientId: 'client_apex',
+          clientName: 'Apex Electronics Ltd',
+          date: '2026-11-03T16:30:00.000Z',
+          carrier: 'Royal Mail',
+          trackingNumber: 'GB491028114RM',
+          serviceLevel: 'Tracked 24 with Signature',
+          parcelWeightKg: 0.85,
+          carrierCostMinor: 380,
+          serviceChargeMinor: 650,
+          totalChargeMinor: 1030,
+          status: 'DELIVERED',
+          invoiceId: 'inv_001',
+          orderNumber: 'NX-ORD-2026-001',
+          destination: 'Edinburgh, UK',
+        },
+        {
+          id: 'shp_002',
+          dispatchId: 'DSP-2026-002',
+          clientId: 'client_bolt',
+          clientName: 'Bolt Gear Ltd',
+          date: '2026-11-05T17:00:00.000Z',
+          carrier: 'DPD UK',
+          trackingNumber: 'DPD-UK-8841029',
+          serviceLevel: 'Next Day Express Courier',
+          parcelWeightKg: 3.4,
+          carrierCostMinor: 620,
+          serviceChargeMinor: 1150,
+          totalChargeMinor: 1770,
+          status: 'IN_TRANSIT',
+          invoiceId: 'inv_002',
+          orderNumber: 'NX-ORD-2026-002',
+          destination: 'Birmingham, UK',
+        },
+        {
+          id: 'shp_003',
+          dispatchId: 'DSP-2026-003',
+          clientId: 'client_zenith',
+          clientName: 'Zenith Retail Partners',
+          date: '2026-11-06T18:00:00.000Z',
+          carrier: 'DHL Express',
+          trackingNumber: 'DHL-992019284',
+          serviceLevel: 'Worldwide Air Express',
+          parcelWeightKg: 1.2,
+          carrierCostMinor: 1450,
+          serviceChargeMinor: 2400,
+          totalChargeMinor: 3850,
+          status: 'DISPATCHED',
+          orderNumber: 'NX-ORD-2026-003',
+          destination: 'Dublin, Ireland',
+        },
+      ];
+    }
+
+    if (!this.data.dropshippingCalculations || this.data.dropshippingCalculations.length === 0) {
+      this.data.dropshippingCalculations = [
+        {
+          id: 'ds_calc_001',
+          productId: 'prd_001',
+          sku: 'NX-AUD-001',
+          productName: 'Nexus Pro Active Noise-Cancelling Headphones',
+          supplierName: 'Anker Innovations Technology Ltd',
+          purchaseCostMinor: 3800,
+          supplierCostMinor: 3800,
+          shippingCostMinor: 450,
+          packagingCostMinor: 120,
+          additionalExpensesMinor: 50,
+          sellingPriceMinor: 8999,
+          marketplaceFeePercent: 12.8,
+          marketplaceFeeMinor: 1152,
+          otherCostsMinor: 30,
+          shippingOption: 'SHIPPING_INCLUDED',
+          shippingChargedToCustomerMinor: 0,
+          totalCostMinor: 4420,
+          grossProfitMinor: 4579,
+          marginPercent: 50.88,
+          netProfitMinor: 3367,
+          currency: 'GBP',
+          updatedAt: '2026-11-08T12:00:00.000Z',
+          updatedBy: 'Elena Rostova (Finance)',
+        },
+        {
+          id: 'ds_calc_002',
+          productId: 'prd_002',
+          sku: 'NX-CAM-002',
+          productName: 'Nexus 4K Ultra Wide StreamCam with Stereo Mic',
+          supplierName: 'Logitech Europe S.A.',
+          purchaseCostMinor: 2400,
+          supplierCostMinor: 2400,
+          shippingCostMinor: 395,
+          packagingCostMinor: 95,
+          additionalExpensesMinor: 40,
+          sellingPriceMinor: 5999,
+          marketplaceFeePercent: 12.8,
+          marketplaceFeeMinor: 768,
+          otherCostsMinor: 30,
+          shippingOption: 'SHIPPING_EXCLUDED',
+          shippingChargedToCustomerMinor: 395,
+          totalCostMinor: 2535,
+          grossProfitMinor: 3464,
+          marginPercent: 57.74,
+          netProfitMinor: 2666,
+          currency: 'GBP',
+          updatedAt: '2026-11-08T12:15:00.000Z',
+          updatedBy: 'Elena Rostova (Finance)',
+        },
+      ];
     }
   }
 
@@ -1467,8 +1870,14 @@ class DatabaseService {
       auditLogs,
       notifications,
       config,
+      payouts: [],
+      reconciliations: [],
+      packagingJobs: [],
+      shippingJobs: [],
+      dropshippingCalculations: [],
     };
   }
+
 }
 
 export const db = new DatabaseService();

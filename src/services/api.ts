@@ -19,7 +19,13 @@ import {
   AuditLogEntry,
   NotificationItem,
   SystemConfig,
+  EbayPayout,
+  FinancialReconciliation,
+  WarehousePackagingJob,
+  WarehouseShippingJob,
+  DropshippingCalculation,
 } from '../types';
+
 
 import { handleClientDbRequest } from './clientDb';
 
@@ -178,6 +184,64 @@ export const api = {
     return request<any>(`/reports/${id}?${q.toString()}`);
   },
 
+  // Order Editing
+  editOrder: (
+    id: string,
+    payload: {
+      items?: { sku: string; quantity: number; unitPriceMinor: number }[];
+      shippingFeeMinor?: number;
+      customerName?: string;
+      customerEmail?: string;
+      shippingAddress?: any;
+      notes?: string;
+      reason: string;
+      status?: any;
+    }
+  ) =>
+    request<{ order: Order }>(`/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  // Phase 4: eBay Payouts & Reconciliation
+  getPayouts: (accountId?: string) => {
+    const q = accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : '';
+    return request<{ payouts: EbayPayout[]; balances: any }>(`/payouts${q}`);
+  },
+  confirmPayoutDeposit: (id: string, bankReference: string) =>
+    request<{ payout: EbayPayout; success: boolean }>(`/payouts/${id}/confirm-deposit`, {
+      method: 'POST',
+      body: JSON.stringify({ bankReference }),
+    }),
+  getReconciliations: (accountId?: string) => {
+    const q = accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : '';
+    return request<{ reconciliations: FinancialReconciliation[] }>(`/reconciliation${q}`);
+  },
+
+  // Phase 3: Warehouse Services
+  getWarehouseServicesSummary: () => request<any>('/warehouse-services/summary'),
+  getPackagingJobs: () => request<{ packagingJobs: WarehousePackagingJob[] }>('/warehouse-services/packaging'),
+  createPackagingJob: (payload: Partial<WarehousePackagingJob>) =>
+    request<{ job: WarehousePackagingJob }>('/warehouse-services/packaging', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getShippingJobs: () => request<{ shippingJobs: WarehouseShippingJob[] }>('/warehouse-services/shipping'),
+  createShippingJob: (payload: Partial<WarehouseShippingJob>) =>
+    request<{ job: WarehouseShippingJob }>('/warehouse-services/shipping', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Phase 1: Dropshipping Calculator
+  getDropshippingCalculations: () =>
+    request<{ calculations: DropshippingCalculation[] }>('/dropshipping/calculations'),
+  saveDropshippingCalculation: (payload: Partial<DropshippingCalculation>) =>
+    request<{ calculation: DropshippingCalculation }>('/dropshipping/calculations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   // System
   getAuditLogs: () => request<{ logs: AuditLogEntry[] }>('/audit-logs'),
   getNotifications: () => request<{ notifications: NotificationItem[] }>('/notifications'),
@@ -191,3 +255,4 @@ export const api = {
     }),
   resetDemo: () => request<{ success: boolean; message: string }>('/system/reset-demo', { method: 'POST' }),
 };
+

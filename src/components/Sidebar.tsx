@@ -115,25 +115,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'Stock',
+      title: 'Stock & Costing',
       items: [
         { id: 'products', label: 'Products & SKUs', icon: Package, phase: 'P1' },
         { id: 'inventory', label: 'Inventory & Ledger', icon: Layers, phase: 'P1' },
         { id: 'adjustments', label: 'Stock Adjustments', icon: Sliders, phase: 'P1' },
+        { id: 'dropshipping', label: 'Dropship Calculator', icon: TrendingUp, phase: 'P1' },
         { id: 'warehouse', label: 'Warehouse Hub', icon: Warehouse, phase: 'P2' },
         { id: 'locations', label: 'Locations & Bins', icon: MapPin, phase: 'P2' },
       ],
     },
     {
-      title: 'Buying',
+      title: 'Buying & Receiving',
       items: [
         { id: 'suppliers', label: 'Suppliers', icon: Truck, phase: 'P2' },
         { id: 'purchase-orders', label: 'Purchase Orders', icon: Boxes, phase: 'P2' },
       ],
     },
     {
-      title: 'Fulfilment',
+      title: 'Warehouse Services & 3PL',
       items: [
+        { id: 'warehouse-services', label: 'Warehouse Services', icon: Boxes, phase: 'P3' },
         { id: '3pl-clients', label: '3PL Clients', icon: Users, phase: 'P3' },
         { id: 'fulfilment', label: 'Pick & Pack', icon: Package, phase: 'P3' },
         { id: 'shipping', label: 'Shipping & Parcels', icon: Truck, phase: 'P1' },
@@ -141,8 +143,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'Finance',
+      title: 'Finance & Payouts',
       items: [
+        { id: 'payouts', label: 'eBay Payouts & Treasury', icon: CreditCard, phase: 'P4' },
+        { id: 'reconciliation', label: 'Reconciliation', icon: Receipt, phase: 'P4' },
         { id: 'invoices', label: 'Invoices', icon: FileText, phase: 'P4' },
         { id: 'payments', label: 'Payments', icon: CreditCard, phase: 'P4' },
         { id: 'expenses', label: 'Expenses', icon: Receipt, phase: 'P4' },
@@ -150,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'System',
+      title: 'System & Reports',
       items: [
         { id: 'reports', label: 'Reports (14)', icon: BarChart3, phase: 'P1' },
         {
@@ -164,6 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1' },
       ],
     },
+
   ];
 
   return (

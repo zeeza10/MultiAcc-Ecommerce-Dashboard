@@ -15,10 +15,14 @@ import { ReportsView } from './components/ReportsView';
 import { NotificationsView } from './components/NotificationsView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
+import { WarehouseServicesView } from './components/WarehouseServicesView';
+import { DropshippingCalculatorView } from './components/DropshippingCalculatorView';
+import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api, setStoredUserId, getStoredUserId } from './services/api';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
+
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
 
 const DEFAULT_USER: User = {
@@ -59,7 +63,9 @@ export default function App() {
   });
   const [showNewAdjustmentModal, setShowNewAdjustmentModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
   const [loading, setLoading] = useState(false);
+
 
   useEffect(() => {
     initApp();
@@ -174,11 +180,6 @@ export default function App() {
 
 
 
-  // Phase gate notification banner for future modules
-  const isFutureModule =
-    config.activeReleasePhase === 'P1' &&
-    ['customers', 'returns', 'warehouse', 'locations', 'suppliers', 'purchase-orders', '3pl-clients', 'fulfilment', 'storage', 'invoices', 'payments', 'expenses', 'profitability'].includes(activeTab);
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navigation */}
@@ -200,7 +201,10 @@ export default function App() {
         isSyncing={isSyncing}
         globalSearch={globalSearch}
         setGlobalSearch={setGlobalSearch}
+        selectedStoreId={selectedStoreId}
+        onStoreChange={setSelectedStoreId}
       />
+
 
       {/* Global Search Results Overlay (FR-SRCH-01) */}
       {globalSearch.trim() && (
@@ -296,21 +300,6 @@ export default function App() {
 
         {/* Center Main View */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {/* Phase 1 roadmap notice banner if clicking a future module */}
-          {isFutureModule && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 flex items-center justify-between">
-              <div>
-                <strong>Roadmap Phase Gate (PRD S6):</strong> This module is scheduled in a future phase. You are currently previewing its fully integrated interface. You can switch the active phase in <strong>Settings</strong> or the top bar selector.
-              </div>
-              <button
-                onClick={() => setConfig({ ...config, activeReleasePhase: 'ALL' })}
-                className="ml-3 shrink-0 px-2.5 py-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold rounded text-[11px]"
-              >
-                Unlock All Phases
-              </button>
-            </div>
-          )}
-
           {activeTab === 'dashboard' && (
             <DashboardView
               currentUser={currentUser}
@@ -329,6 +318,11 @@ export default function App() {
               onOpenNewOrder={() => setShowNewOrderModal(true)}
             />
           )}
+
+          {activeTab === 'dropshipping' && (
+            <DropshippingCalculatorView currentUser={currentUser} />
+          )}
+
 
           {activeTab === 'ebay-accounts' && (
             <EbayAccountsView
@@ -388,6 +382,11 @@ export default function App() {
           )}
 
           {/* Phase 3 Modules */}
+          {/* Phase 3 Warehouse Services & 3PL Modules */}
+          {activeTab === 'warehouse-services' && (
+            <WarehouseServicesView currentUser={currentUser} />
+          )}
+
           {(activeTab === '3pl-clients' || activeTab === 'fulfilment' || activeTab === 'shipping' || activeTab === 'storage') && (
             <Clients3PLView
               currentUser={currentUser}
@@ -404,7 +403,15 @@ export default function App() {
             />
           )}
 
-          {/* Phase 4 Modules */}
+          {/* Phase 4 Payouts & Finance Modules */}
+          {(activeTab === 'payouts' || activeTab === 'reconciliation') && (
+            <EbayPayoutsView
+              currentUser={currentUser}
+              selectedStoreId={selectedStoreId}
+              onStoreChange={setSelectedStoreId}
+            />
+          )}
+
           {(activeTab === 'invoices' || activeTab === 'payments' || activeTab === 'expenses' || activeTab === 'profitability') && (
             <FinanceView
               currentUser={currentUser}
@@ -420,6 +427,7 @@ export default function App() {
               }
             />
           )}
+
 
           {/* Phase 1 & 5 System Modules */}
           {activeTab === 'reports' && (

@@ -206,8 +206,19 @@ export interface StockLedgerEntry {
   ownerId: string;
   qtyDelta: number; // signed integer (+ or -)
   state: StockState;
-  sourceType: 'ORDER_RESERVE' | 'ORDER_DISPATCH' | 'ORDER_CANCEL' | 'PO_RECEIPT' | 'ADJUSTMENT' | 'RETURN_RESTOCK' | 'RETURN_DISPOSITION' | 'CYCLE_COUNT' | 'TRANSFER';
+  sourceType:
+    | 'ORDER_RESERVE'
+    | 'ORDER_DISPATCH'
+    | 'ORDER_CANCEL'
+    | 'ORDER_EDIT'
+    | 'PO_RECEIPT'
+    | 'ADJUSTMENT'
+    | 'RETURN_RESTOCK'
+    | 'RETURN_DISPOSITION'
+    | 'CYCLE_COUNT'
+    | 'TRANSFER';
   sourceId: string;
+
   unitCostMinor?: number;
   note?: string;
   createdBy: string;
@@ -482,3 +493,110 @@ export interface SystemConfig {
   allowNegativeStock: boolean;
   autoSyncEnabled: boolean;
 }
+
+export interface EbayPayout {
+  id: string;
+  payoutId: string;
+  marketplaceAccountId: string;
+  accountName: string;
+  totalSalesMinor: number;
+  totalFeesMinor: number;
+  refundsMinor: number;
+  shippingAdjustmentsMinor: number;
+  otherAdjustmentsMinor: number;
+  netPayoutMinor: number;
+  currency: string;
+  payoutDate: string;
+  status: 'INITIATED' | 'PROCESSING' | 'PAID' | 'BANK_CONFIRMED';
+  transactionId: string;
+  bankDepositStatus: 'PENDING' | 'CLEARED' | 'RECONCILED';
+  bankReference?: string;
+  orderIds: string[];
+  notes?: string;
+}
+
+export interface FinancialReconciliation {
+  id: string;
+  period: string;
+  marketplaceAccountId: string;
+  accountName: string;
+  expectedPayoutMinor: number;
+  actualPayoutMinor: number;
+  differenceMinor: number;
+  unmatchedTransactionsCount: number;
+  status: 'RECONCILED' | 'VARIANCE_FLAGGED' | 'IN_REVIEW';
+  lastReconciledAt: string;
+  reconciledBy: string;
+  auditNotes: string;
+  breakdown: {
+    ordersGrossMinor: number;
+    marketplaceFeesMinor: number;
+    refundsMinor: number;
+    shippingPostageMinor: number;
+    bankConfirmedMinor: number;
+  };
+}
+
+export interface WarehousePackagingJob {
+  id: string;
+  jobNumber: string;
+  clientId: string;
+  clientName: string;
+  date: string;
+  packagingType: 'CUSTOM_BOX' | 'BUBBLE_MAILER' | 'PALLET_WRAP' | 'FRAGILE_PREP';
+  quantity: number;
+  materialCostMinor: number;
+  serviceChargeMinor: number;
+  totalChargeMinor: number;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'INVOICED';
+  invoiceId?: string;
+  orderNumber?: string;
+  performedBy: string;
+  notes?: string;
+}
+
+export interface WarehouseShippingJob {
+  id: string;
+  dispatchId: string;
+  clientId: string;
+  clientName: string;
+  date: string;
+  carrier: string;
+  trackingNumber: string;
+  serviceLevel: string;
+  parcelWeightKg: number;
+  carrierCostMinor: number;
+  serviceChargeMinor: number;
+  totalChargeMinor: number;
+  status: 'DISPATCHED' | 'DELIVERED' | 'IN_TRANSIT';
+  invoiceId?: string;
+  orderNumber: string;
+  destination: string;
+}
+
+export interface DropshippingCalculation {
+  id: string;
+  productId?: string;
+  sku: string;
+  productName: string;
+  supplierName: string;
+  purchaseCostMinor: number;
+  supplierCostMinor: number;
+  shippingCostMinor: number;
+  packagingCostMinor: number;
+  additionalExpensesMinor: number;
+  sellingPriceMinor: number;
+  marketplaceFeePercent: number;
+  marketplaceFeeMinor: number;
+  otherCostsMinor: number;
+  shippingOption: 'SHIPPING_INCLUDED' | 'SHIPPING_EXCLUDED';
+  shippingChargedToCustomerMinor: number;
+  totalCostMinor: number;
+  grossProfitMinor: number;
+  marginPercent: number;
+  netProfitMinor: number;
+  currency: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+

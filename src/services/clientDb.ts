@@ -3848,16 +3848,398 @@ class ClientDatabaseManager {
   }
 
   private load(): ClientDatabaseState {
+    let result: ClientDatabaseState;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        result = JSON.parse(stored);
+      } else {
+        result = JSON.parse(JSON.stringify(SEED_DATA));
       }
     } catch (e) {
       console.warn('Failed to load client db from localStorage:', e);
+      result = JSON.parse(JSON.stringify(SEED_DATA));
     }
-    return JSON.parse(JSON.stringify(SEED_DATA));
+
+    // Ensure all phase 1-5 collections exist
+    if (!result.config) result.config = { ...SEED_DATA.config };
+    result.config.activeReleasePhase = 'ALL';
+
+    if (!result.payouts || result.payouts.length === 0) {
+      result.payouts = [
+        {
+          id: 'pay_uk_01',
+          payoutId: 'EP-2026-UK-081',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          totalSalesMinor: 489000,
+          totalFeesMinor: 62592,
+          refundsMinor: 8999,
+          shippingAdjustmentsMinor: 1500,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 415909,
+          currency: 'GBP',
+          payoutDate: '2026-11-04T12:00:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-UK-99201',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'BARCLAYS-DEP-88419',
+          orderIds: ['ord_gen_1001', 'ord_gen_1002', 'ord_gen_1003'],
+          notes: 'Settled to Barclays UK Business Account. Reconciled with bank feed.',
+        },
+        {
+          id: 'pay_uk_02',
+          payoutId: 'EP-2026-UK-082',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          totalSalesMinor: 234050,
+          totalFeesMinor: 29958,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 204092,
+          currency: 'GBP',
+          payoutDate: '2026-11-06T12:00:00.000Z',
+          status: 'PAID',
+          transactionId: 'TX-EBAY-UK-99208',
+          bankDepositStatus: 'CLEARED',
+          bankReference: 'BARCLAYS-DEP-88502',
+          orderIds: ['ord_gen_1004', 'ord_gen_1005'],
+          notes: 'Dispatched from eBay Payments. Awaiting end-of-week ledger match.',
+        },
+        {
+          id: 'pay_us_01',
+          payoutId: 'EP-2026-US-041',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          totalSalesMinor: 493846,
+          totalFeesMinor: 63212,
+          refundsMinor: 9230,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 421404,
+          currency: 'USD',
+          payoutDate: '2026-11-03T14:30:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-US-41829',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'CHASE-WIRE-55102',
+          orderIds: ['ord_gen_1006', 'ord_gen_1007'],
+          notes: 'International disbursement via Chase Commercial FX conversion.',
+        },
+        {
+          id: 'pay_us_02',
+          payoutId: 'EP-2026-US-042',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          totalSalesMinor: 244615,
+          totalFeesMinor: 31310,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 213305,
+          currency: 'USD',
+          payoutDate: '2026-11-08T15:00:00.000Z',
+          status: 'PROCESSING',
+          transactionId: 'TX-EBAY-US-41904',
+          bankDepositStatus: 'PENDING',
+          orderIds: ['ord_gen_1008'],
+          notes: 'Processing batch payout in US Automated Clearing House (ACH).',
+        },
+        {
+          id: 'pay_de_01',
+          payoutId: 'EP-2026-DE-019',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          totalSalesMinor: 329060,
+          totalFeesMinor: 41132,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 287928,
+          currency: 'EUR',
+          payoutDate: '2026-11-05T10:15:00.000Z',
+          status: 'BANK_CONFIRMED',
+          transactionId: 'TX-EBAY-DE-11029',
+          bankDepositStatus: 'RECONCILED',
+          bankReference: 'DEUTSCHE-SEPA-9931',
+          orderIds: ['ord_gen_1009'],
+          notes: 'SEPA Euro settlement completed to European treasury account.',
+        },
+        {
+          id: 'pay_de_02',
+          payoutId: 'EP-2026-DE-020',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          totalSalesMinor: 121368,
+          totalFeesMinor: 15171,
+          refundsMinor: 0,
+          shippingAdjustmentsMinor: 0,
+          otherAdjustmentsMinor: 0,
+          netPayoutMinor: 106197,
+          currency: 'EUR',
+          payoutDate: '2026-11-09T08:00:00.000Z',
+          status: 'INITIATED',
+          transactionId: 'TX-EBAY-DE-11088',
+          bankDepositStatus: 'PENDING',
+          orderIds: ['ord_gen_1010'],
+          notes: 'eBay initiated payout transfer. Pending SEPA bank processing.',
+        },
+      ];
+    }
+
+    if (!result.reconciliations || result.reconciliations.length === 0) {
+      result.reconciliations = [
+        {
+          id: 'rec_uk_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_uk',
+          accountName: 'Nexus Tech Direct (UK)',
+          expectedPayoutMinor: 620001,
+          actualPayoutMinor: 620001,
+          differenceMinor: 0,
+          unmatchedTransactionsCount: 0,
+          status: 'RECONCILED',
+          lastReconciledAt: '2026-11-07T16:00:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: '100% verified against Barclays statement and eBay transaction report.',
+          breakdown: {
+            ordersGrossMinor: 723050,
+            marketplaceFeesMinor: 92550,
+            refundsMinor: 8999,
+            shippingPostageMinor: 1500,
+            bankConfirmedMinor: 620001,
+          },
+        },
+        {
+          id: 'rec_us_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_us',
+          accountName: 'Nexus Global Outlet (US)',
+          expectedPayoutMinor: 634709,
+          actualPayoutMinor: 634709,
+          differenceMinor: 0,
+          unmatchedTransactionsCount: 0,
+          status: 'RECONCILED',
+          lastReconciledAt: '2026-11-07T16:15:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: 'Chase Wire transfer matched against US sales ledger.',
+          breakdown: {
+            ordersGrossMinor: 738461,
+            marketplaceFeesMinor: 94522,
+            refundsMinor: 9230,
+            shippingPostageMinor: 0,
+            bankConfirmedMinor: 634709,
+          },
+        },
+        {
+          id: 'rec_de_nov',
+          period: 'November 2026',
+          marketplaceAccountId: 'mkt_ebay_de',
+          accountName: 'Nexus Tech Europe (DE)',
+          expectedPayoutMinor: 394125,
+          actualPayoutMinor: 287928,
+          differenceMinor: 106197,
+          unmatchedTransactionsCount: 1,
+          status: 'IN_REVIEW',
+          lastReconciledAt: '2026-11-09T07:00:00.000Z',
+          reconciledBy: 'Elena Rostova (Finance)',
+          auditNotes: 'EUR 1,242.50 (£1,061.97) initiated by eBay on Nov 9, awaiting final SEPA bank arrival.',
+          breakdown: {
+            ordersGrossMinor: 450428,
+            marketplaceFeesMinor: 56303,
+            refundsMinor: 0,
+            shippingPostageMinor: 0,
+            bankConfirmedMinor: 287928,
+          },
+        },
+      ];
+    }
+
+    if (!result.packagingJobs || result.packagingJobs.length === 0) {
+      result.packagingJobs = [
+        {
+          id: 'pkg_001',
+          jobNumber: 'PKG-2026-001',
+          clientId: 'client_apex',
+          clientName: 'Apex Electronics Ltd',
+          date: '2026-11-03T11:00:00.000Z',
+          packagingType: 'CUSTOM_BOX',
+          quantity: 120,
+          materialCostMinor: 7200,
+          serviceChargeMinor: 14400,
+          totalChargeMinor: 21600,
+          status: 'INVOICED',
+          invoiceId: 'inv_001',
+          orderNumber: 'NX-ORD-2026-001',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Double-walled carton with ESD electrostatic shielding bags.',
+        },
+        {
+          id: 'pkg_002',
+          jobNumber: 'PKG-2026-002',
+          clientId: 'client_bolt',
+          clientName: 'Bolt Gear Ltd',
+          date: '2026-11-05T09:30:00.000Z',
+          packagingType: 'PALLET_WRAP',
+          quantity: 14,
+          materialCostMinor: 3500,
+          serviceChargeMinor: 10500,
+          totalChargeMinor: 14000,
+          status: 'INVOICED',
+          invoiceId: 'inv_002',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Full pallet machine shrink-wrap & corner reinforcement brackets.',
+        },
+        {
+          id: 'pkg_003',
+          jobNumber: 'PKG-2026-003',
+          clientId: 'client_zenith',
+          clientName: 'Zenith Retail Partners',
+          date: '2026-11-06T14:15:00.000Z',
+          packagingType: 'BUBBLE_MAILER',
+          quantity: 85,
+          materialCostMinor: 2550,
+          serviceChargeMinor: 6800,
+          totalChargeMinor: 9350,
+          status: 'COMPLETED',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Eco-recycled bubble mailers with tamper-evident security tape.',
+        },
+        {
+          id: 'pkg_004',
+          jobNumber: 'PKG-2026-004',
+          clientId: 'client_cloud',
+          clientName: 'CloudLogix Direct',
+          date: '2026-11-08T16:00:00.000Z',
+          packagingType: 'FRAGILE_PREP',
+          quantity: 45,
+          materialCostMinor: 4050,
+          serviceChargeMinor: 9000,
+          totalChargeMinor: 13050,
+          status: 'IN_PROGRESS',
+          performedBy: 'Jack Miller (Warehouse Staff)',
+          notes: 'Suspended air foam packaging for delicate camera sensors.',
+        },
+      ];
+    }
+
+    if (!result.shippingJobs || result.shippingJobs.length === 0) {
+      result.shippingJobs = [
+        {
+          id: 'shp_001',
+          dispatchId: 'DSP-2026-001',
+          clientId: 'client_apex',
+          clientName: 'Apex Electronics Ltd',
+          date: '2026-11-03T16:30:00.000Z',
+          carrier: 'Royal Mail',
+          trackingNumber: 'GB491028114RM',
+          serviceLevel: 'Tracked 24 with Signature',
+          parcelWeightKg: 0.85,
+          carrierCostMinor: 380,
+          serviceChargeMinor: 650,
+          totalChargeMinor: 1030,
+          status: 'DELIVERED',
+          invoiceId: 'inv_001',
+          orderNumber: 'NX-ORD-2026-001',
+          destination: 'Edinburgh, UK',
+        },
+        {
+          id: 'shp_002',
+          dispatchId: 'DSP-2026-002',
+          clientId: 'client_bolt',
+          clientName: 'Bolt Gear Ltd',
+          date: '2026-11-05T17:00:00.000Z',
+          carrier: 'DPD UK',
+          trackingNumber: 'DPD-UK-8841029',
+          serviceLevel: 'Next Day Express Courier',
+          parcelWeightKg: 3.4,
+          carrierCostMinor: 620,
+          serviceChargeMinor: 1150,
+          totalChargeMinor: 1770,
+          status: 'IN_TRANSIT',
+          invoiceId: 'inv_002',
+          orderNumber: 'NX-ORD-2026-002',
+          destination: 'Birmingham, UK',
+        },
+        {
+          id: 'shp_003',
+          dispatchId: 'DSP-2026-003',
+          clientId: 'client_zenith',
+          clientName: 'Zenith Retail Partners',
+          date: '2026-11-06T18:00:00.000Z',
+          carrier: 'DHL Express',
+          trackingNumber: 'DHL-992019284',
+          serviceLevel: 'Worldwide Air Express',
+          parcelWeightKg: 1.2,
+          carrierCostMinor: 1450,
+          serviceChargeMinor: 2400,
+          totalChargeMinor: 3850,
+          status: 'DISPATCHED',
+          orderNumber: 'NX-ORD-2026-003',
+          destination: 'Dublin, Ireland',
+        },
+      ];
+    }
+
+    if (!result.dropshippingCalculations || result.dropshippingCalculations.length === 0) {
+      result.dropshippingCalculations = [
+        {
+          id: 'ds_calc_001',
+          productId: 'prd_001',
+          sku: 'NX-AUD-001',
+          productName: 'Nexus Pro Active Noise-Cancelling Headphones',
+          supplierName: 'Anker Innovations Technology Ltd',
+          purchaseCostMinor: 3800,
+          supplierCostMinor: 3800,
+          shippingCostMinor: 450,
+          packagingCostMinor: 120,
+          additionalExpensesMinor: 50,
+          sellingPriceMinor: 8999,
+          marketplaceFeePercent: 12.8,
+          marketplaceFeeMinor: 1152,
+          otherCostsMinor: 30,
+          shippingOption: 'SHIPPING_INCLUDED',
+          shippingChargedToCustomerMinor: 0,
+          totalCostMinor: 4420,
+          grossProfitMinor: 4579,
+          marginPercent: 50.88,
+          netProfitMinor: 3397,
+          currency: 'GBP',
+          updatedAt: '2026-11-07T14:30:00.000Z',
+          updatedBy: 'Marcus Reid (Operations Manager)',
+        },
+        {
+          id: 'ds_calc_002',
+          productId: 'prd_004',
+          sku: 'NX-KEY-004',
+          productName: 'Nexus RGB Mechanical Gaming Keyboard - Brown Switches',
+          supplierName: 'Shenzhen Foxconn Digital Supply',
+          purchaseCostMinor: 3100,
+          supplierCostMinor: 3100,
+          shippingCostMinor: 550,
+          packagingCostMinor: 180,
+          additionalExpensesMinor: 75,
+          sellingPriceMinor: 7499,
+          marketplaceFeePercent: 12.8,
+          marketplaceFeeMinor: 960,
+          otherCostsMinor: 40,
+          shippingOption: 'SHIPPING_EXCLUDED',
+          shippingChargedToCustomerMinor: 499,
+          totalCostMinor: 3355,
+          grossProfitMinor: 4643,
+          marginPercent: 58.05,
+          netProfitMinor: 3643,
+          currency: 'GBP',
+          updatedAt: '2026-11-08T10:15:00.000Z',
+          updatedBy: 'Marcus Reid (Operations Manager)',
+        },
+      ];
+    }
+
+    return result;
   }
+
 
   public save() {
     try {
@@ -4023,11 +4405,107 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   if (pathPart.startsWith('/orders/')) {
     const orderId = pathPart.split('/')[2];
     const order = data.orders.find((o) => o.id === orderId);
+
+    if (method === 'PUT') {
+      if (!order) {
+        throw new Error(`Order ${orderId} not found.`);
+      }
+
+      // Check if order is already dispatched or completed
+      const isDispatchedOrDelivered = ['Shipped', 'Delivered'].includes(order.status);
+      if (isDispatchedOrDelivered && body.items) {
+        throw new Error(`Order ${order.orderNumber} is already ${order.status}. Line items and inventory allocations are immutable once dispatched.`);
+      }
+
+      const oldLines = [...order.lines];
+
+      // Update lines and recalculate totals if items provided
+      if (body.items && Array.isArray(body.items)) {
+        order.lines = body.items.map((item: any, idx: number) => {
+          const matchedProd = data.products.find((p) => p.sku === item.sku);
+          const unitPrice = item.unitPriceMinor !== undefined ? item.unitPriceMinor : (matchedProd?.sellingPriceMinor || 2000);
+          const totalLinePrice = unitPrice * item.quantity;
+          const taxLine = Math.round(totalLinePrice * 0.2);
+          return {
+            id: `ordl_${order.id}_${idx + 1}`,
+            orderId: order.id,
+            productId: matchedProd?.id || 'prd_custom',
+            sku: item.sku,
+            productName: matchedProd?.name || `Item ${item.sku}`,
+            quantity: item.quantity,
+            unitPriceMinor: unitPrice,
+            taxAmountMinor: taxLine,
+            totalPriceMinor: totalLinePrice,
+            isBackordered: false,
+            reservedQuantity: item.quantity,
+          };
+        });
+
+        const subtotal = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
+        const vat = Math.round(subtotal * 0.2);
+        const shippingFee = body.shippingFeeMinor !== undefined ? body.shippingFeeMinor : order.shippingChargeMinor;
+
+        order.totalMinor = subtotal + shippingFee;
+        order.taxMinor = vat;
+        order.shippingChargeMinor = shippingFee;
+      } else if (body.shippingFeeMinor !== undefined) {
+        const subtotal = order.lines.reduce((acc, l) => acc + l.totalPriceMinor, 0);
+        order.shippingChargeMinor = body.shippingFeeMinor;
+        order.totalMinor = subtotal + body.shippingFeeMinor;
+      }
+
+      // Customer and shipping address fields
+      if (body.customerName) order.customerName = body.customerName;
+      if (body.customerEmail) order.customerEmail = body.customerEmail;
+      if (body.shippingAddress) {
+        order.shippingAddress = {
+          ...order.shippingAddress,
+          ...body.shippingAddress,
+          name: body.customerName || order.shippingAddress.name,
+        };
+      }
+      if (body.notes !== undefined) order.notes = body.notes;
+      if (body.status && !isDispatchedOrDelivered) order.status = body.status;
+
+      order.updatedAt = new Date().toISOString();
+
+      // Record in order history
+      const historyEntry = {
+        id: `his_${Date.now()}`,
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: order.status,
+        reason: body.reason || 'Order details amended by authorized administrator.',
+        changedByUserId: 'usr_superadmin',
+        timestamp: new Date().toISOString(),
+      };
+      if (!data.orderHistories) data.orderHistories = [];
+      data.orderHistories.unshift(historyEntry);
+
+      // Record in audit log
+      const auditEntry: AuditLogEntry = {
+        id: `aud_${Date.now()}`,
+        actorId: 'usr_superadmin',
+        actorName: 'Sarah Jenkins (Super Admin)',
+        action: 'UPDATE',
+        entity: 'ORDER',
+        entityId: order.id,
+        notes: `Order ${order.orderNumber} updated: ${body.reason || 'Admin modification'}. New Total: £${(order.totalMinor / 100).toFixed(2)}`,
+        timestamp: new Date().toISOString(),
+      };
+      if (!data.auditLogs) data.auditLogs = [];
+      data.auditLogs.unshift(auditEntry);
+
+      clientDb.save();
+      return { order } as unknown as T;
+    }
+
     return {
       order: order || data.orders[0],
-      histories: data.orderHistories.filter((h) => h.orderId === orderId),
+      histories: (data.orderHistories || []).filter((h: any) => h.orderId === orderId),
     } as unknown as T;
   }
+
 
   // 4. Products
   if (pathPart === '/products') {
@@ -4277,7 +4755,192 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
     return { success: true } as unknown as T;
   }
 
-  // 13. System Config
+  // 13. eBay Payouts & Reconciliation
+  if (pathPart === '/payouts') {
+    let list = data.payouts || [];
+    const accountId = params.get('accountId');
+    if (accountId && accountId !== 'ALL') {
+      list = list.filter((p: any) => p.marketplaceAccountId === accountId);
+    }
+    const totalSalesMinor = list.reduce((sum: number, p: any) => sum + p.totalSalesMinor, 0);
+    const totalFeesMinor = list.reduce((sum: number, p: any) => sum + p.totalFeesMinor, 0);
+    const refundsMinor = list.reduce((sum: number, p: any) => sum + p.refundsMinor, 0);
+    const netPayoutsMinor = list.reduce((sum: number, p: any) => sum + p.netPayoutMinor, 0);
+    const confirmedMinor = list
+      .filter((p: any) => p.status === 'BANK_CONFIRMED')
+      .reduce((sum: number, p: any) => sum + p.netPayoutMinor, 0);
+    const pendingDepositMinor = netPayoutsMinor - confirmedMinor;
+
+    return {
+      payouts: list,
+      balances: {
+        totalSalesMinor,
+        totalFeesMinor,
+        refundsMinor,
+        netPayoutsMinor,
+        confirmedMinor,
+        pendingDepositMinor,
+      },
+    } as unknown as T;
+  }
+
+  if (pathPart.includes('/payouts/') && pathPart.endsWith('/confirm-deposit')) {
+    const payoutId = pathPart.split('/')[2];
+    const payout = (data.payouts || []).find((p: any) => p.id === payoutId);
+    if (payout) {
+      payout.status = 'BANK_CONFIRMED';
+      payout.bankDepositStatus = 'RECONCILED';
+      payout.bankReference = body.bankReference || 'DEP-VERIFIED';
+      clientDb.save();
+      return { success: true, payout } as unknown as T;
+    }
+    throw new Error(`Payout ${payoutId} not found`);
+  }
+
+  if (pathPart === '/reconciliation') {
+    let list = data.reconciliations || [];
+    const accountId = params.get('accountId');
+    if (accountId && accountId !== 'ALL') {
+      list = list.filter((r: any) => r.marketplaceAccountId === accountId);
+    }
+    return { reconciliations: list } as unknown as T;
+  }
+
+  // 14. Phase 3 Warehouse Services
+  if (pathPart === '/warehouse-services/summary') {
+    const clients = data.clients || [];
+    const packagingJobs = data.packagingJobs || [];
+    const shippingJobs = data.shippingJobs || [];
+
+    const totalStorageCharges = 21600; // £216.00 mock baseline
+    const totalPackagingCharges = packagingJobs.reduce((sum: number, j: any) => sum + j.totalChargeMinor, 0);
+    const totalShippingCharges = shippingJobs.reduce((sum: number, j: any) => sum + j.totalChargeMinor, 0);
+    const totalServiceCharges = totalStorageCharges + totalPackagingCharges + totalShippingCharges;
+    const paidAmount = 35600;
+    const outstandingBalance = totalServiceCharges - paidAmount;
+
+    return {
+      storage: {
+        activeClients: clients.length,
+        totalItemsStored: 580,
+        utilizedBins: 11,
+        totalStorageChargesMinor: totalStorageCharges,
+      },
+      packaging: {
+        totalJobs: packagingJobs.length,
+        totalUnitsPacked: packagingJobs.reduce((sum: number, j: any) => sum + j.quantity, 0),
+        totalPackagingChargesMinor: totalPackagingCharges,
+      },
+      shipping: {
+        totalDispatches: shippingJobs.length,
+        totalCarrierCostMinor: shippingJobs.reduce((sum: number, j: any) => sum + j.carrierCostMinor, 0),
+        totalShippingChargesMinor: totalShippingCharges,
+      },
+      billing: {
+        totalServiceChargesMinor: totalServiceCharges,
+        paidAmountMinor: paidAmount,
+        outstandingBalanceMinor: Math.max(0, outstandingBalance),
+      },
+    } as unknown as T;
+  }
+
+  if (pathPart === '/warehouse-services/packaging') {
+    if (method === 'POST') {
+      const jobNumber = `PKG-2026-${String((data.packagingJobs || []).length + 1).padStart(3, '0')}`;
+      const newJob = {
+        id: `pkg_${Date.now()}`,
+        jobNumber,
+        clientId: body.clientId || 'client_apex',
+        clientName: body.clientName || 'Apex Electronics Ltd',
+        date: new Date().toISOString(),
+        packagingType: body.packagingType || 'CUSTOM_BOX',
+        quantity: body.quantity || 1,
+        materialCostMinor: body.materialCostMinor || 500,
+        serviceChargeMinor: body.serviceChargeMinor || 1000,
+        totalChargeMinor: (body.materialCostMinor || 500) + (body.serviceChargeMinor || 1000),
+        status: 'COMPLETED',
+        orderNumber: body.orderNumber || undefined,
+        performedBy: body.performedBy || 'Jack Miller (Warehouse Staff)',
+        notes: body.notes || 'Warehouse service packaging recorded.',
+      };
+      if (!data.packagingJobs) data.packagingJobs = [];
+      data.packagingJobs.unshift(newJob);
+      clientDb.save();
+      return { job: newJob } as unknown as T;
+    }
+    return { packagingJobs: data.packagingJobs || [] } as unknown as T;
+  }
+
+  if (pathPart === '/warehouse-services/shipping') {
+    if (method === 'POST') {
+      const dispatchId = `DSP-2026-${String((data.shippingJobs || []).length + 1).padStart(3, '0')}`;
+      const newJob = {
+        id: `shp_${Date.now()}`,
+        dispatchId,
+        clientId: body.clientId || 'client_apex',
+        clientName: body.clientName || 'Apex Electronics Ltd',
+        date: new Date().toISOString(),
+        carrier: body.carrier || 'Royal Mail',
+        trackingNumber: body.trackingNumber || `GB-${Date.now().toString().slice(-8)}RM`,
+        serviceLevel: body.serviceLevel || 'Tracked 24',
+        parcelWeightKg: body.parcelWeightKg || 1.0,
+        carrierCostMinor: body.carrierCostMinor || 400,
+        serviceChargeMinor: body.serviceChargeMinor || 600,
+        totalChargeMinor: (body.carrierCostMinor || 400) + (body.serviceChargeMinor || 600),
+        status: 'DISPATCHED',
+        orderNumber: body.orderNumber || 'NX-ORD-2026-001',
+        destination: body.destination || 'UK Mainland',
+      };
+      if (!data.shippingJobs) data.shippingJobs = [];
+      data.shippingJobs.unshift(newJob);
+      clientDb.save();
+      return { job: newJob } as unknown as T;
+    }
+    return { shippingJobs: data.shippingJobs || [] } as unknown as T;
+  }
+
+  // 15. Phase 1 Dropshipping Calculator
+  if (pathPart === '/dropshipping/calculations') {
+    if (method === 'POST') {
+      const newCalc = {
+        id: body.id || `ds_${Date.now()}`,
+        productId: body.productId,
+        sku: body.sku || 'DS-SKU-CUSTOM',
+        productName: body.productName || 'Custom Dropshipped Product',
+        supplierName: body.supplierName || 'Global DropShip Source',
+        purchaseCostMinor: body.purchaseCostMinor || 0,
+        supplierCostMinor: body.supplierCostMinor || body.purchaseCostMinor || 0,
+        shippingCostMinor: body.shippingCostMinor || 0,
+        packagingCostMinor: body.packagingCostMinor || 0,
+        additionalExpensesMinor: body.additionalExpensesMinor || 0,
+        sellingPriceMinor: body.sellingPriceMinor || 0,
+        marketplaceFeePercent: body.marketplaceFeePercent || 12.8,
+        marketplaceFeeMinor: body.marketplaceFeeMinor || 0,
+        otherCostsMinor: body.otherCostsMinor || 0,
+        shippingOption: body.shippingOption || 'SHIPPING_INCLUDED',
+        shippingChargedToCustomerMinor: body.shippingChargedToCustomerMinor || 0,
+        totalCostMinor: body.totalCostMinor || 0,
+        grossProfitMinor: body.grossProfitMinor || 0,
+        marginPercent: body.marginPercent || 0,
+        netProfitMinor: body.netProfitMinor || 0,
+        currency: body.currency || 'GBP',
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'Marcus Reid (Operations Manager)',
+      };
+      if (!data.dropshippingCalculations) data.dropshippingCalculations = [];
+      const existingIdx = data.dropshippingCalculations.findIndex((c: any) => c.id === newCalc.id);
+      if (existingIdx >= 0) {
+        data.dropshippingCalculations[existingIdx] = newCalc;
+      } else {
+        data.dropshippingCalculations.unshift(newCalc);
+      }
+      clientDb.save();
+      return { calculation: newCalc } as unknown as T;
+    }
+    return { calculations: data.dropshippingCalculations || [] } as unknown as T;
+  }
+
+  // 16. System Config
   if (pathPart === '/system/config' || pathPart === '/config') {
     if (method === 'POST') {
       data.config = { ...data.config, ...body };
@@ -4293,4 +4956,5 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
 
   return {} as unknown as T;
 }
+
 

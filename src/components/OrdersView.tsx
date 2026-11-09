@@ -15,9 +15,12 @@ import {
   ExternalLink,
   ChevronRight,
   AlertTriangle,
+  Edit,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { Order, OrderStatus, User, SystemConfig } from '../types';
+import { Order, OrderStatus, User, SystemConfig, Product } from '../types';
+import { EditOrderModal } from './EditOrderModal';
+
 
 interface OrdersViewProps {
   currentUser: User;
@@ -40,6 +43,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [orderHistories, setOrderHistories] = useState<any[]>([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
   const [carrierInput, setCarrierInput] = useState('Royal Mail');
   const [trackingInput, setTrackingInput] = useState('');
   const [shippingCostInput, setShippingCostInput] = useState('4.50');
@@ -48,7 +53,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
   useEffect(() => {
     loadOrders();
+    loadProducts();
   }, [statusFilter, currentUser.id]);
+
+  const loadProducts = async () => {
+    try {
+      const res = await api.getProducts();
+      setProducts(res.products);
+    } catch (e) {
+      console.warn('Failed to load products for editing', e);
+    }
+  };
 
   const loadOrders = async () => {
     setLoading(true);
@@ -57,6 +72,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         status: statusFilter === 'PENDING_GROUP' ? undefined : statusFilter,
         search,
       });
+
 
       let list = res.orders;
       if (statusFilter === 'PENDING_GROUP') {
@@ -373,13 +389,26 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 </p>
               </div>
 
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-md"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER' && (
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-md shadow-2xs text-xs transition"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Edit Order</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-md"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+
 
             {/* Error banner inside modal */}
             {actionError && (
@@ -687,6 +716,22 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Edit Order Modal */}
+      {showEditModal && selectedOrder && (
+        <EditOrderModal
+          order={selectedOrder}
+          products={products}
+          currentUser={currentUser}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={(updated) => {
+            setSelectedOrder(updated);
+            loadOrders();
+            openOrderDetail(updated.id);
+          }}
+        />
+      )}
     </div>
   );
 };
+

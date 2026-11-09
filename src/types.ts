@@ -22,6 +22,11 @@ import {
   AuditLogEntry,
   NotificationItem,
   SystemConfig,
+  EbayPayout,
+  FinancialReconciliation,
+  WarehousePackagingJob,
+  WarehouseShippingJob,
+  DropshippingCalculation,
 } from '../server/types';
 
 export type {
@@ -48,6 +53,11 @@ export type {
   AuditLogEntry,
   NotificationItem,
   SystemConfig,
+  EbayPayout,
+  FinancialReconciliation,
+  WarehousePackagingJob,
+  WarehouseShippingJob,
+  DropshippingCalculation,
 };
 
 export type NavItem =
@@ -59,8 +69,10 @@ export type NavItem =
   | 'products'
   | 'inventory'
   | 'adjustments'
+  | 'dropshipping'
   | 'warehouse'
   | 'locations'
+  | 'warehouse-services'
   | 'suppliers'
   | 'purchase-orders'
   | '3pl-clients'
@@ -70,6 +82,8 @@ export type NavItem =
   | 'invoices'
   | 'payments'
   | 'expenses'
+  | 'payouts'
+  | 'reconciliation'
   | 'profitability'
   | 'reports'
   | 'notifications'

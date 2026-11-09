@@ -3,7 +3,20 @@ import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
 import { reportsService } from './reports';
-import { User, UserRole, Order, OrderStatus, StockState, OwnerType } from './types';
+import {
+  User,
+  UserRole,
+  Order,
+  OrderStatus,
+  StockState,
+  OwnerType,
+  EbayPayout,
+  FinancialReconciliation,
+  WarehousePackagingJob,
+  WarehouseShippingJob,
+  DropshippingCalculation,
+} from './types';
+
 
 export const apiRouter = Router();
 
@@ -266,6 +279,18 @@ apiRouter.post('/orders/:id/transition', (req: Request, res: Response) => {
     trackingNumber,
     note,
   });
+
+  if (!result.success) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+
+  res.json({ order: result.order });
+});
+
+apiRouter.put('/orders/:id', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  const result = engine.editOrder(req.params.id, req.body, user);
 
   if (!result.success) {
     res.status(400).json({ error: result.error });
@@ -1047,6 +1072,237 @@ apiRouter.get('/me', (req: Request, res: Response) => {
 apiRouter.get('/exceptions', (_req: Request, res: Response) => {
   const raw = db.getRawData();
   res.json({ exceptions: raw.exceptions });
+});
+
+/**
+ * PHASE 4 – EBAY PAYOUTS & RECONCILIATION
+ */
+apiRouter.get('/payouts', (req: Request, res: Response) => {
+  const raw = db.getRawData();
+  const { accountId } = req.query;
+  let payouts = raw.payouts || [];
+  if (accountId && accountId !== 'ALL') {
+    payouts = payouts.filter((p) => p.marketplaceAccountId === accountId);
+  }
+  res.json({ payouts });
+});
+
+apiRouter.post('/payouts/:id/confirm-deposit', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  const raw = db.getRawData();
+  const payout = (raw.payouts || []).find((p) => p.id === req.params.id);
+  if (!payout) {
+    res.status(404).json({ error: 'Payout not found' });
+    return;
+  }
+
+  payout.status = 'BANK_CONFIRMED';
+  payout.bankDepositStatus = 'RECONCILED';
+  payout.bankReference = req.body.bankReference || `BANK-DEP-${Date.now()}`;
+
+  const now = new Date().toISOString();
+  raw.financialLedger.push({
+    id: `fin_pay_dep_${Date.now()}`,
+    accountId: '1000',
+    accountName: 'Operating Cash at Bank (Barclays)',
+    debitMinor: payout.netPayoutMinor,
+    creditMinor: 0,
+    sourceType: 'PAYMENT',
+    sourceId: payout.id,
+    note: `Bank Deposit Cleared for ${payout.accountName} Payout ${payout.payoutId}`,
+    createdAt: now,
+  });
+
+  raw.financialLedger.push({
+    id: `fin_pay_clr_${Date.now()}`,
+    accountId: '1250',
+    accountName: 'Marketplace Settlement Clearing',
+    debitMinor: 0,
+    creditMinor: payout.netPayoutMinor,
+    sourceType: 'PAYMENT',
+    sourceId: payout.id,
+    note: `Clearing settlement for ${payout.payoutId}`,
+    createdAt: now,
+  });
+
+  raw.auditLogs.unshift({
+    id: `aud_payout_${Date.now()}`,
+    actorId: user.id,
+    actorName: user.name,
+    action: 'APPROVE',
+    entity: 'EbayPayout',
+    entityId: payout.id,
+    notes: `Confirmed bank deposit for payout ${payout.payoutId} by ${user.name}`,
+    timestamp: now,
+  });
+
+  db.save();
+  res.json({ success: true, payout });
+});
+
+apiRouter.get('/reconciliation', (req: Request, res: Response) => {
+  const raw = db.getRawData();
+  const { accountId } = req.query;
+  let reconciliations = raw.reconciliations || [];
+  if (accountId && accountId !== 'ALL') {
+    reconciliations = reconciliations.filter((r) => r.marketplaceAccountId === accountId);
+  }
+  res.json({ reconciliations });
+});
+
+/**
+ * PHASE 3 – WAREHOUSE SERVICES (STORAGE, PACKAGING, SHIPPING, BILLING)
+ */
+apiRouter.get('/warehouse-services/summary', (req: Request, res: Response) => {
+  const raw = db.getRawData();
+  const clients = raw.clients || [];
+  const pkgJobs = raw.packagingJobs || [];
+  const shpJobs = raw.shippingJobs || [];
+
+  const totalPackagingCharges = pkgJobs.reduce((acc, j) => acc + j.totalChargeMinor, 0);
+  const totalShippingCharges = shpJobs.reduce((acc, j) => acc + j.totalChargeMinor, 0);
+  const totalStorageCharges = 21600;
+  const totalServiceCharges = totalPackagingCharges + totalShippingCharges + totalStorageCharges;
+  const totalPaid = 36000;
+  const outstandingBalance = Math.max(0, totalServiceCharges - totalPaid);
+
+  res.json({
+    summary: {
+      totalClients: clients.length,
+      totalServicesProvided: pkgJobs.length + shpJobs.length + 18,
+      totalPackagingChargesMinor: totalPackagingCharges,
+      totalShippingChargesMinor: totalShippingCharges,
+      totalStorageChargesMinor: totalStorageCharges,
+      totalServiceChargesMinor: totalServiceCharges,
+      totalPaidMinor: totalPaid,
+      outstandingBalanceMinor: outstandingBalance,
+      currency: raw.config.baseCurrency,
+    },
+    clients,
+    packagingJobs: pkgJobs,
+    shippingJobs: shpJobs,
+  });
+});
+
+apiRouter.get('/warehouse-services/packaging', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ packagingJobs: raw.packagingJobs || [] });
+});
+
+apiRouter.post('/warehouse-services/packaging', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  const raw = db.getRawData();
+  const body = req.body;
+
+  const now = new Date().toISOString();
+  const newJob: WarehousePackagingJob = {
+    id: `pkg_${Date.now()}`,
+    jobNumber: `PKG-2026-${String((raw.packagingJobs || []).length + 1).padStart(3, '0')}`,
+    clientId: body.clientId,
+    clientName: body.clientName || 'Client',
+    date: now,
+    packagingType: body.packagingType || 'CUSTOM_BOX',
+    quantity: Number(body.quantity) || 1,
+    materialCostMinor: Number(body.materialCostMinor) || 1000,
+    serviceChargeMinor: Number(body.serviceChargeMinor) || 2000,
+    totalChargeMinor: (Number(body.materialCostMinor) || 1000) + (Number(body.serviceChargeMinor) || 2000),
+    status: 'COMPLETED',
+    orderNumber: body.orderNumber,
+    performedBy: user.name,
+    notes: body.notes,
+  };
+
+  raw.packagingJobs = raw.packagingJobs || [];
+  raw.packagingJobs.unshift(newJob);
+  db.save();
+  res.status(201).json({ job: newJob });
+});
+
+apiRouter.get('/warehouse-services/shipping', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ shippingJobs: raw.shippingJobs || [] });
+});
+
+apiRouter.post('/warehouse-services/shipping', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  const raw = db.getRawData();
+  const body = req.body;
+
+  const now = new Date().toISOString();
+  const newJob: WarehouseShippingJob = {
+    id: `shp_${Date.now()}`,
+    dispatchId: `DSP-2026-${String((raw.shippingJobs || []).length + 1).padStart(3, '0')}`,
+    clientId: body.clientId,
+    clientName: body.clientName || 'Client',
+    date: now,
+    carrier: body.carrier || 'Royal Mail',
+    trackingNumber: body.trackingNumber || `TRACK-${Date.now()}`,
+    serviceLevel: body.serviceLevel || 'Standard Tracked',
+    parcelWeightKg: Number(body.parcelWeightKg) || 1.0,
+    carrierCostMinor: Number(body.carrierCostMinor) || 450,
+    serviceChargeMinor: Number(body.serviceChargeMinor) || 750,
+    totalChargeMinor: (Number(body.carrierCostMinor) || 450) + (Number(body.serviceChargeMinor) || 750),
+    status: 'DISPATCHED',
+    orderNumber: body.orderNumber || 'DIRECT',
+    destination: body.destination || 'United Kingdom',
+  };
+
+  raw.shippingJobs = raw.shippingJobs || [];
+  raw.shippingJobs.unshift(newJob);
+  db.save();
+  res.status(201).json({ job: newJob });
+});
+
+/**
+ * PHASE 1 – DROPSHIPPING COST CALCULATOR
+ */
+apiRouter.get('/dropshipping/calculations', (_req: Request, res: Response) => {
+  const raw = db.getRawData();
+  res.json({ calculations: raw.dropshippingCalculations || [] });
+});
+
+apiRouter.post('/dropshipping/calculations', (req: Request, res: Response) => {
+  const user = getActiveUser(req);
+  const raw = db.getRawData();
+  const body = req.body;
+
+  const now = new Date().toISOString();
+  const calc: DropshippingCalculation = {
+    id: `ds_${Date.now()}`,
+    productId: body.productId,
+    sku: body.sku,
+    productName: body.productName,
+    supplierName: body.supplierName,
+    purchaseCostMinor: Number(body.purchaseCostMinor) || 0,
+    supplierCostMinor: Number(body.supplierCostMinor) || 0,
+    shippingCostMinor: Number(body.shippingCostMinor) || 0,
+    packagingCostMinor: Number(body.packagingCostMinor) || 0,
+    additionalExpensesMinor: Number(body.additionalExpensesMinor) || 0,
+    sellingPriceMinor: Number(body.sellingPriceMinor) || 0,
+    marketplaceFeePercent: Number(body.marketplaceFeePercent) || 12.8,
+    marketplaceFeeMinor: Number(body.marketplaceFeeMinor) || 0,
+    otherCostsMinor: Number(body.otherCostsMinor) || 0,
+    shippingOption: body.shippingOption || 'SHIPPING_INCLUDED',
+    shippingChargedToCustomerMinor: Number(body.shippingChargedToCustomerMinor) || 0,
+    totalCostMinor: Number(body.totalCostMinor) || 0,
+    grossProfitMinor: Number(body.grossProfitMinor) || 0,
+    marginPercent: Number(body.marginPercent) || 0,
+    netProfitMinor: Number(body.netProfitMinor) || 0,
+    currency: body.currency || 'GBP',
+    updatedAt: now,
+    updatedBy: user.name,
+  };
+
+  raw.dropshippingCalculations = raw.dropshippingCalculations || [];
+  const existingIdx = raw.dropshippingCalculations.findIndex((c) => c.sku === calc.sku);
+  if (existingIdx >= 0) {
+    raw.dropshippingCalculations[existingIdx] = calc;
+  } else {
+    raw.dropshippingCalculations.unshift(calc);
+  }
+
+  db.save();
+  res.status(201).json({ calculation: calc });
 });
 
 // 404 for unhandled API calls
