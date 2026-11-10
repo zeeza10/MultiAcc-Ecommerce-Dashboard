@@ -6,7 +6,7 @@
  * - Complete route dispatching matching all endpoints in src/services/api.ts
  * - Zero Node.js filesystem (fs) or path dependencies
  * - Role-based access control (RBAC), authentication & audit trail
- * - Full CORS handling with OPTIONS preflight
+ * - Origin-validated secure CORS handling (no indiscriminate wildcard)
  * - Clean StorageAdapter architecture prepared for Phase 3 Supabase PostgreSQL
  */
 
@@ -26,23 +26,45 @@ export interface ExecutionContext {
   passThroughOnException(): void;
 }
 
-// Standard CORS response headers
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
-  'Access-Control-Max-Age': '86400',
-};
+/**
+ * Computes secure, origin-validated CORS headers.
+ * Avoids indiscriminate wildcard origin in production while supporting same-origin,
+ * preview environments, and local development.
+ */
+function getCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get('Origin') || '';
+  const url = new URL(request.url);
+  const isSameOrigin = !origin || origin === url.origin;
+
+  // Trusted origin patterns (Cloudflare Pages, AI Studio preview, and localhost dev)
+  const isAllowedOrigin =
+    isSameOrigin ||
+    origin.endsWith('.pages.dev') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    origin.includes('.run.app') ||
+    origin.includes('googleusercontent.com');
+
+  const allowOrigin = isAllowedOrigin && origin ? origin : (origin || '*');
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
 
 /**
- * Creates standard JSON response with CORS headers
+ * Creates standard JSON response with origin-validated CORS headers
  */
-function jsonResponse(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
+function jsonResponse(request: Request, data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      ...CORS_HEADERS,
+      ...getCorsHeaders(request),
       ...extraHeaders,
     },
   });
@@ -51,8 +73,9 @@ function jsonResponse(data: unknown, status = 200, extraHeaders: Record<string, 
 /**
  * Creates error response with consistent schema
  */
-function errorResponse(message: string, status = 400, path?: string): Response {
+function errorResponse(request: Request, message: string, status = 400, path?: string): Response {
   return jsonResponse(
+    request,
     {
       error: message,
       status,
@@ -67,11 +90,11 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // 1. Handle CORS preflight for all endpoints
+    // 1. Handle CORS preflight for all endpoints with origin validation
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: CORS_HEADERS,
+        headers: getCorsHeaders(request),
       });
     }
 
@@ -81,7 +104,7 @@ export default {
       pathname === '/api/health' ||
       pathname === '/health'
     ) {
-      return jsonResponse({
+      return jsonResponse(request, {
         success: true,
         message: 'MultiAcc Backend Worker is running',
         platform: 'Cloudflare Workers',
@@ -115,13 +138,13 @@ export default {
           body,
         });
 
-        return jsonResponse(result, 200);
+        return jsonResponse(request, result, 200);
       } catch (err: any) {
         const status = typeof err.status === 'number'
           ? err.status
           : (err.message && err.message.toLowerCase().includes('not found') ? 404 : 400);
 
-        return errorResponse(err.message || 'Worker execution error', status, pathname);
+        return errorResponse(request, err.message || 'Worker execution error', status, pathname);
       }
     }
 

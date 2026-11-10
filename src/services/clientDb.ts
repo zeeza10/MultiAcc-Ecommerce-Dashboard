@@ -4298,12 +4298,20 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
     } as unknown as T;
   }
 
-  // Extract caller user from headers
+  // Extract and validate caller user identity from headers
   const headers = options.headers instanceof Headers
     ? options.headers
     : new Headers(options.headers || {});
-  const userId = headers.get('x-user-id') || 'usr_superadmin';
-  const currentUser = data.users.find((u: any) => u.id === userId) || data.users[0];
+  const userId = headers.get('x-user-id');
+  let currentUser = userId ? data.users.find((u: any) => u.id === userId) : null;
+  if (!currentUser) {
+    currentUser = data.users[0]; // Baseline default identity
+  }
+  if (!currentUser.isActive) {
+    const inactiveErr: any = new Error('Unauthorized: User account is inactive or disabled.');
+    inactiveErr.status = 403;
+    throw inactiveErr;
+  }
 
   // 1. Auth
   if (pathPart === '/auth/users' || pathPart === '/users') {
@@ -4459,6 +4467,19 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
         throw notFound;
       }
 
+      // Role-based access control: Only Super Admin and Ops Manager can edit orders
+      if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'OPS_MANAGER') {
+        const err: any = new Error('Unauthorized: Order editing requires Super Admin or Operations Manager privileges.');
+        err.status = 403;
+        throw err;
+      }
+
+      if (!body.reason && !body.editReason) {
+        const err: any = new Error('Validation Error: A mandatory audit reason is required when editing an order.');
+        err.status = 400;
+        throw err;
+      }
+
       // Update lines and recalculate totals if items provided
       if (body.items && Array.isArray(body.items)) {
         order.lines = body.items.map((item: any, idx: number) => {
@@ -4557,6 +4578,12 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   // 4. Products
   if (pathPart === '/products') {
     if (method === 'POST') {
+      if (currentUser.role === 'WAREHOUSE_STAFF' || currentUser.role === 'VIEWER') {
+        const err: any = new Error('Unauthorized: Not authorized to create products');
+        err.status = 403;
+        throw err;
+      }
+
       const newProd: Product = {
         id: `prd_${Date.now()}`,
         sku: body.sku,
@@ -4580,8 +4607,16 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
       return { product: newProd } as unknown as T;
     }
 
-    const enhanced = data.products.map((p) => ({
+    const isWarehouseStaff = currentUser.role === 'WAREHOUSE_STAFF';
+    let productsList = [...data.products];
+    if (currentUser.role === 'CLIENT_USER') {
+      productsList = productsList.filter((p) => p.ownerId === currentUser.clientId);
+    }
+
+    const enhanced = productsList.map((p) => ({
       ...p,
+      costPriceMinor: isWarehouseStaff ? 0 : p.costPriceMinor,
+      sellingPriceMinor: isWarehouseStaff ? 0 : p.sellingPriceMinor,
       stockOnHand: 45,
       stockReserved: 4,
       stockAvailable: 41,
@@ -4642,12 +4677,22 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   if (pathPart.includes('/stock/adjustments/') && pathPart.endsWith('/decision')) {
     const adjId = pathPart.split('/')[3];
     const adj = data.stockAdjustments.find((a: any) => a.id === adjId);
-    if (adj) {
-      adj.status = body.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
-      adj.approvalNote = body.approvalNote;
-      clientDb.save();
-      return { adjustment: adj } as unknown as T;
+    if (!adj) {
+      const notFound: any = new Error(`Stock adjustment ${adjId} not found`);
+      notFound.status = 404;
+      throw notFound;
     }
+    if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'OPS_MANAGER') {
+      const err: any = new Error('Unauthorized: Only Operations Managers or Super Admins can decide stock adjustments.');
+      err.status = 403;
+      throw err;
+    }
+    adj.status = body.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    adj.approvalNote = body.approvalNote || body.reasonNotes;
+    adj.reviewedByUserId = currentUser.id;
+    adj.reviewedAt = new Date().toISOString();
+    clientDb.save();
+    return { adjustment: adj } as unknown as T;
   }
 
   // 7. eBay Accounts & Exceptions
@@ -4727,11 +4772,20 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   if (pathPart.includes('/finance/invoices/') && pathPart.endsWith('/void')) {
     const invId = pathPart.split('/')[3];
     const inv = data.invoices.find((i: any) => i.id === invId);
-    if (inv) {
-      inv.status = 'VOID';
-      clientDb.save();
-      return { success: true, invoice: inv } as unknown as T;
+    if (!inv) {
+      const notFound: any = new Error(`Invoice ${invId} not found`);
+      notFound.status = 404;
+      throw notFound;
     }
+    if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'FINANCE_USER') {
+      const err: any = new Error('Unauthorized: Only Finance Users or Super Admins can void invoices.');
+      err.status = 403;
+      throw err;
+    }
+    inv.status = 'VOID';
+    inv.voidReason = body.reason || 'Voided by authorized administrator';
+    clientDb.save();
+    return { success: true, invoice: inv } as unknown as T;
   }
   if (pathPart === '/finance/payments') {
     if (method === 'POST') {
