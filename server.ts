@@ -13,23 +13,37 @@ async function startServer() {
   const app = express();
   const port = 3000;
   const distPath = path.resolve(__dirname, 'dist');
-  const hasDist = fs.existsSync(path.resolve(distPath, 'index.html'));
 
   app.use(express.json());
+
+  // Mount health check endpoint
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      success: true,
+      message: 'MultiAcc Backend Worker is running',
+      platform: 'Cloudflare Workers',
+    });
+  });
 
   // Mount internal API routes
   app.use('/api/v1', apiRouter);
 
+  // Check both dist/client and dist root for compiled assets
+  const clientPath = fs.existsSync(path.resolve(distPath, 'client', 'index.html'))
+    ? path.resolve(distPath, 'client')
+    : distPath;
+  const hasDist = fs.existsSync(path.resolve(clientPath, 'index.html'));
+
   if (hasDist) {
     // Ultra-fast instant static serving (zero bundle delay)
     // Assets with content hashes can be cached safely
-    app.use('/assets', express.static(path.resolve(distPath, 'assets'), {
+    app.use('/assets', express.static(path.resolve(clientPath, 'assets'), {
       maxAge: '1y',
       immutable: true,
     }));
 
     // Static html and roots must never be cached to prevent stale clients
-    app.use(express.static(distPath, {
+    app.use(express.static(clientPath, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -43,7 +57,7 @@ async function startServer() {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.sendFile(path.resolve(distPath, 'index.html'));
+      res.sendFile(path.resolve(clientPath, 'index.html'));
     });
   } else {
     // Mount Vite middleware in development if dist not built yet

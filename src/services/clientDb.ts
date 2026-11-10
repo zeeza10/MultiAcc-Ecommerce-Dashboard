@@ -4285,6 +4285,15 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
     }
   }
 
+  // Health check endpoint
+  if (pathPart === '/api/health' || pathPart === '/health') {
+    return {
+      success: true,
+      message: 'MultiAcc Backend Worker is running',
+      platform: 'Cloudflare Workers',
+    } as unknown as T;
+  }
+
   // 1. Auth
   if (pathPart === '/auth/users' || pathPart === '/users') {
     return { users: data.users } as unknown as T;
