@@ -282,5 +282,6 @@ export const api = {
       body: JSON.stringify(config),
     }),
   resetDemo: () => request<{ success: boolean; message: string }>('/system/reset-demo', { method: 'POST' }),
+  getHealth: () => request<{ success: boolean; message: string; platform: string }>('/health'),
 };
 

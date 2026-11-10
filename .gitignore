@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Cloudflare Wrangler & Secrets
+.wrangler/
+.dev.vars*
+worker-configuration.d.ts
+
