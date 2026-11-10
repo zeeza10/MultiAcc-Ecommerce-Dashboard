@@ -8,6 +8,7 @@ import {
   Sliders,
   ShieldCheck,
   Layers,
+  Cloud,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, SystemConfig } from '../types';
@@ -37,6 +38,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activePhase, setActivePhase] = useState(config.activeReleasePhase);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [workerHealth, setWorkerHealth] = useState<{
+    success: boolean;
+    message: string;
+    platform: string;
+  } | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  React.useEffect(() => {
+    checkHealth();
+  }, []);
+
+  const checkHealth = async () => {
+    setCheckingHealth(true);
+    try {
+      const res = await api.getHealth();
+      setWorkerHealth(res);
+    } catch {
+      setWorkerHealth({
+        success: false,
+        message: 'Unable to reach backend worker',
+        platform: 'Cloudflare Workers (Offline)',
+      });
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,6 +266,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </form>
+
+      {/* Cloudflare Worker & API Synchronization Status */}
+      <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+          <div className="flex items-center space-x-2">
+            <Cloud className="w-4 h-4 text-indigo-600" />
+            <h3 className="font-bold text-gray-900 text-sm">Cloudflare Worker Backend & API Status</h3>
+          </div>
+          <button
+            type="button"
+            onClick={checkHealth}
+            disabled={checkingHealth}
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${checkingHealth ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-2.5 rounded bg-slate-50 border border-slate-200">
+            <span className="text-gray-500 block text-[11px]">Runtime Platform</span>
+            <span className="font-semibold text-gray-900">{workerHealth?.platform || 'Cloudflare Workers'}</span>
+          </div>
+          <div className="p-2.5 rounded bg-slate-50 border border-slate-200">
+            <span className="text-gray-500 block text-[11px]">Worker Endpoint Status (/api/health)</span>
+            <span className="font-semibold text-emerald-600 flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5" />
+              {workerHealth?.success ? 'Active & Healthy' : 'Connecting...'}
+            </span>
+          </div>
+          <div className="p-2.5 rounded bg-slate-50 border border-slate-200">
+            <span className="text-gray-500 block text-[11px]">Worker Status Message</span>
+            <span className="font-medium text-gray-800">{workerHealth?.message || 'MultiAcc Backend Worker is running'}</span>
+          </div>
+        </div>
+      </div>
 
       {/* Demo Data Management */}
       <div className="bg-white border border-rose-200 rounded-lg p-4 shadow-2xs space-y-3">

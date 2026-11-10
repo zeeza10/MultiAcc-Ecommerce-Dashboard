@@ -158,7 +158,7 @@ apiRouter.get('/orders', (req: Request, res: Response) => {
 apiRouter.get('/orders/:id', (req: Request, res: Response) => {
   const user = getActiveUser(req);
   const raw = db.getRawData();
-  const order = raw.orders.find((o) => o.id === req.params.id);
+  const order = raw.orders.find((o) => o.id === req.params.id || o.orderNumber === req.params.id);
 
   if (!order) {
     res.status(404).json({ error: 'Order not found' });

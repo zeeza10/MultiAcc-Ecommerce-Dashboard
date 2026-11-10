@@ -3851,14 +3851,17 @@ class ClientDatabaseManager {
   private load(): ClientDatabaseState {
     let result: ClientDatabaseState;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+      const isLocalStorageAvailable = typeof localStorage !== 'undefined';
+      const stored = isLocalStorageAvailable
+        ? (localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY))
+        : null;
       if (stored) {
         result = JSON.parse(stored);
       } else {
         result = JSON.parse(JSON.stringify(SEED_DATA));
       }
     } catch (e) {
-      console.warn('Failed to load client db from localStorage:', e);
+      console.warn('Failed to load client db from storage:', e);
       result = JSON.parse(JSON.stringify(SEED_DATA));
     }
 
@@ -4248,6 +4251,7 @@ class ClientDatabaseManager {
 
 
   public save() {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
     } catch (e) {
@@ -4294,12 +4298,19 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
     } as unknown as T;
   }
 
+  // Extract caller user from headers
+  const headers = options.headers instanceof Headers
+    ? options.headers
+    : new Headers(options.headers || {});
+  const userId = headers.get('x-user-id') || 'usr_superadmin';
+  const currentUser = data.users.find((u: any) => u.id === userId) || data.users[0];
+
   // 1. Auth
   if (pathPart === '/auth/users' || pathPart === '/users') {
     return { users: data.users } as unknown as T;
   }
   if (pathPart === '/auth/me' || pathPart === '/me') {
-    return { user: data.users[0] } as unknown as T;
+    return { user: currentUser } as unknown as T;
   }
 
   // 2. Dashboard
@@ -4398,17 +4409,23 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
 
     let list = [...data.orders];
     const status = params.get('status');
+    const accountId = params.get('accountId');
     const search = params.get('search');
     if (status && status !== 'ALL') {
       list = list.filter((o) => o.status === status);
+    }
+    if (accountId && accountId !== 'ALL') {
+      list = list.filter((o) => o.marketplaceAccountId === accountId);
     }
     if (search) {
       const s = search.toLowerCase();
       list = list.filter(
         (o) =>
           o.orderNumber.toLowerCase().includes(s) ||
+          (o.externalOrderId && o.externalOrderId.toLowerCase().includes(s)) ||
           o.customerName.toLowerCase().includes(s) ||
-          (o.trackingNumber && o.trackingNumber.toLowerCase().includes(s))
+          (o.trackingNumber && o.trackingNumber.toLowerCase().includes(s)) ||
+          (o.lines && o.lines.some((l: any) => l.sku?.toLowerCase().includes(s) || l.productName?.toLowerCase().includes(s)))
       );
     }
     return { orders: list } as unknown as T;
@@ -4417,15 +4434,18 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
   if (pathPart.startsWith('/orders/') && pathPart.endsWith('/transition')) {
     const orderId = pathPart.split('/')[2];
     const targetStatus = body.targetStatus as OrderStatus;
-    const order = data.orders.find((o) => o.id === orderId);
-    if (order) {
-      order.status = targetStatus;
-      if (body.carrier) order.carrier = body.carrier;
-      if (body.trackingNumber) order.trackingNumber = body.trackingNumber;
-      order.updatedAt = new Date().toISOString();
-      clientDb.save();
-      return { order } as unknown as T;
+    const order = data.orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!order) {
+      const notFound: any = new Error(`Order ${orderId} not found`);
+      notFound.status = 404;
+      throw notFound;
     }
+    order.status = targetStatus;
+    if (body.carrier) order.carrier = body.carrier;
+    if (body.trackingNumber) order.trackingNumber = body.trackingNumber;
+    order.updatedAt = new Date().toISOString();
+    clientDb.save();
+    return { order } as unknown as T;
   }
 
   if (pathPart.startsWith('/orders/')) {
@@ -4434,7 +4454,9 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
 
     if (method === 'PUT') {
       if (!order) {
-        throw new Error(`Order ${orderId} not found.`);
+        const notFound: any = new Error(`Order ${orderId} not found.`);
+        notFound.status = 404;
+        throw notFound;
       }
 
       // Update lines and recalculate totals if items provided
@@ -4495,7 +4517,7 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
         fromStatus: order.status,
         toStatus: order.status,
         reason: body.reason || body.editReason || 'Order details amended by authorized administrator.',
-        changedByUserId: 'usr_superadmin',
+        changedByUserId: currentUser.id,
         timestamp: new Date().toISOString(),
       };
       if (!data.orderHistories) data.orderHistories = [];
@@ -4504,8 +4526,8 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
       // Record in audit log
       const auditEntry: AuditLogEntry = {
         id: `aud_${Date.now()}`,
-        actorId: 'usr_superadmin',
-        actorName: 'Sarah Jenkins (Super Admin)',
+        actorId: currentUser.id,
+        actorName: currentUser.name,
         action: 'UPDATE',
         entity: 'ORDER',
         entityId: order.id,
@@ -4519,10 +4541,15 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
       return { order } as unknown as T;
     }
 
-    const matchedOrder = order || data.orders[0];
+    if (!order) {
+      const notFound: any = new Error(`Order ${orderId} not found`);
+      notFound.status = 404;
+      throw notFound;
+    }
+
     return {
-      order: matchedOrder,
-      histories: (data.orderHistories || []).filter((h: any) => h.orderId === matchedOrder.id || h.orderId === orderId),
+      order,
+      histories: (data.orderHistories || []).filter((h: any) => h.orderId === order.id || h.orderId === orderId),
     } as unknown as T;
   }
 
@@ -4974,7 +5001,9 @@ export async function handleClientDbRequest<T>(endpoint: string, options: Reques
     return { success: true, message: 'Client database reset to seed baseline.' } as unknown as T;
   }
 
-  return {} as unknown as T;
+  const notFoundErr: any = new Error(`API endpoint not found: ${pathPart}`);
+  notFoundErr.status = 404;
+  throw notFoundErr;
 }
 
 

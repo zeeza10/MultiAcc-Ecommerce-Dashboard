@@ -52,20 +52,11 @@ const isKnownStaticHost = (): boolean => {
   );
 };
 
-let staticModeDetected: boolean | null = null;
-
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   headers.set('x-user-id', currentUserId);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
-  }
-
-  // If we know this is a static hosting environment (like Cloudflare Pages), bypass fetch
-  // to avoid HTTP 405 Method Not Allowed / 404 network errors and execute cleanly in-browser
-  if (staticModeDetected === true || (staticModeDetected === null && isKnownStaticHost())) {
-    staticModeDetected = true;
-    return handleClientDbRequest<T>(endpoint, options);
   }
 
   try {
@@ -79,14 +70,27 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       return (await res.json()) as T;
     }
 
-    // Backend returned non-JSON / 404 / 405 (static CDN hosting fallback)
-    staticModeDetected = true;
-  } catch (err) {
-    // Backend API unavailable (e.g. Cloudflare Pages / GitHub Pages static hosting)
-    staticModeDetected = true;
+    if (!res.ok) {
+      if (contentType.includes('application/json')) {
+        const errorJson = await res.json().catch(() => null);
+        if (errorJson && errorJson.error) {
+          throw new Error(errorJson.error);
+        }
+      }
+      if (res.status === 404) {
+        throw new Error(`Resource or endpoint not found: ${endpoint}`);
+      }
+      throw new Error(`Request failed with status ${res.status}`);
+    }
+  } catch (err: any) {
+    // If it's a known error from the API backend, re-throw so the UI can notify the user
+    if (err && err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+      throw err;
+    }
+    // Network or server unavailable - fallback gracefully to in-browser storage engine
   }
 
-  // Client-side fallback engine for Cloudflare Pages / Static Hosting
+  // Client-side fallback engine for offline or static hosting
   return handleClientDbRequest<T>(endpoint, options);
 }
 

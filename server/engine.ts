@@ -621,7 +621,7 @@ export class EngineService {
     actor: User
   ): { success: boolean; order?: Order; error?: string } {
     const raw = db.getRawData();
-    const order = raw.orders.find((o) => o.id === orderId);
+    const order = raw.orders.find((o) => o.id === orderId || o.orderNumber === orderId);
 
     if (!order) {
       return { success: false, error: 'Order not found' };
