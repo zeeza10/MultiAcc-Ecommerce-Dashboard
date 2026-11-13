@@ -102,3 +102,42 @@ export function OrganizationSetup() {
     </div>
   );
 }
+
+
+export function PasswordRecoveryScreen() {
+  const auth = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (password.length < 8) { setMessage('Password must be at least 8 characters.'); return; }
+    if (password !== confirmation) { setMessage('The passwords do not match.'); return; }
+    setBusy(true);
+    setMessage('');
+    try {
+      await auth.changePassword(password);
+      setMessage('Password updated. You can now continue securely.');
+    } catch (err: any) {
+      setMessage(err.message || 'Could not update password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-7 space-y-4">
+        <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center"><LockKeyhole /></div>
+        <h1 className="text-xl font-bold text-slate-900">Choose a new password</h1>
+        <label className="block text-sm font-medium text-slate-700">New password<input required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" /></label>
+        <label className="block text-sm font-medium text-slate-700">Confirm new password<input required type="password" minLength={8} value={confirmation} onChange={(e) => setConfirmation(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" /></label>
+        {message && <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">{message}</div>}
+        <button disabled={busy} className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5">{busy ? 'Updating…' : 'Update password'}</button>
+        <button type="button" onClick={() => void auth.signOutUser()} className="w-full py-2 text-sm text-slate-500 hover:text-slate-800">Cancel and sign out</button>
+      </form>
+    </div>
+  );
+}
