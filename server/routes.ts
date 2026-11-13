@@ -20,6 +20,12 @@ import {
 
 export const apiRouter = Router();
 
+const getActiveUser = (req: Request): User => {
+  const context = (req as any).authContext as VerifiedAuthContext | undefined;
+  if (!context) throw new Error('Authenticated request context is missing.');
+  return context.user;
+};
+
 interface VerifiedAuthContext {
   user: User;
   organizationId: string;
