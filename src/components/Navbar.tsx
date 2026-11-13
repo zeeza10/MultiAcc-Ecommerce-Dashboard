@@ -17,6 +17,7 @@ import { User, NotificationItem, SystemConfig } from '../types';
 interface NavbarProps {
   currentUser: User;
   onSignOut: () => void;
+  organizationName: string;
   config: SystemConfig;
   onUpdateConfig: (cfg: Partial<SystemConfig>) => void;
   notifications: NotificationItem[];
@@ -35,6 +36,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onSignOut,
+  organizationName,
   config,
   onUpdateConfig,
   notifications,
@@ -297,6 +299,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="px-3 py-3 border-b border-gray-100">
                   <div className="font-bold text-gray-900">{currentUser.name}</div>
                   <div className="text-gray-500 text-[11px]">{currentUser.email}</div>
+                  <div className="mt-2 text-[11px] text-slate-600">Workspace: <span className="font-semibold text-slate-800">{organizationName}</span></div>
                   <div className="mt-2">{getRoleBadge(currentUser.role)}</div>
                 </div>
                 <button onClick={() => { setShowUserMenu(false); onSignOut(); }} className="w-full text-left px-3 py-3 text-rose-700 hover:bg-rose-50 font-semibold">
