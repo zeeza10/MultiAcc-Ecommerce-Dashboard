@@ -39,3 +39,33 @@ The current Cloudflare Worker serves static assets only. It intentionally return
 ## Organization isolation status
 
 The Supabase business tables already have `organization_id` columns and RLS policies. The policy audit found RLS enabled across the public tables; the credentials table intentionally has no client policies (default deny). The remaining work is to move the business API from the in-memory demo repository to organization-scoped Supabase queries so the existing RLS policies enforce isolation end-to-end.
+
+
+## Cloudflare deployment variables
+
+The frontend reads Supabase values at Vite build time. Configure these under the Cloudflare Pages/Workers build environment for both Preview and Production:
+
+- `VITE_SUPABASE_URL=https://nmlwnezlsqystjrvszcd.supabase.co`
+- `VITE_SUPABASE_PUBLISHABLE_KEY=<the project's sb_publishable key>`
+
+The Cloudflare Worker also needs:
+
+- `API_ORIGIN=https://<your-express-api-host>` — origin only, no `/api/v1` suffix. The Worker proxies `/api/*` to this host and preserves the caller's Bearer token.
+- `ALLOWED_ORIGIN=https://<your-frontend-domain>` — exact deployed frontend origin.
+
+For local Vite/Express development, copy `.env.example` to `.env` and fill in the publishable key. For local Wrangler development, copy `.dev.vars.example` to `.dev.vars` and set API_ORIGIN to the local Express origin.
+
+The publishable key is intentionally public and must still be protected by RLS. Never configure a Supabase secret/service-role key in Vite, Cloudflare browser variables, or any `VITE_*` variable.
+
+## Supabase Auth URL configuration
+
+In Supabase Dashboard → Authentication → URL Configuration:
+
+- Site URL: the exact deployed frontend origin.
+- Redirect URLs: add the exact local origin (for example `http://localhost:3000/**`) and deployed frontend origin (for example `https://app.example.com/**`).
+
+Keep email confirmation enabled. In Authentication → Security and Protection (the exact menu label can vary), enable leaked-password protection.
+
+## Current API migration boundary
+
+The following reads now use the authenticated request's Supabase client, so database RLS is applied: app config, notifications, marketplace exceptions, marketplace accounts/sync runs, orders, and products. Other business routes are intentionally still behind the production safety gate until their read/write logic, transactional behavior, and organization-scoped policies are migrated and tested. Do not enable legacy demo mode in production.
