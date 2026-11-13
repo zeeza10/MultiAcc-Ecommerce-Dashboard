@@ -27,73 +27,32 @@ import {
 } from '../types';
 
 
-import { handleClientDbRequest } from './clientDb';
-
-let currentUserId = localStorage.getItem('nexus_active_user_id') || 'usr_superadmin';
-
-export const setStoredUserId = (id: string) => {
-  currentUserId = id;
-  localStorage.setItem('nexus_active_user_id', id);
-};
-
-export const getStoredUserId = () => currentUserId;
-
-// Detect if running on a static hosting provider (e.g. Cloudflare Pages, GitHub Pages)
-const isKnownStaticHost = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return (
-    host.includes('.pages.dev') ||
-    host.includes('.github.io') ||
-    host.includes('.netlify.app') ||
-    host.includes('.vercel.app') ||
-    host.includes('cloudflare') ||
-    (!host.includes('localhost') && !host.includes('127.0.0.1') && !window.location.port)
-  );
-};
-
-let staticModeDetected: boolean | null = null;
+import { supabase } from '../lib/supabase';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+
   const headers = new Headers(options.headers || {});
-  headers.set('x-user-id', currentUserId);
+  headers.set('Authorization', `Bearer ${session.access_token}`);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
   }
 
-  // If we know this is a static hosting environment (like Cloudflare Pages), bypass fetch
-  // to avoid HTTP 405 Method Not Allowed / 404 network errors and execute cleanly in-browser
-  if (staticModeDetected === true || (staticModeDetected === null && isKnownStaticHost())) {
-    staticModeDetected = true;
-    return handleClientDbRequest<T>(endpoint, options);
+  const response = await fetch(`/api/v1${endpoint}`, { ...options, headers });
+  const contentType = response.headers.get('content-type') || '';
+  const payload = contentType.includes('application/json') ? await response.json() : null;
+  if (!response.ok) {
+    throw new Error(payload?.error || `API request failed (${response.status}).`);
   }
-
-  try {
-    const res = await fetch(`/api/v1${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    const contentType = res.headers.get('content-type') || '';
-    if (res.ok && contentType.includes('application/json')) {
-      return (await res.json()) as T;
-    }
-
-    // Backend returned non-JSON / 404 / 405 (static CDN hosting fallback)
-    staticModeDetected = true;
-  } catch (err) {
-    // Backend API unavailable (e.g. Cloudflare Pages / GitHub Pages static hosting)
-    staticModeDetected = true;
+  if (!contentType.includes('application/json')) {
+    throw new Error('The authenticated API service is unavailable. Demo/local fallback is disabled.');
   }
-
-  // Client-side fallback engine for Cloudflare Pages / Static Hosting
-  return handleClientDbRequest<T>(endpoint, options);
+  return payload as T;
 }
 
 export const api = {
   // Auth
-  getUsers: () => request<{ users: User[] }>('/auth/users'),
-  getMe: () => request<{ user: User }>('/auth/me'),
 
   // Dashboard
   getKPIs: (period = '30D', accountId?: string) => {
