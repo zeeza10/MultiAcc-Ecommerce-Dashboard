@@ -130,6 +130,7 @@ export async function signOut() {
   } finally {
     saveSession(null);
     localStorage.removeItem(ACTIVE_ORG_KEY);
+    clearPasswordRecoverySession();
   }
 }
 
