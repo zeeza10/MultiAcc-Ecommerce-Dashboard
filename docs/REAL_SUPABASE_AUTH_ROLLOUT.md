@@ -68,4 +68,4 @@ Keep email confirmation enabled. In Authentication → Security and Protection (
 
 ## Current API migration boundary
 
-The following reads now use the authenticated request's Supabase client, so database RLS is applied: app config, notifications, marketplace exceptions, marketplace accounts/sync runs, orders, and products. Other business routes are intentionally still behind the production safety gate until their read/write logic, transactional behavior, and organization-scoped policies are migrated and tested. Do not enable legacy demo mode in production.
+The Express API still blocks all business endpoints by default because its handlers currently read/write the legacy JSON repository. The Cloudflare Worker now supports proxying API traffic to an independently deployed Express origin when API_ORIGIN is configured, but the full business-route migration is not complete. Do not enable legacy demo mode in production. The next implementation step is to migrate each business route to request-scoped Supabase queries and verify RLS/transactions before removing the safety gate.
