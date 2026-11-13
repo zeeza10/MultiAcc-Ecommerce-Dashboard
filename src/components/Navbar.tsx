@@ -16,8 +16,7 @@ import { User, NotificationItem, SystemConfig } from '../types';
 
 interface NavbarProps {
   currentUser: User;
-  users: User[];
-  onSwitchUser: (userId: string) => void;
+  onSignOut: () => void;
   config: SystemConfig;
   onUpdateConfig: (cfg: Partial<SystemConfig>) => void;
   notifications: NotificationItem[];
@@ -35,8 +34,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
-  users,
-  onSwitchUser,
+  onSignOut,
   config,
   onUpdateConfig,
   notifications,
@@ -82,10 +80,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center space-x-3">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px] font-semibold tracking-wide border border-amber-500/40">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            DEMO DATA MODE
+            AUTHENTICATED SESSION
           </span>
           <span className="text-slate-400 hidden sm:inline">
-            eBay Sandbox & Local Append-Only Ledgers Active. All financial & inventory postings fully verified.
+            Supabase identity verified. Business data migration is being completed module by module.
           </span>
         </div>
 
@@ -280,64 +278,30 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* User Role Switcher Dropdown (SRS S4 & Acceptance Criteria) */}
+          {/* Authenticated account menu — demo role switching removed */}
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-2 pl-2 pr-3 py-1 rounded-md border border-gray-300 hover:border-gray-400 bg-gray-50 text-left focus:outline-none"
+              className="flex items-center space-x-2 pl-2 pr-3 py-1 rounded-md border border-gray-300 hover:border-gray-400 bg-gray-50 text-left"
             >
               <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-xs">
-                {currentUser.name.charAt(0)}
+                {currentUser.name.charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:block text-left">
-                <div className="text-xs font-semibold text-gray-900 leading-tight truncate max-w-[130px]">
-                  {currentUser.name}
-                </div>
+                <div className="text-xs font-semibold text-gray-900 leading-tight truncate max-w-[130px]">{currentUser.name}</div>
                 <div className="text-[10px] text-gray-500">{currentUser.role.replace('_', ' ')}</div>
               </div>
             </button>
-
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 text-xs">
-                <div className="px-3 py-2 border-b border-gray-100">
+                <div className="px-3 py-3 border-b border-gray-100">
                   <div className="font-bold text-gray-900">{currentUser.name}</div>
                   <div className="text-gray-500 text-[11px]">{currentUser.email}</div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {getRoleBadge(currentUser.role)}
-                    {currentUser.role === 'CLIENT_USER' && (
-                      <span className="text-[11px] text-indigo-600 font-medium">Apex Electronics</span>
-                    )}
-                  </div>
+                  <div className="mt-2">{getRoleBadge(currentUser.role)}</div>
                 </div>
-
-                <div className="px-3 py-1.5 bg-slate-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                  Test Role Switching (Permission & Isolation)
-                </div>
-
-                <div className="py-1">
-                  {users.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        onSwitchUser(u.id);
-                        setShowUserMenu(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 hover:bg-indigo-50 flex items-center justify-between ${
-                        u.id === currentUser.id ? 'bg-indigo-50/70 font-semibold' : ''
-                      }`}
-                    >
-                      <div>
-                        <div className="text-gray-900">{u.name}</div>
-                        <div className="text-[11px] text-gray-500">{u.email}</div>
-                      </div>
-                      {u.id === currentUser.id && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="border-t border-gray-100 p-2 text-[11px] text-gray-500 bg-amber-50/50">
-                  <span className="font-medium text-amber-800">Security Rule:</span> Client user queries are strictly isolated on the server (AT-07). Warehouse staff cannot see profit or cost fields.
-                </div>
+                <button onClick={() => { setShowUserMenu(false); onSignOut(); }} className="w-full text-left px-3 py-3 text-rose-700 hover:bg-rose-50 font-semibold">
+                  Sign out
+                </button>
               </div>
             )}
           </div>
