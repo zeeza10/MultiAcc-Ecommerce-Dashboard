@@ -27,7 +27,7 @@ import {
 } from '../types';
 
 
-import { getAccessToken } from './supabaseAuth';
+import { getAccessToken, getActiveOrganizationId } from './supabaseAuth';
 
 // Detect if running on a static hosting provider (e.g. Cloudflare Pages, GitHub Pages)
 const isKnownStaticHost = (): boolean => {
@@ -49,6 +49,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
+  const organizationId = getActiveOrganizationId();
+  if (organizationId) headers.set('x-organization-id', organizationId);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
   }
