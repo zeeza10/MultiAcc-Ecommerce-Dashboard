@@ -26,28 +26,31 @@ export interface ExecutionContext {
 }
 
 /**
- * Computes secure, origin-validated CORS headers.
- * Avoids indiscriminate wildcard origin in production while supporting same-origin,
- * preview environments, and local development.
+ * Only allow same-origin requests and explicitly trusted preview/local origins.
  */
+function isAllowedOrigin(request: Request): boolean {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(request.url);
+    const hostname = originUrl.hostname.toLowerCase();
+    return originUrl.origin === requestUrl.origin ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.pages.dev') ||
+      hostname.endsWith('.run.app') ||
+      hostname.endsWith('.googleusercontent.com');
+  } catch {
+    return false;
+  }
+}
+
 function getCorsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get('Origin') || '';
   const url = new URL(request.url);
-  const isSameOrigin = !origin || origin === url.origin;
-
-  // Trusted origin patterns (Cloudflare Pages, AI Studio preview, and localhost dev)
-  const isAllowedOrigin =
-    isSameOrigin ||
-    origin.endsWith('.pages.dev') ||
-    origin.includes('localhost') ||
-    origin.includes('127.0.0.1') ||
-    origin.includes('.run.app') ||
-    origin.includes('googleusercontent.com');
-
-  const allowOrigin = isAllowedOrigin && origin ? origin : url.origin;
-
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Origin': origin && isAllowedOrigin(request) ? origin : url.origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-organization-id',
     'Access-Control-Max-Age': '86400',
@@ -88,18 +91,11 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
-    const origin = request.headers.get('Origin') || '';
-    const allowedOrigin = !origin || origin === url.origin || origin.endsWith('.pages.dev') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('.run.app') || origin.includes('googleusercontent.com');
-    if (!allowedOrigin) return new Response('Forbidden origin', { status: 403 });
+    if (!isAllowedOrigin(request)) return new Response('Forbidden origin', { status: 403 });
 
-    // 1. Handle CORS preflight for all endpoints with origin validation
+    // 1. Handle CORS preflight for all endpoints.
     if (request.method === 'OPTIONS') {
-      const origin = request.headers.get('Origin') || '';
-      const cors = getCorsHeaders(request);
-      const url = new URL(request.url);
-      const allowed = !origin || origin === url.origin || origin.endsWith('.pages.dev') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('.run.app') || origin.includes('googleusercontent.com');
-      if (!allowed) return new Response(null, { status: 403, headers: cors });
-      return new Response(null, { status: 204, headers: cors });
+      return new Response(null, { status: 204, headers: getCorsHeaders(request) });
     }
 
     // 2. Health check endpoints (Single standardized health endpoint per requirement 4)
