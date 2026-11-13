@@ -10,14 +10,13 @@
  * - Clean StorageAdapter architecture prepared for Phase 3 Supabase PostgreSQL
  */
 
-import { clientDb, handleClientDbRequest } from '../src/services/clientDb';
-
 export interface Env {
   ASSETS?: {
     fetch: (request: Request | string) => Promise<Response>;
   };
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
   [key: string]: unknown;
 }
 
@@ -45,12 +44,12 @@ function getCorsHeaders(request: Request): Record<string, string> {
     origin.includes('.run.app') ||
     origin.includes('googleusercontent.com');
 
-  const allowOrigin = isAllowedOrigin && origin ? origin : (origin || '*');
+  const allowOrigin = isAllowedOrigin && origin ? origin : url.origin;
 
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-organization-id',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   };
@@ -92,10 +91,12 @@ export default {
 
     // 1. Handle CORS preflight for all endpoints with origin validation
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: getCorsHeaders(request),
-      });
+      const origin = request.headers.get('Origin') || '';
+      const cors = getCorsHeaders(request);
+      const url = new URL(request.url);
+      const allowed = !origin || origin === url.origin || origin.endsWith('.pages.dev') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('.run.app') || origin.includes('googleusercontent.com');
+      if (!allowed) return new Response(null, { status: 403, headers: cors });
+      return new Response(null, { status: 204, headers: cors });
     }
 
     // 2. Health check endpoints (Single standardized health endpoint per requirement 4)
@@ -113,38 +114,60 @@ export default {
       });
     }
 
-    // 3. Backend API Route Dispatcher (/api/v1/* and /api/*)
+    // 3. Backend API: verify Supabase identity and organization membership.
     if (pathname === '/api' || pathname.startsWith('/api/')) {
-      try {
-        // Strip API prefix to obtain canonical endpoint path
-        const subPath = pathname.replace(/^\/api\/v1/, '').replace(/^\/api/, '');
-        const endpoint = (subPath || '/') + url.search;
-        const method = request.method.toUpperCase();
+      const subPath = pathname.replace(/^\/api\/v1/, '').replace(/^\/api/, '');
+      const endpoint = subPath || '/';
+      const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+      if (!token) return errorResponse(request, 'Authentication required.', 401, pathname);
+      const supabaseUrl = (env.SUPABASE_URL || '').replace(/\/$/, '');
+      const supabaseKey = env.SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_ANON_KEY || '';
+      if (!supabaseUrl || !supabaseKey) return errorResponse(request, 'Supabase Worker bindings are not configured.', 503, pathname);
 
-        // Safe JSON or text body parsing for mutation requests
-        let body: string | undefined = undefined;
-        if (method !== 'GET' && method !== 'HEAD') {
-          try {
-            body = await request.text();
-          } catch {
-            body = undefined;
-          }
+      try {
+        const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+        });
+        if (!authResponse.ok) return errorResponse(request, 'Invalid or expired Supabase session.', 401, pathname);
+        const authUser = await authResponse.json() as { id: string; email?: string; user_metadata?: Record<string, unknown> };
+
+        const membershipUrl = new URL(`${supabaseUrl}/rest/v1/organization_members`);
+        membershipUrl.searchParams.set('select', 'organization_id,client_3pl_id,is_active,roles(code)');
+        membershipUrl.searchParams.set('user_id', `eq.${authUser.id}`);
+        membershipUrl.searchParams.set('is_active', 'eq.true');
+        membershipUrl.searchParams.set('limit', '1');
+        const organizationId = request.headers.get('x-organization-id');
+        if (organizationId) membershipUrl.searchParams.set('organization_id', `eq.${organizationId}`);
+
+        const membershipResponse = await fetch(membershipUrl, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+        });
+        if (!membershipResponse.ok) return errorResponse(request, 'Unable to verify organization membership.', 403, pathname);
+        const memberships = await membershipResponse.json() as Array<{ organization_id: string; roles?: { code?: string } | null }>;
+        const membership = memberships[0];
+        if (!membership) return errorResponse(request, 'No active membership found for this organization.', 403, pathname);
+
+        if (endpoint === '/auth/me') {
+          return jsonResponse(request, {
+            user: {
+              id: authUser.id,
+              email: authUser.email || '',
+              name: String(authUser.user_metadata?.full_name || authUser.email || 'User'),
+              role: membership.roles?.code || 'VIEWER',
+              isActive: true,
+            },
+            organizationId: membership.organization_id,
+          });
         }
 
-        // Forward to the backend data & logic handler
-        const result = await handleClientDbRequest(endpoint, {
-          method,
-          headers: request.headers,
-          body,
-        });
-
-        return jsonResponse(request, result, 200);
-      } catch (err: any) {
-        const status = typeof err.status === 'number'
-          ? err.status
-          : (err.message && err.message.toLowerCase().includes('not found') ? 404 : 400);
-
-        return errorResponse(request, err.message || 'Worker execution error', status, pathname);
+        return errorResponse(
+          request,
+          'This business module is temporarily unavailable while its data layer is being migrated to organization-scoped Supabase tables. No demo data was returned.',
+          503,
+          pathname
+        );
+      } catch {
+        return errorResponse(request, 'Could not verify the Supabase session.', 503, pathname);
       }
     }
 
