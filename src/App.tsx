@@ -20,21 +20,11 @@ import { DropshippingCalculatorView } from './components/DropshippingCalculatorV
 import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
-import { api, setStoredUserId, getStoredUserId } from './services/api';
+import { api } from './services/api';
+import { useAuth } from './auth/AuthGate';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
-
-const DEFAULT_USER: User = {
-  id: 'usr_superadmin',
-  email: 'sarah.jenkins@nexusops.com',
-  name: 'Sarah Jenkins (Super Admin)',
-  role: 'SUPER_ADMIN',
-  isActive: true,
-  twoFactorEnabled: true,
-  failedLoginAttempts: 0,
-  createdAt: new Date().toISOString(),
-};
 
 const DEFAULT_CONFIG: SystemConfig = {
   baseCurrency: 'GBP',
@@ -48,8 +38,8 @@ const DEFAULT_CONFIG: SystemConfig = {
 };
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
-  const [users, setUsers] = useState<User[]>([DEFAULT_USER]);
+  const { user: authenticatedUser, signOut, organizationName } = useAuth();
+  const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
@@ -66,6 +56,8 @@ export default function App() {
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
   const [loading, setLoading] = useState(false);
 
+
+  useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
 
   useEffect(() => {
     initApp();
@@ -102,16 +94,11 @@ export default function App() {
   const initApp = async () => {
     setLoading(true);
     try {
-      const [uRes, meRes, cfgRes, notifRes, excRes] = await Promise.all([
-        api.getUsers(),
-        api.getMe(),
+      const [cfgRes, notifRes, excRes] = await Promise.all([
         api.getConfig(),
         api.getNotifications(),
         api.getExceptions(),
       ]);
-
-      setUsers(uRes.users);
-      setCurrentUser(meRes.user);
       setConfig(cfgRes.config);
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
@@ -119,25 +106,6 @@ export default function App() {
       console.error('Failed to initialize app:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSwitchUser = async (userId: string) => {
-    setStoredUserId(userId);
-    const targetUser = users.find((u) => u.id === userId);
-    if (targetUser) {
-      setCurrentUser(targetUser);
-    }
-    // Refresh notifications and state
-    try {
-      const [notifRes, excRes] = await Promise.all([
-        api.getNotifications(),
-        api.getExceptions(),
-      ]);
-      setNotifications(notifRes.notifications);
-      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -185,8 +153,8 @@ export default function App() {
       {/* Top Navigation */}
       <Navbar
         currentUser={currentUser}
-        users={users}
-        onSwitchUser={handleSwitchUser}
+        organizationName={organizationName}
+        onSignOut={signOut}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
