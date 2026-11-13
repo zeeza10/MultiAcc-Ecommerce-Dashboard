@@ -27,16 +27,7 @@ import {
 } from '../types';
 
 
-import { handleClientDbRequest } from './clientDb';
-
-let currentUserId = localStorage.getItem('nexus_active_user_id') || 'usr_superadmin';
-
-export const setStoredUserId = (id: string) => {
-  currentUserId = id;
-  localStorage.setItem('nexus_active_user_id', id);
-};
-
-export const getStoredUserId = () => currentUserId;
+import { getAccessToken } from './supabaseAuth';
 
 // Detect if running on a static hosting provider (e.g. Cloudflare Pages, GitHub Pages)
 const isKnownStaticHost = (): boolean => {
@@ -53,51 +44,41 @@ const isKnownStaticHost = (): boolean => {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Authentication required. Please sign in again.');
+
   const headers = new Headers(options.headers || {});
-  headers.set('x-user-id', currentUserId);
+  headers.set('Authorization', `Bearer ${token}`);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
   }
 
+  let response: Response;
   try {
-    const res = await fetch(`/api/v1${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    const contentType = res.headers.get('content-type') || '';
-    if (res.ok && contentType.includes('application/json')) {
-      return (await res.json()) as T;
-    }
-
-    if (!res.ok) {
-      if (contentType.includes('application/json')) {
-        const errorJson = await res.json().catch(() => null);
-        if (errorJson && errorJson.error) {
-          throw new Error(errorJson.error);
-        }
-      }
-      if (res.status === 404) {
-        throw new Error(`Resource or endpoint not found: ${endpoint}`);
-      }
-      throw new Error(`Request failed with status ${res.status}`);
-    }
-  } catch (err: any) {
-    // If it's a known error from the API backend, re-throw so the UI can notify the user
-    if (err && err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
-      throw err;
-    }
-    // Network or server unavailable - fallback gracefully to in-browser storage engine
+    response = await fetch(`/api/v1${endpoint}`, { ...options, headers });
+  } catch {
+    throw new Error('The application API is unavailable. No demo or local-storage fallback was used.');
   }
 
-  // Client-side fallback engine for offline or static hosting
-  return handleClientDbRequest<T>(endpoint, options);
+  const contentType = response.headers.get('content-type') || '';
+  const payload = contentType.includes('application/json')
+    ? await response.json().catch(() => ({}))
+    : null;
+
+  if (!response.ok) {
+    const message = payload && typeof payload.error === 'string'
+      ? payload.error
+      : `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+  if (!contentType.includes('application/json')) {
+    throw new Error('The API returned an unexpected response format.');
+  }
+  return payload as T;
 }
 
 export const api = {
   // Auth
-  getUsers: () => request<{ users: User[] }>('/auth/users'),
-  getMe: () => request<{ user: User }>('/auth/me'),
 
   // Dashboard
   getKPIs: (period = '30D', accountId?: string) => {
