@@ -173,6 +173,7 @@ function DashboardApp() {
       <Navbar
         currentUser={currentUser}
         onSignOut={() => void auth.signOutUser()}
+        organizationName={auth.activeMembership.organizations?.name || 'Workspace'}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
