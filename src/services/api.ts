@@ -1,5 +1,4 @@
 import {
-  User,
   MarketplaceAccount,
   Product,
   Order,
