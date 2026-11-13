@@ -51,7 +51,7 @@ The frontend reads Supabase values at Vite build time. Configure these under the
 The Cloudflare Worker also needs:
 
 - `API_ORIGIN=https://<your-express-api-host>` — origin only, no `/api/v1` suffix. The Worker proxies `/api/*` to this host and preserves the caller's Bearer token.
-- `ALLOWED_ORIGIN=https://<your-frontend-domain>` — exact deployed frontend origin.
+- `ALLOWED_ORIGIN=https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev` — exact deployed frontend origin.
 
 For local Vite/Express development, copy `.env.example` to `.env` and fill in the publishable key. For local Wrangler development, copy `.dev.vars.example` to `.dev.vars` and set API_ORIGIN to the local Express origin.
 
@@ -62,7 +62,7 @@ The publishable key is intentionally public and must still be protected by RLS. 
 In Supabase Dashboard → Authentication → URL Configuration:
 
 - Site URL: the exact deployed frontend origin.
-- Redirect URLs: add the exact local origin (for example `http://localhost:3000/**`) and deployed frontend origin (for example `https://app.example.com/**`).
+- Redirect URLs: add the exact local origin (for example `http://localhost:3000/**`) and deployed frontend origin (for example `https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/**`).
 
 Keep email confirmation enabled. In Authentication → Security and Protection (the exact menu label can vary), enable leaked-password protection.
 
