@@ -63,10 +63,10 @@ function saveSession(session: SupabaseSession | null) {
   window.dispatchEvent(new CustomEvent('nexusops-auth-change'));
 }
 
-async function authRequest<T>(path: string, body?: unknown, accessToken?: string): Promise<T> {
+async function authRequest<T>(path: string, body?: unknown, accessToken?: string, method?: string): Promise<T> {
   if (!isSupabaseConfigured) throw new Error(supabaseConfigError);
   const response = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
+    method: method || (body === undefined ? 'GET' : 'POST'),
     headers: {
       apikey: SUPABASE_KEY,
       'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ export async function signUp(email: string, password: string, fullName: string) 
 export async function signOut() {
   const token = await getAccessToken();
   try {
-    if (token) await authRequest('logout', undefined, token);
+    if (token) await authRequest('logout', {}, token, 'POST');
   } finally {
     saveSession(null);
     localStorage.removeItem(ACTIVE_ORG_KEY);
@@ -136,10 +136,10 @@ export async function signOut() {
 
 export async function sendPasswordReset(email: string) {
   if (!isSupabaseConfigured) throw new Error(supabaseConfigError);
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(window.location.origin)}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.trim(), redirect_to: window.location.origin }),
+    body: JSON.stringify({ email: email.trim() }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.msg || payload.message || 'Could not request password reset.');
@@ -148,14 +148,48 @@ export async function sendPasswordReset(email: string) {
 export async function updatePassword(password: string) {
   const token = await getAccessToken();
   if (!token) throw new Error('Your session has expired. Please sign in again.');
-  await authRequest('user', { password }, token);
+  await authRequest('user', { password }, token, 'PUT');
+}
+
+function consumeAuthRedirect() {
+  if (typeof window === 'undefined' || !window.location.hash) return;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+  if (!accessToken || !refreshToken) return;
+  const expiresIn = Number(params.get('expires_in') || 3600);
+  const placeholder: SupabaseSession = {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: expiresIn,
+    expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+    token_type: params.get('token_type') || 'bearer',
+    user: { id: '' },
+  };
+  saveSession(placeholder);
+  if (params.get('type') === 'recovery') {
+    sessionStorage.setItem('nexusops_password_recovery', 'true');
+  }
+  window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+}
+
+export function hasPasswordRecoverySession(): boolean {
+  return typeof window !== 'undefined' && sessionStorage.getItem('nexusops_password_recovery') === 'true';
+}
+
+export function clearPasswordRecoverySession() {
+  if (typeof window !== 'undefined') sessionStorage.removeItem('nexusops_password_recovery');
 }
 
 export async function getAuthenticatedUser(): Promise<SupabaseAuthUser | null> {
+  consumeAuthRedirect();
   const token = await getAccessToken();
   if (!token) return null;
   try {
-    return await authRequest<SupabaseAuthUser>('user', undefined, token);
+    const user = await authRequest<SupabaseAuthUser>('user', undefined, token);
+    const session = readSession();
+    if (session) saveSession({ ...session, user });
+    return user;
   } catch {
     saveSession(null);
     return null;
