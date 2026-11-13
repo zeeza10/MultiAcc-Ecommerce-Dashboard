@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { User } from './types';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -20,26 +21,97 @@ import {
 
 export const apiRouter = Router();
 
-// Middleware: Extract active user from header or session
-const getActiveUser = (req: Request): User => {
-  const raw = db.getRawData();
-  const userId = (req.headers['x-user-id'] as string) || req.query.userId as string;
-  const user = raw.users.find((u) => u.id === userId);
-  // Default to Super Admin if not specified
-  return user || raw.users[0];
-};
+interface VerifiedAuthContext {
+  user: User;
+  organizationId: string;
+  accessToken: string;
+}
 
-/**
- * AUTH & ROLE SIMULATION
- */
-apiRouter.get('/auth/users', (_req: Request, res: Response) => {
-  const raw = db.getRawData();
-  res.json({ users: raw.users });
+const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+apiRouter.use(async (req: Request, res: Response, next) => {
+  const authorization = req.header('authorization') || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required.' });
+    return;
+  }
+  if (!supabaseUrl || !supabaseKey) {
+    res.status(503).json({ error: 'Supabase server environment is not configured.' });
+    return;
+  }
+
+  try {
+    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+    });
+    if (!userResponse.ok) {
+      res.status(401).json({ error: 'Invalid or expired Supabase session.' });
+      return;
+    }
+    const authUser = await userResponse.json() as { id: string; email?: string; created_at?: string; user_metadata?: Record<string, unknown> };
+    const requestedOrganization = req.header('x-organization-id');
+    const membershipUrl = new URL(`${supabaseUrl}/rest/v1/organization_members`);
+    membershipUrl.searchParams.set('select', 'organization_id,client_3pl_id,is_active,roles(code)');
+    membershipUrl.searchParams.set('user_id', `eq.${authUser.id}`);
+    membershipUrl.searchParams.set('is_active', 'eq.true');
+    membershipUrl.searchParams.set('limit', '1');
+    if (requestedOrganization) membershipUrl.searchParams.set('organization_id', `eq.${requestedOrganization}`);
+
+    const membershipResponse = await fetch(membershipUrl, {
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+    });
+    if (!membershipResponse.ok) {
+      res.status(403).json({ error: 'Unable to verify organization membership.' });
+      return;
+    }
+    const memberships = await membershipResponse.json() as Array<{
+      organization_id: string;
+      client_3pl_id: string | null;
+      roles?: { code?: string } | null;
+    }>;
+    const membership = memberships[0];
+    if (!membership) {
+      res.status(403).json({ error: 'No active membership found for this organization.' });
+      return;
+    }
+
+    const allowedRoles: UserRole[] = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
+    const role = allowedRoles.includes(membership.roles?.code as UserRole) ? membership.roles!.code as UserRole : 'VIEWER';
+    const user: User = {
+      id: authUser.id,
+      email: authUser.email || '',
+      name: String(authUser.user_metadata?.full_name || authUser.email || 'User'),
+      role,
+      clientId: membership.client_3pl_id || undefined,
+      isActive: true,
+      twoFactorEnabled: false,
+      failedLoginAttempts: 0,
+      createdAt: authUser.created_at || new Date().toISOString(),
+    };
+    (req as any).authContext = { user, organizationId: membership.organization_id, accessToken: token } satisfies VerifiedAuthContext;
+
+    if (req.path === '/auth/me') {
+      next();
+      return;
+    }
+
+    // Legacy handlers still read an unscoped JSON file. Fail closed until each module is migrated to tenant-scoped Supabase queries.
+    res.status(503).json({ error: 'Business module is temporarily unavailable while its data layer is being migrated to organization-scoped Supabase tables. No demo data was returned.' });
+  } catch (error) {
+    console.error('Supabase authentication verification failed:', error);
+    res.status(503).json({ error: 'Could not verify the Supabase session.' });
+  }
 });
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  res.json({ user });
+  const context = (req as any).authContext as VerifiedAuthContext | undefined;
+  if (!context) {
+    res.status(401).json({ error: 'Authentication required.' });
+    return;
+  }
+  res.json({ user: context.user, organizationId: context.organizationId });
 });
 
 /**
