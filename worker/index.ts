@@ -23,7 +23,7 @@ export default {
     const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
     // Handle CORS preflight
@@ -31,6 +31,17 @@ export default {
       return new Response(null, {
         status: 204,
         headers: corsHeaders,
+      });
+    }
+
+    // This deployment currently serves static assets only. Never fall through to
+    // the SPA shell for API requests or silently switch to local demo storage.
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({
+        error: 'Authenticated business API is not deployed on this Worker yet.',
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
