@@ -88,6 +88,9 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
+    const origin = request.headers.get('Origin') || '';
+    const allowedOrigin = !origin || origin === url.origin || origin.endsWith('.pages.dev') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('.run.app') || origin.includes('googleusercontent.com');
+    if (!allowedOrigin) return new Response('Forbidden origin', { status: 403 });
 
     // 1. Handle CORS preflight for all endpoints with origin validation
     if (request.method === 'OPTIONS') {
