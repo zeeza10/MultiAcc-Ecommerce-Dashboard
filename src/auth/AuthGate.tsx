@@ -26,6 +26,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [recoveryActive, setRecoveryActive] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -41,7 +42,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     if (!activeSession?.user) return;
     const authUser = activeSession.user;
     const [{ data: profile, error: profileError }, { data: member, error: memberError }] = await Promise.all([
-      supabase.from('profiles').select('id,full_name,is_active,two_factor_enabled').eq('id', authUser.id).maybeSingle(),
+      supabase.from('profiles').select('id,full_name,is_active,two_factor_enabled,created_at').eq('id', authUser.id).maybeSingle(),
       supabase.from('organization_members')
         .select('organization_id,is_active,role:roles(code),organization:organizations(name)')
         .eq('user_id', authUser.id).eq('is_active', true).limit(1).maybeSingle(),
@@ -77,7 +78,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       try { await loadAccount(data.session); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load account.'); }
       finally { if (alive) setLoading(false); }
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') { setRecoveryActive(true); setMode('reset'); }
       setTimeout(async () => {
         if (!alive) return;
         try { await loadAccount(nextSession); setError(''); }
@@ -99,7 +101,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (mode === 'login') {
+    if (mode === 'reset' && recoveryActive) {
+      await runAuth(async () => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (!error) { setMessage('Password updated. Please sign in with your new password.'); setRecoveryActive(false); await supabase.auth.signOut(); setMode('login'); setPassword(''); }
+        return { error };
+      });
+    } else if (mode === 'login') {
       await runAuth(() => supabase.auth.signInWithPassword({ email: email.trim(), password }));
     } else if (mode === 'signup') {
       await runAuth(async () => {
@@ -136,7 +144,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => session && appUser && workspace ? { session, user: appUser, organizationId: workspace.id, organizationName: workspace.name, signOut } : null, [session, appUser, workspace]);
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Loading secure session…</div>;
-  if (value) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  if (value && !recoveryActive) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 
   const signedInWithoutWorkspace = !!session;
   return (
@@ -162,8 +170,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           <form onSubmit={submit} className="space-y-4">
             {mode === 'signup' && <label className="block text-sm font-medium text-slate-700">Full name<input required value={fullName} onChange={e=>setFullName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /></label>}
             <label className="block text-sm font-medium text-slate-700">Email<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /></label>
-            {mode !== 'reset' && <label className="block text-sm font-medium text-slate-700">Password<input required minLength={10} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /><span className="mt-1 block text-xs text-slate-400">Use at least 10 characters.</span></label>}
-            <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}</button>
+            {(mode !== 'reset' || recoveryActive) && <label className="block text-sm font-medium text-slate-700">{recoveryActive ? 'New password' : 'Password'}<input required minLength={10} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /><span className="mt-1 block text-xs text-slate-400">Use at least 10 characters.</span></label>}
+            <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : recoveryActive ? 'Update password' : 'Send reset link'}</button>
             <div className="flex flex-wrap justify-between gap-3 text-sm">
               <button type="button" onClick={()=>{setMode(mode==='login'?'signup':'login');setError('');setMessage('');}} className="text-indigo-600">{mode==='login'?'Create an account':'Back to sign in'}</button>
               {mode==='login' && <button type="button" onClick={()=>{setMode('reset');setError('');setMessage('');}} className="text-slate-500">Forgot password?</button>}
