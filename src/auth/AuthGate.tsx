@@ -146,7 +146,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Loading secure session…</div>;
   if (value && !recoveryActive) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 
-  const signedInWithoutWorkspace = !!session;
+  const signedInWithoutWorkspace = !!session && !recoveryActive;
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-8">
