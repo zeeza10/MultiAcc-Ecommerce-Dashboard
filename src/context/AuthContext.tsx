@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   bootstrapOrganization,
+  clearPasswordRecoverySession,
+  hasPasswordRecoverySession,
   getAuthenticatedUser,
   getActiveOrganizationId,
   isSupabaseConfigured,
@@ -18,6 +20,7 @@ import {
 
 interface AuthContextValue {
   configured: boolean;
+  passwordRecovery: boolean;
   configError: string;
   loading: boolean;
   user: SupabaseAuthUser | null;
@@ -42,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [memberships, setMemberships] = useState<OrganizationMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [passwordRecovery, setPasswordRecovery] = useState(hasPasswordRecoverySession());
 
   const hydrate = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextValue = {
     configured: isSupabaseConfigured,
+    passwordRecovery,
     configError: supabaseConfigError,
     loading,
     user,
@@ -111,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMemberships([]);
     },
     requestPasswordReset: async (email) => { await sendPasswordReset(email); },
-    changePassword: async (password) => { await updatePassword(password); },
+    changePassword: async (password) => { await updatePassword(password); clearPasswordRecoverySession(); setPasswordRecovery(false); },
     createOrganization: async (name, slug) => {
       setError('');
       await bootstrapOrganization(name, slug);
