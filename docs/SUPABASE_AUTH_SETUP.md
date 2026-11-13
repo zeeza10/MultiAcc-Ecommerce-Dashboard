@@ -5,11 +5,12 @@
 - Project URL: `https://nmlwnezlsqystjrvszcd.supabase.co`
 - The publishable key in `.env.example` and `wrangler.jsonc` is designed for browser/client use. Never substitute a service-role or secret key.
 
-## Local development
-1. Copy `.env.example` to `.env.local` (Vite) and ensure the same server variables are available in `.env` for the Express server.
-2. Keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` set for the browser.
-3. Keep `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` set for the Express API.
-4. Run `npm install`, then `npm run dev`.
+## Local development and Google AI Studio
+The browser and Express API now have safe defaults for this Supabase project's public URL and publishable key. The login screen therefore does not depend on manually injecting Vite variables into an AI Studio preview.
+
+For local overrides, copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. For the Express server, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `.env`.
+
+Run `npm install`, then `npm run dev`. If the preview is already running, restart it or reload after syncing the latest `main` branch..
 
 ## Supabase Dashboard settings
 1. Open Authentication → Providers → Email and ensure Email provider is enabled.
