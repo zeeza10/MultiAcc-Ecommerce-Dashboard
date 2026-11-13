@@ -36,7 +36,7 @@ export default {
 
     // This deployment currently serves static assets only. Never fall through to
     // the SPA shell for API requests or silently switch to local demo storage.
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/') && url.pathname !== '/api/health') {
       return new Response(JSON.stringify({
         error: 'Authenticated business API is not deployed on this Worker yet.',
       }), {
