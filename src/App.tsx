@@ -20,21 +20,12 @@ import { DropshippingCalculatorView } from './components/DropshippingCalculatorV
 import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
-import { api, setStoredUserId, getStoredUserId } from './services/api';
+import { api } from './services/api';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthScreen, OrganizationSetup } from './components/AuthScreen';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
-
-const DEFAULT_USER: User = {
-  id: 'usr_superadmin',
-  email: 'sarah.jenkins@nexusops.com',
-  name: 'Sarah Jenkins (Super Admin)',
-  role: 'SUPER_ADMIN',
-  isActive: true,
-  twoFactorEnabled: true,
-  failedLoginAttempts: 0,
-  createdAt: new Date().toISOString(),
-};
 
 const DEFAULT_CONFIG: SystemConfig = {
   baseCurrency: 'GBP',
@@ -47,9 +38,19 @@ const DEFAULT_CONFIG: SystemConfig = {
   autoSyncEnabled: true,
 };
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
-  const [users, setUsers] = useState<User[]>([DEFAULT_USER]);
+function DashboardApp() {
+  const auth = useAuth();
+  const currentUser: User | null = auth.user && auth.activeMembership ? {
+    id: auth.user.id,
+    email: auth.user.email || '',
+    name: String(auth.user.user_metadata?.full_name || auth.user.email || 'User'),
+    role: (auth.activeMembership.roles?.code || 'VIEWER') as User['role'],
+    clientId: auth.activeMembership.client_3pl_id || undefined,
+    isActive: auth.activeMembership.is_active,
+    twoFactorEnabled: false,
+    failedLoginAttempts: 0,
+    createdAt: auth.user.email_confirmed_at || new Date().toISOString(),
+  } : null;
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
@@ -68,8 +69,8 @@ export default function App() {
 
 
   useEffect(() => {
-    initApp();
-  }, []);
+    if (auth.user && auth.activeMembership) void initApp();
+  }, [auth.user?.id, auth.activeMembership?.id]);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
@@ -102,16 +103,12 @@ export default function App() {
   const initApp = async () => {
     setLoading(true);
     try {
-      const [uRes, meRes, cfgRes, notifRes, excRes] = await Promise.all([
-        api.getUsers(),
-        api.getMe(),
+      const [cfgRes, notifRes, excRes] = await Promise.all([
         api.getConfig(),
         api.getNotifications(),
         api.getExceptions(),
       ]);
 
-      setUsers(uRes.users);
-      setCurrentUser(meRes.user);
       setConfig(cfgRes.config);
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
@@ -119,25 +116,6 @@ export default function App() {
       console.error('Failed to initialize app:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSwitchUser = async (userId: string) => {
-    setStoredUserId(userId);
-    const targetUser = users.find((u) => u.id === userId);
-    if (targetUser) {
-      setCurrentUser(targetUser);
-    }
-    // Refresh notifications and state
-    try {
-      const [notifRes, excRes] = await Promise.all([
-        api.getNotifications(),
-        api.getExceptions(),
-      ]);
-      setNotifications(notifRes.notifications);
-      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -180,13 +158,20 @@ export default function App() {
 
 
 
+  if (!auth.configured) {
+    return <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6"><div className="max-w-xl rounded-xl bg-white border border-amber-200 p-6 shadow"><h1 className="text-xl font-bold text-slate-900">Supabase configuration required</h1><p className="mt-3 text-sm text-slate-600">{auth.configError}</p><p className="mt-2 text-sm text-slate-600">Copy .env.example to .env.local, add the project's publishable key, then restart the development server.</p></div></div>;
+  }
+  if (auth.loading) return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading secure session…</div>;
+  if (!auth.user) return <AuthScreen />;
+  if (!auth.activeMembership) return <OrganizationSetup />;
+  if (!currentUser) return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading organization workspace…</div>;
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navigation */}
       <Navbar
         currentUser={currentUser}
-        users={users}
-        onSwitchUser={handleSwitchUser}
+        onSignOut={() => void auth.signOutUser()}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
@@ -487,4 +472,9 @@ export default function App() {
       />
     </div>
   );
+}
+
+
+export default function App() {
+  return <AuthProvider><DashboardApp /></AuthProvider>;
 }
