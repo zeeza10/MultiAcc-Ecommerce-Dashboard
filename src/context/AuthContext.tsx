@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const authenticatedUser = await getAuthenticatedUser();
+    setPasswordRecovery(hasPasswordRecoverySession());
     setUser(authenticatedUser);
     if (authenticatedUser) {
       try {
