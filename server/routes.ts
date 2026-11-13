@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { User } from './types';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
