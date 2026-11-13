@@ -32,8 +32,9 @@ interface VerifiedAuthContext {
   accessToken: string;
 }
 
-const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+// These are public Supabase project settings. Server secrets must never be placed here.
+const supabaseUrl = (process.env.SUPABASE_URL || 'https://nmlwnezlsqystjrvszcd.supabase.co').replace(/\/$/, '');
+const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI';
 
 apiRouter.use(async (req: Request, res: Response, next) => {
   const authorization = req.header('authorization') || '';
