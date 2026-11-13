@@ -23,7 +23,7 @@ export default {
 
     // Standard CORS headers
     const requestOrigin = request.headers.get('Origin') || '';
-    const allowedOrigin = env.ALLOWED_ORIGIN || url.origin;
+    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev';
     const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Origin': requestOrigin === allowedOrigin ? allowedOrigin : url.origin,
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
