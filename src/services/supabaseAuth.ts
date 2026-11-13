@@ -25,8 +25,13 @@ export interface OrganizationMembership {
   organizations?: { id: string; name: string; slug: string } | null;
 }
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+// The Supabase URL and publishable key are public client configuration, not secrets.
+// Keep the project defaults here so AI Studio previews and static deployments work
+// even when Vite environment variables have not been injected at build time.
+const DEFAULT_SUPABASE_URL = 'https://nmlwnezlsqystjrvszcd.supabase.co';
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 const SESSION_KEY = 'nexusops_supabase_session';
 const ACTIVE_ORG_KEY = 'nexusops_active_organization_id';
 
