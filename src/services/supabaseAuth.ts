@@ -114,11 +114,10 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signUp(email: string, password: string, fullName: string) {
-  const result = await authRequest<{ user: SupabaseAuthUser; session?: SupabaseSession | null }>('signup', {
+  const result = await authRequest<{ user: SupabaseAuthUser; session?: SupabaseSession | null }>(`signup?redirect_to=${encodeURIComponent(window.location.origin)}`, {
     email: email.trim(),
     password,
     data: { full_name: fullName.trim() },
-    options: { emailRedirectTo: window.location.origin },
   });
   if (result.session) saveSession(result.session);
   return result;
