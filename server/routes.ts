@@ -114,7 +114,7 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
  * Never serve shared demo records as production tenant data.
  */
 apiRouter.use((req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'production' && process.env.NEXUS_DEMO_MODE !== 'true') {
+  if (process.env.NEXUS_DEMO_MODE !== 'true') {
     res.status(503).json({ error: 'Business data storage is not yet connected to the organization-scoped database. Demo records are disabled in production.' });
     return;
   }
