@@ -9,7 +9,7 @@
 - The role-switching demo UI and browser localStorage demo database have been removed.
 - Frontend API calls send the current Supabase access token as a Bearer token.
 - The Express API verifies the token with Supabase Auth and checks the profile and active workspace membership.
-- Production Express API requests fail closed while the old in-memory demo repository remains in use.
+- Business API requests fail closed by default while the old in-memory demo repository remains in use. The demo repository can only be enabled explicitly for local testing with NEXUS_DEMO_MODE=true.
 - The Cloudflare Worker returns 503 for unavailable business API routes rather than serving demo records as if they were production data.
 
 ## Required environment variables
