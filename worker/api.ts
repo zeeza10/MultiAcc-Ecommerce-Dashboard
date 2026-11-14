@@ -654,7 +654,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         Number(balance.available || 0) <= Number((productsResult.data || []).find(product => product.id === balance.productId)?.low_stock_threshold || 0)
       ).length;
       const totalStockUnits = (inventoryBalances || []).reduce((sum, balance) => sum + Number(balance.onHand || 0), 0);
-      const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => sum + Number(balance.inventoryValueMinor || 0), 0);
+      const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => sum + (Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0)), 0);
       const invoices = invoiceResult.data || [];
       const expenses = expenseResult.data || [];
       return json({ kpis: {
@@ -721,7 +721,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
           .select('id,name,marketplace,seller_username,auth_status,environment,last_sync_at,last_sync_status,last_sync_message,token_expires_at,auto_sync_interval_minutes,is_demo')
           .eq('organization_id', auth.organizationId).order('created_at', { ascending: false }),
         auth.repositoryContext.supabase.from('marketplace_sync_runs')
-          .select('id,marketplace_account_id,status,started_at,completed_at,records_imported,records_skipped,error_message')
+          .select('id,marketplace_account_id,status,started_at,completed_at,orders_fetched,orders_imported,orders_skipped_duplicate,exceptions_raised,log_message')
           .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
       ]);
       if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
@@ -731,7 +731,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
         tokenExpiresAt: row.token_expires_at || '', autoSyncIntervalMinutes: row.auto_sync_interval_minutes,
         isDemo: row.is_demo,
-      })), recentSyncs: syncResult.data || [] });
+      })), recentSyncs: (syncResult.data || []).map(row => ({ id: row.id, accountId: row.marketplace_account_id, startedAt: row.started_at, completedAt: row.completed_at || '', status: row.status, ordersFetched: row.orders_fetched, ordersImported: row.orders_imported, ordersSkippedDuplicate: row.orders_skipped_duplicate, exceptionsRaised: row.exceptions_raised, logMessage: row.log_message || '' })) });
     }
 
     if (path === '/ebay/exceptions' && request.method === 'GET') {
