@@ -54,6 +54,8 @@ export default function App() {
   const [showNewAdjustmentModal, setShowNewAdjustmentModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+  const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
+  const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
   const [loading, setLoading] = useState(false);
 
 
@@ -97,14 +99,16 @@ export default function App() {
     setLoading(true);
     try {
       const canViewMarketplace = permissions.includes('*') || permissions.includes('marketplace.view');
-      const [cfgRes, notifRes, excRes] = await Promise.all([
-        api.getConfig(),
-        api.getNotifications(),
+      const [cfgRes, notifRes, excRes, accountsRes] = await Promise.all([
+        api.getConfig(), api.getNotifications(),
         canViewMarketplace ? api.getExceptions() : Promise.resolve({ exceptions: [] }),
+        canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
       setConfig(cfgRes.config);
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
+      setMarketplaceAccounts(accountsRes.accounts || []);
+      setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
     } catch (err) {
       console.error('Failed to initialize app:', err);
     } finally {
@@ -117,9 +121,11 @@ export default function App() {
     setIsSyncing(true);
     try {
       const accRes = await api.getEbayAccounts();
-      if (accRes.accounts.length > 0) {
-        await api.syncEbayAccount(accRes.accounts[0].id);
+      if (!accRes.integrationReady) {
+        alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
+        return;
       }
+      if (accRes.accounts.length > 0) await api.syncEbayAccount(accRes.accounts[0].id);
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
         permissions.includes('*') || permissions.includes('marketplace.view')
@@ -173,7 +179,8 @@ export default function App() {
         onOpenNewOrder={() => setShowNewOrderModal(true)}
         onTriggerSync={handleTriggerSync}
         isSyncing={isSyncing}
-        canSyncEbay={permissions.includes('*') || permissions.includes('marketplace.manage')}
+        canSyncEbay={(permissions.includes('*') || permissions.includes('marketplace.manage')) && marketplaceIntegrationReady}
+        marketplaceAccounts={marketplaceAccounts}
         canAdjustStock={permissions.includes('*') || permissions.includes('inventory.adjust')}
         canCreateOrder={permissions.includes('*') || permissions.includes('orders.create')}
         canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
