@@ -50,6 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setKpis(null);
+    setCharts(null);
+    setExceptions([]);
     try {
       const results = await Promise.allSettled([
         api.getKPIs(period, selectedStoreId),
