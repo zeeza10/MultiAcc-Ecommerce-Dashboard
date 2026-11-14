@@ -1,0 +1,62 @@
+name: Production Worker Security Smoke Test
+
+on:
+  workflow_run:
+    workflows: ["Verify application"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production health and security headers
+        env:
+          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body -D health.headers "$WORKER_URL/api/v1/health" -o health.json
+          grep -qi '^HTTP/.* 200' health.headers
+          grep -qi '^x-content-type-options: nosniff' health.headers
+          grep -qi '^x-frame-options: DENY' health.headers
+          grep -qi '^referrer-policy: strict-origin-when-cross-origin' health.headers
+          grep -qi '^strict-transport-security: max-age=31536000' health.headers
+          cat health.json
+
+      - name: Verify unauthenticated API requests are rejected
+        env:
+          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error -D unauth.headers -o unauth.json -w '%{http_code}' "$WORKER_URL/api/v1/products")
+          test "$status" = "401"
+          grep -qi '^x-content-type-options: nosniff' unauth.headers
+
+      - name: Verify oversized API bodies are rejected
+        env:
+          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+        run: |
+          set -euo pipefail
+          head -c 1048577 /dev/zero > oversized.bin
+          status=$(curl --silent --show-error -D oversized.headers -o oversized.json -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data-binary @oversized.bin \
+            "$WORKER_URL/api/v1/products")
+          test "$status" = "413"
+
+      - name: Verify hostile CORS origins are rejected
+        env:
+          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error -D cors.headers -o cors.txt -w '%{http_code}' \
+            -X OPTIONS -H 'Origin: https://attacker.example' \
+            -H 'Access-Control-Request-Method: POST' "$WORKER_URL/api/v1/products")
+          test "$status" = "403"
+          if grep -qi '^access-control-allow-origin: https://attacker.example' cors.headers; then
+            echo "Hostile origin was reflected by CORS."
+            exit 1
+          fi
