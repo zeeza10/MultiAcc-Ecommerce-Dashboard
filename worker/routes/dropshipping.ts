@@ -18,6 +18,7 @@ const mapCalculation = (row: any) => ({
 
 export async function handleDropshippingRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
   if (path === '/dropshipping/calculations' && request.method === 'GET') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client-scoped dropshipping simulations are not enabled.' }, 403);
     const { data, error } = await auth.repositoryContext.supabase.from('dropshipping_calculations')
       .select(COLUMNS).eq('organization_id', auth.organizationId)
       .order('updated_at', { ascending: false }).limit(500);
