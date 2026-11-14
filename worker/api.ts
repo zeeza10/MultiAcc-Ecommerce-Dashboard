@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { SupabaseProductRepository } from '../server/repositories/productRepository';
 import { SupabaseInventoryRepository } from '../server/repositories/inventoryRepository';
+import { SupabaseOrderRepository } from '../server/repositories/orderRepository';
+import { SupabasePurchasingRepository } from '../server/repositories/purchasingRepository';
+import { SupabaseReturnRepository } from '../server/repositories/returnRepository';
+import { SupabaseWarehouseRepository } from '../server/repositories/warehouseRepository';
 import type { RepositoryContext } from '../server/repositories/context';
 
 type WorkerEnv = {
@@ -144,6 +148,120 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   }
 
   try {
+    if (path === '/orders' && request.method === 'GET') {
+      const repository = new SupabaseOrderRepository(auth.repositoryContext);
+      const isClientUser = auth.user.role === 'CLIENT_USER';
+      const orders = await repository.listOrders({
+        status: url.searchParams.get('status') || undefined,
+        accountId: url.searchParams.get('accountId') || undefined,
+        search: url.searchParams.get('search') || undefined,
+        client3plId: auth.user.clientId,
+        onlyClientOrders: isClientUser,
+      });
+      return json({ orders });
+    }
+
+    const orderDetailMatch = path.match(/^\\/orders\\/([^/]+)$/);
+    if (orderDetailMatch && request.method === 'GET') {
+      const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderDetailMatch[1], {
+        client3plId: auth.user.clientId,
+        onlyClientOrders: auth.user.role === 'CLIENT_USER',
+      });
+      return result ? json(result) : json({ error: 'Order not found in this workspace.' }, 404);
+    }
+
+    if (path === '/orders' && request.method === 'POST') {
+      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace orders.' }, 403);
+      const body = await request.json() as Record<string, unknown>;
+      const order = await new SupabaseOrderRepository(auth.repositoryContext).createOrder(body);
+      return json({ order }, 201);
+    }
+
+    const orderTransitionMatch = path.match(/^\\/orders\\/([^/]+)\\/transition$/);
+    if (orderTransitionMatch && request.method === 'POST') {
+      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot transition workspace orders.' }, 403);
+      const body = await request.json() as Record<string, unknown>;
+      if (typeof body.targetStatus !== 'string' || !body.targetStatus.trim()) {
+        return json({ error: 'A target order status is required.' }, 400);
+      }
+      const order = await new SupabaseOrderRepository(auth.repositoryContext).transitionOrder(
+        orderTransitionMatch[1],
+        body.targetStatus as any,
+        {
+          carrier: typeof body.carrier === 'string' ? body.carrier : undefined,
+          trackingNumber: typeof body.trackingNumber === 'string' ? body.trackingNumber : undefined,
+          note: typeof body.note === 'string' ? body.note : undefined,
+        },
+      );
+      return json({ order });
+    }
+
+    if (path === '/suppliers' && request.method === 'GET') {
+      const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers();
+      return json({ suppliers });
+    }
+
+    if (path === '/purchase-orders' && request.method === 'GET') {
+      const repository = new SupabasePurchasingRepository(auth.repositoryContext);
+      const [purchaseOrders, receipts] = await Promise.all([
+        repository.listPurchaseOrders(),
+        repository.listGoodsReceipts(),
+      ]);
+      return json({ purchaseOrders, receipts });
+    }
+
+    if (path === '/returns' && request.method === 'GET') {
+      const returns = await new SupabaseReturnRepository(auth.repositoryContext).listReturns();
+      return json({ returns });
+    }
+
+    const returnDispositionMatch = path.match(/^\\/returns\\/([^/]+)\\/disposition$/);
+    if (returnDispositionMatch && request.method === 'POST') {
+      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot process workspace returns.' }, 403);
+      const body = await request.json() as Record<string, unknown>;
+      if (!Array.isArray(body.dispositions) || typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
+        return json({ error: 'Return dispositions and an idempotency key are required.' }, 400);
+      }
+      const result = await new SupabaseReturnRepository(auth.repositoryContext).processDisposition(
+        returnDispositionMatch[1],
+        body.dispositions as Array<{ lineId: string; disposition: string; quantity: number }>,
+        Boolean(body.issueRefund),
+        body.idempotencyKey,
+      );
+      return json(result);
+    }
+
+    if (path === '/warehouses' && request.method === 'GET') {
+      const layout = await new SupabaseWarehouseRepository(auth.repositoryContext).getLayout();
+      return json(layout);
+    }
+
+    if (path === '/warehouses' && request.method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      const warehouse = await new SupabaseWarehouseRepository(auth.repositoryContext).createWarehouse({
+        name: String(body.name || ''),
+        code: String(body.code || ''),
+        address: typeof body.address === 'string' ? body.address : undefined,
+      });
+      return json({ warehouse }, 201);
+    }
+
+    const locationCreateMatch = path.match(/^\\/warehouses\\/([^/]+)\\/locations$/);
+    if (locationCreateMatch && request.method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      const location = await new SupabaseWarehouseRepository(auth.repositoryContext).createLocation({
+        warehouseId: locationCreateMatch[1],
+        locationCode: String(body.locationCode || ''),
+        locationType: String(body.locationType || ''),
+        zone: typeof body.zone === 'string' ? body.zone : undefined,
+        aisle: typeof body.aisle === 'string' ? body.aisle : undefined,
+        shelf: typeof body.shelf === 'string' ? body.shelf : undefined,
+        bin: typeof body.bin === 'string' ? body.bin : undefined,
+        capacityUnits: body.capacityUnits == null ? undefined : Number(body.capacityUnits),
+      });
+      return json({ location }, 201);
+    }
+
     if (path === '/products' && request.method === 'GET') {
       const repository = new SupabaseProductRepository(auth.repositoryContext);
       const isClientUser = auth.user.role === 'CLIENT_USER';
