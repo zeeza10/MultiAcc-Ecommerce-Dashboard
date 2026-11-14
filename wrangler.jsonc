@@ -17,5 +17,11 @@
   "vars": {
     "SUPABASE_URL": "https://nmlwnezlsqystjrvszcd.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI"
+  },
+  "previews": {
+    "vars": {
+      "SUPABASE_URL": "https://preview.invalid",
+      "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_preview_not_configured"
+    }
   }
 }
