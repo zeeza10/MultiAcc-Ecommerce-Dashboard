@@ -56,17 +56,17 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   if(id==='R-07')report=result(id,{inventoryValue:money(data.reduce((s,x)=>s+Number(String(x.inventoryValue).replace(/[^0-9.-]/g,''))*100,0)),skus:data.length},['SKU','Product','On Hand','Unit Cost','Inventory Value'],data.map(x=>({sku:x.sku,product:x.product,onHand:x.onHand,unitCost:x.unitCost,inventoryValue:x.inventoryValue})));
  }else if(id==='R-04'){
   const [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at','created_at',url),rows(auth,'products','id,sku,name')]);
-  const pmap=new Map(products.map((x:any)=>[x.id,x]));
+  const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
   report=result(id,{movements:data.length},['Timestamp','SKU','Product','Delta','State','Source','Reference','Note'],data);
  }else if(id==='R-06'){
   const [adjustments,products]=await Promise.all([rows(auth,'stock_adjustments','id,adjustment_number,product_id,quantity_delta,reason_code,status,note,created_at','created_at',url),rows(auth,'products','id,sku')]);
-  const pmap=new Map(products.map((x:any)=>[x.id,x.sku]));
+  const pmap=new Map<string, string>(products.map((x:any)=>[String(x.id),String(x.sku)] as [string,string]));
   const data=adjustments.map((x:any)=>({adjustment:x.adjustment_number,sku:pmap.get(x.product_id)||'—',delta:x.quantity_delta,reason:x.reason_code,status:x.status,note:x.note||'',date:x.created_at}));
   report=result(id,{adjustments:data.length,pending:data.filter(x=>x.status==='PENDING_APPROVAL').length},['Adjustment','SKU','Delta','Reason','Status','Note','Date'],data);
  }else if(id==='R-08'){
   const [pos,suppliers,items]=await Promise.all([rows(auth,'purchase_orders','id,po_number,supplier_id,status,total_minor,expected_date,created_at','created_at',url),rows(auth,'suppliers','id,name'),rows(auth,'purchase_order_items','purchase_order_id,ordered_qty,received_qty')]);
-  const smap=new Map(suppliers.map((x:any)=>[x.id,x.name]));
+  const smap=new Map<string, string>(suppliers.map((x:any)=>[String(x.id),String(x.name)] as [string,string]));
   const data=pos.map((p:any)=>{const lines=items.filter((x:any)=>x.purchase_order_id===p.id);return {po:p.po_number,supplier:smap.get(p.supplier_id)||'—',status:p.status,ordered:lines.reduce((s:number,x:any)=>s+Number(x.ordered_qty),0),received:lines.reduce((s:number,x:any)=>s+Number(x.received_qty),0),total:money(p.total_minor),expected:p.expected_date||'—'};});
   report=result(id,{purchaseOrders:data.length,totalValue:money(pos.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0))},['PO','Supplier','Status','Ordered Units','Received Units','Total','Expected Date'],data);
  }else if(id==='R-09'){
@@ -79,7 +79,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{clients:data.length,serviceCharges:money([...packaging,...shipping].reduce((n:number,x:any)=>n+Number(x.total_charge_minor||0),0))},['Client','Code','Orders','Packaging Jobs','Packed Units','Shipping Jobs','Service Charges'],data);
  }else if(id==='R-11'){
   const [snapshots,clients]=await Promise.all([rows(auth,'storage_snapshots','client_3pl_id,snapshot_date,occupied_pallets,occupied_shelves,occupied_bins,estimated_cost_minor','snapshot_date',url),rows(auth,'clients_3pl','id,company_name')]);
-  const cmap=new Map(clients.map((x:any)=>[x.id,x.company_name]));
+  const cmap=new Map<string, string>(clients.map((x:any)=>[String(x.id),String(x.company_name)] as [string,string]));
   const data=snapshots.map((x:any)=>({client:cmap.get(x.client_3pl_id)||'—',date:x.snapshot_date,pallets:x.occupied_pallets,shelves:x.occupied_shelves,bins:x.occupied_bins,estimatedCost:money(x.estimated_cost_minor)}));
   report=result(id,{snapshots:data.length,estimatedCost:money(snapshots.reduce((n:number,x:any)=>n+Number(x.estimated_cost_minor||0),0))},['Client','Snapshot Date','Pallets','Shelves','Bins','Estimated Cost'],data);
  }else if(id==='R-12'){
@@ -88,7 +88,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{receivables:invoices.length,payables:pos.length},['Type','Reference','Party','Balance','Due Date','Status'],data);
  }else if(id==='R-13'){
   const [orders,items,products,expenses]=await Promise.all([rows(auth,'orders','id,order_number,total_minor,currency,shipping_cost_minor,created_at','created_at',url),rows(auth,'order_items','order_id,product_id,quantity'),rows(auth,'products','id,cost_price_minor,sku'),rows(auth,'expenses','category,amount_minor,expense_date','expense_date',url)]);
-  const pmap=new Map(products.map((x:any)=>[x.id,x]));
+  const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=orders.map((o:any)=>{const lines=items.filter((x:any)=>x.order_id===o.id);const cogs=lines.reduce((s:number,l:any)=>s+Number(l.quantity||0)*Number(pmap.get(l.product_id)?.cost_price_minor||0),0);const shipping=Number(o.shipping_cost_minor||0);const fees=0;return {order:o.order_number,revenue:money(o.total_minor,o.currency||'GBP'),cogs:money(cogs,o.currency||'GBP'),fees:money(fees,o.currency||'GBP'),shipping:money(shipping,o.currency||'GBP'),grossProfit:money(Number(o.total_minor)-cogs-fees-shipping,o.currency||'GBP')};});
   report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(expenses.reduce((s:number,x:any)=>s+Number(x.amount_minor||0),0))},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
  }else if(id==='R-14'){
