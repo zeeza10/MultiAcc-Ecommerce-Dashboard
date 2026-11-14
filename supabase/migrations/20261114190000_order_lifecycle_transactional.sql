@@ -79,7 +79,11 @@ begin
   ) then
     raise exception 'Invalid order status transition from % to %.',v_order.status,p_target_status using errcode = '22023';
   end if;
-  v_before := to_jsonb(v_order);
+  v_before := to_jsonb(v_order) || jsonb_build_object('lines', (
+    select coalesce(jsonb_agg(to_jsonb(oi) order by oi.id), '[]'::jsonb)
+    from public.order_items oi
+    where oi.organization_id=p_organization_id and oi.order_id=v_order.id
+  ));
 
   select coalesce(s.allow_negative_stock,false) into v_allow_negative
   from public.system_settings s where s.organization_id=p_organization_id limit 1;
@@ -275,7 +279,12 @@ begin
   insert into public.audit_logs(
     organization_id,actor_id,action,entity,entity_id,before_snapshot,after_snapshot,notes
   ) values (
-    p_organization_id,v_actor,'UPDATE','Order',v_order.id::text,v_before,to_jsonb(v_order),
+    p_organization_id,v_actor,'UPDATE','Order',v_order.id::text,v_before,
+    to_jsonb(v_order) || jsonb_build_object('lines', (
+      select coalesce(jsonb_agg(to_jsonb(oi) order by oi.id), '[]'::jsonb)
+      from public.order_items oi
+      where oi.organization_id=p_organization_id and oi.order_id=v_order.id
+    )),
     format('Order %s transitioned from %s to %s.',v_order.order_number,v_before->>'status',p_target_status)
   );
 
