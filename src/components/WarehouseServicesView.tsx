@@ -30,6 +30,8 @@ interface WarehouseServicesViewProps {
   currentUser: User;
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
   const [summary, setSummary] = useState<any>(null);
@@ -212,7 +214,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Phase 3 • Warehouse Services
+              Warehouse Services
             </span>
             <span className="text-xs text-slate-400 font-medium">Dedicated Operational Workflow</span>
           </div>
@@ -465,13 +467,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                       </td>
                       <td className="py-3 px-3 text-center font-bold">{j.quantity}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(j.materialCostMinor / 100).toFixed(2)}
+                        {formatMoney(j.materialCostMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(j.serviceChargeMinor / 100).toFixed(2)}
+                        {formatMoney(j.serviceChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                        £{(j.totalChargeMinor / 100).toFixed(2)}
+                        {formatMoney(j.totalChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -549,13 +551,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                       </td>
                       <td className="py-3 px-3 text-slate-500">{s.destination}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(s.carrierCostMinor / 100).toFixed(2)}
+                        {formatMoney(s.carrierCostMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-medium">
-                        £{(s.serviceChargeMinor / 100).toFixed(2)}
+                        {formatMoney(s.serviceChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                        £{(s.totalChargeMinor / 100).toFixed(2)}
+                        {formatMoney(s.totalChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3">
                         <span
