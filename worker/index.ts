@@ -4,6 +4,7 @@
  * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
 import { handleApiRequest } from './api';
+import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 
 export interface Env {
   ASSETS?: {
@@ -45,7 +46,12 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/')) {
-      const response = await handleApiRequest(request, env);
+      const tooLarge = await exceedsApiRequestBodyLimit(request);
+      const response = tooLarge
+        ? Response.json({
+            error: `Request body exceeds the maximum allowed size of ${MAX_API_REQUEST_BODY_BYTES} bytes.`,
+          }, { status: 413 })
+        : await handleApiRequest(request, env);
       const headers = new Headers(response.headers);
       for (const [key, value] of corsHeaders.entries()) headers.set(key, value);
       return new Response(response.body, {
