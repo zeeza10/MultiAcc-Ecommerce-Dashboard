@@ -45,9 +45,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [carrierInput, setCarrierInput] = useState('Royal Mail');
+  const [carrierInput, setCarrierInput] = useState('');
   const [trackingInput, setTrackingInput] = useState('');
-  const [shippingCostInput, setShippingCostInput] = useState('4.50');
+  const [shippingCostInput, setShippingCostInput] = useState('');
   const [actionError, setActionError] = useState('');
   const [copiedRaw, setCopiedRaw] = useState(false);
 
