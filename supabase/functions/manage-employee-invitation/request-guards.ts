@@ -1,7 +1,12 @@
 export const INVITATION_APP_ORIGIN = "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev";
+const ALLOWED_INVITATION_ORIGINS = new Set([
+  INVITATION_APP_ORIGIN,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]);
 
 export function isAllowedInvitationOrigin(origin: string | null): boolean {
-  return origin === null || origin === INVITATION_APP_ORIGIN;
+  return origin === null || ALLOWED_INVITATION_ORIGINS.has(origin);
 }
 
 export function corsHeadersForInvitation(origin: string | null): Record<string, string> {
@@ -12,7 +17,7 @@ export function corsHeadersForInvitation(origin: string | null): Record<string, 
     "Cache-Control": "no-store",
     "Vary": "Origin",
   };
-  if (origin === INVITATION_APP_ORIGIN) headers["Access-Control-Allow-Origin"] = INVITATION_APP_ORIGIN;
+  if (origin && ALLOWED_INVITATION_ORIGINS.has(origin)) headers["Access-Control-Allow-Origin"] = origin;
   return headers;
 }
 
