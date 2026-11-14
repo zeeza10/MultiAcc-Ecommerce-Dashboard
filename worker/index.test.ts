@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from './index';
+import { MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 
 const context = {
   waitUntil: (_promise: Promise<unknown>) => undefined,
@@ -23,6 +24,44 @@ describe('Cloudflare Worker request boundary', () => {
     assert.equal(response.status, 401);
     const body = await response.json() as { error?: string };
     assert.match(body.error || '', /bearer token/i);
+  });
+
+  it('rejects declared oversized write bodies before authentication or JSON parsing', async () => {
+    const request = new Request('https://dashboard.example.com/api/v1/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': String(MAX_API_REQUEST_BODY_BYTES + 1) },
+      body: '{}',
+    });
+    const response = await worker.fetch(request, {}, context);
+    assert.equal(response.status, 413);
+    assert.match((await response.json() as { error: string }).error, /maximum allowed size/i);
+  });
+
+  it('rejects oversized streamed write bodies when Content-Length is absent', async () => {
+    const payload = new Uint8Array(MAX_API_REQUEST_BODY_BYTES + 1);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(payload);
+        controller.close();
+      },
+    });
+    const request = new Request('https://dashboard.example.com/api/v1/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: stream,
+      // Node's Request implementation requires duplex for streaming request bodies.
+      duplex: 'half',
+    } as RequestInit);
+    const response = await worker.fetch(request, {}, context);
+    assert.equal(response.status, 413);
+  });
+
+  it('does not apply write-body limits to GET requests', async () => {
+    const request = new Request('https://dashboard.example.com/api/v1/products', {
+      method: 'GET',
+    });
+    const response = await worker.fetch(request, {}, context);
+    assert.equal(response.status, 401);
   });
 
   it('requires authentication before resolving marketplace SKU exceptions', async () => {
