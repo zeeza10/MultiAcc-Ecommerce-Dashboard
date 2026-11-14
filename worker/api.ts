@@ -765,7 +765,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
           .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
       ]);
       if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
-      return json({ accounts: (accountsResult.data || []).map(row => ({
+      return json({ integrationReady: false, integrationMessage: 'Live eBay OAuth and order synchronization are not enabled yet. Account metadata is read-only until credentials and encrypted token storage are configured.', accounts: (accountsResult.data || []).map(row => ({
         id: row.id, name: row.name, marketplace: row.marketplace, sellerUsername: row.seller_username || '',
         authStatus: row.auth_status, environment: row.environment, lastSyncAt: row.last_sync_at || '',
         lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
