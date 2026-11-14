@@ -28,6 +28,7 @@ interface NavbarProps {
   onTriggerSync: () => void;
   isSyncing: boolean;
   canSyncEbay: boolean;
+  marketplaceAccounts: any[];
   canAdjustStock: boolean;
   canCreateOrder: boolean;
   canManageSettings: boolean;
@@ -51,6 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTriggerSync,
   isSyncing,
   canSyncEbay,
+  marketplaceAccounts,
   canAdjustStock,
   canCreateOrder,
   canManageSettings,
@@ -178,10 +180,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Global Store Context Filter"
               className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              <option value="ALL">🏪 All Stores Combined</option>
-              <option value="mkt_ebay_uk">🇬🇧 Nexus Tech Direct (UK)</option>
-              <option value="mkt_ebay_us">🇺🇸 Nexus Global Outlet (US)</option>
-              <option value="mkt_ebay_de">🇩🇪 Nexus Tech Europe (DE)</option>
+              <option value="ALL">All Connected Stores</option>
+              {marketplaceAccounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
+              ))}
             </select>
           </div>
         </div>
