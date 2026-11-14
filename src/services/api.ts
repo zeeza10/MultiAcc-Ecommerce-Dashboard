@@ -206,6 +206,16 @@ export const api = {
     return request<{ reconciliations: FinancialReconciliation[] }>(`/reconciliation${q}`);
   },
 
+  // Warehouse layout
+  getWarehouseLayout: () => request<{
+    warehouses: Array<{ id: string; name: string; code: string; address: string; isActive: boolean; totalCapacity: number; occupiedQty: number; zones: Array<{ name: string; aisles: string; type: string; capacity: number; locationCount: number }> }>;
+    locations: Array<{ id: string; warehouseId: string; warehouseName: string; zone: string; aisle: string; shelf: string; bin: string; locationCode: string; locationType: string; capacityUnits: number; currentQty: number; occupiedQty: number; skuCount: number; isActive: boolean }>;
+  }>('/warehouses'),
+  createWarehouse: (payload: { name: string; code: string; address?: string }) =>
+    request<{ warehouse: unknown }>('/warehouses', { method: 'POST', body: JSON.stringify(payload) }),
+  createWarehouseLocation: (warehouseId: string, payload: { locationCode: string; locationType: string; zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number }) =>
+    request<{ location: unknown }>(`/warehouses/${warehouseId}/locations`, { method: 'POST', body: JSON.stringify(payload) }),
+
   // Phase 3: Warehouse Services
   getWarehouseServicesSummary: () => request<any>('/warehouse-services/summary'),
   getPackagingJobs: () => request<{ packagingJobs: WarehousePackagingJob[] }>('/warehouse-services/packaging'),
