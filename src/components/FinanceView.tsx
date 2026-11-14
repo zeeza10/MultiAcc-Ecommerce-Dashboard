@@ -63,7 +63,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         api.getInvoices(selectedStoreId), api.getPayments(selectedStoreId),
         isClientUser ? Promise.resolve({ expenses: [] }) : api.getExpenses(selectedStoreId),
         isClientUser ? Promise.resolve({ ledger: [] }) : api.getFinancialLedger(selectedStoreId),
-        isClientUser ? Promise.resolve({ data: [] }) : api.getReport('R-13'),
+        isClientUser ? Promise.resolve({ data: [] }) : api.getReport('R-13', { accountId: selectedStoreId }),
       ]);
       setInvoices(invRes.invoices || []);
       setPayments(payRes.payments || []);
