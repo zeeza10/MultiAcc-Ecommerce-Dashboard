@@ -672,6 +672,63 @@ apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Purchase orders and receipts could not be loaded from the workspace database.' });
   }
 });
+apiRouter.post('/purchase-orders', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (!Array.isArray(body.lines) || typeof body.idempotencyKey !== 'string') {
+      res.status(400).json({ error: 'Purchase order lines and a request ID are required.' });
+      return;
+    }
+    const lines = body.lines.map(value => {
+      const line = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+      return {
+        productId: typeof line.productId === 'string' ? line.productId : '',
+        orderedQty: typeof line.orderedQty === 'number' ? line.orderedQty : Number(line.orderedQty),
+        unitCostMinor: typeof line.unitCostMinor === 'number' ? line.unitCostMinor : Number(line.unitCostMinor),
+      };
+    });
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    const purchaseOrder = await repository.createPurchaseOrder({
+      supplierId: typeof body.supplierId === 'string' ? body.supplierId : '',
+      expectedDate: typeof body.expectedDate === 'string' ? body.expectedDate : undefined,
+      notes: typeof body.notes === 'string' ? body.notes : undefined,
+      taxMinor: typeof body.taxMinor === 'number' ? body.taxMinor : Number(body.taxMinor ?? 0),
+      lines,
+    }, body.idempotencyKey);
+    res.status(201).json({ purchaseOrder });
+  } catch (error) {
+    console.error('Transactional purchase order creation failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /authorized|authentication|membership|permission/i.test(message)
+      ? 403
+      : /not found|not active/i.test(message)
+        ? 404
+        : /invalid|must |required|exceeds|cannot|duplicate|request ID|already used|select a supplier|between 1/i.test(message)
+          ? 400
+          : 500;
+    res.status(status).json({ error: status === 500 ? 'Purchase order could not be created.' : message });
+  }
+});
+
+apiRouter.post('/purchase-orders/:id/approve', async (req: Request, res: Response) => {
+  try {
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    const purchaseOrder = await repository.approvePurchaseOrder(req.params.id);
+    res.json({ purchaseOrder });
+  } catch (error) {
+    console.error('Transactional purchase order approval failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /authorized|authentication|membership|permission/i.test(message)
+      ? 403
+      : /not found/i.test(message)
+        ? 404
+        : /only draft|must contain/i.test(message)
+          ? 400
+          : 500;
+    res.status(status).json({ error: status === 500 ? 'Purchase order could not be approved.' : message });
+  }
+});
+
 apiRouter.post('/purchase-orders/:id/receive', async (req: Request, res: Response) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
