@@ -381,6 +381,7 @@ export interface StorageSnapshot {
 
 export interface Invoice {
   id: string;
+  currency?: string;
   invoiceNumber: string;
   type: '3PL_SERVICE' | 'STORAGE' | 'SUPPLIER' | 'DIRECT_SALE';
   recipientType: 'CLIENT' | 'SUPPLIER' | 'CUSTOMER';
@@ -407,6 +408,7 @@ export interface Invoice {
 
 export interface Payment {
   id: string;
+  currency?: string;
   paymentNumber: string;
   amountMinor: number;
   paymentMethod: 'BANK_TRANSFER' | 'CARD' | 'CASH' | 'OTHER';
@@ -425,6 +427,7 @@ export interface Payment {
 
 export interface Expense {
   id: string;
+  currency?: string;
   expenseNumber: string;
   category: 'PACKAGING' | 'SHIPPING_CARRIER' | 'WAREHOUSE_RENT' | 'SOFTWARE_FEES' | 'EQUIPMENT' | 'UTILITIES' | 'OTHER';
   supplierName: string;
