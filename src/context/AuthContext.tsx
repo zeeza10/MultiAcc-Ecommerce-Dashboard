@@ -226,10 +226,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!updateError) {
           setPassword('');
           setInviteConfirmPassword('');
+          await loadAccount(session);
           setInviteSetupActive(false);
           window.history.replaceState({}, '', '/');
           setMessage('Your account password is set. Opening your workspace…');
-          await loadAccount(session);
         }
         return { error: updateError };
       });
