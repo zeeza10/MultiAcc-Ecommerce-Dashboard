@@ -4,6 +4,8 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/exceptions') return 'marketplace.view';
   if (method === 'POST' && /^\/ebay\/exceptions\/[^/]+\/resolve$/.test(path)) return 'marketplace.manage';
+  if (method === 'GET' && path === '/system/config') return null;
+  if (method === 'POST' && path === '/system/config') return 'settings.manage';
   if (method === 'GET' && path === '/audit-logs') return 'audit.view';
   if (method === 'GET' && path === '/notifications') return 'dashboard.view';
   if (method === 'POST' && /^\/notifications\/[^/]+\/dismiss$/.test(path)) return 'dashboard.view';
