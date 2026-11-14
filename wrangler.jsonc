@@ -14,6 +14,28 @@
   "observability": {
     "enabled": true
   },
+  "ratelimits": [
+    {
+      "name": "API_IP_RATE_LIMITER",
+      "namespace_id": "9011501000",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "API_READ_RATE_LIMITER",
+      "namespace_id": "9011501001",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "API_WRITE_RATE_LIMITER",
+      "namespace_id": "9011501002",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "INVITATION_RATE_LIMITER",
+      "namespace_id": "9011501003",
+      "simple": { "limit": 5, "period": 60 }
+    }
+  ],
   "vars": {
     "SUPABASE_URL": "https://nmlwnezlsqystjrvszcd.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI"
