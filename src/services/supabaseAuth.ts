@@ -142,7 +142,7 @@ export async function signOut() {
 
 export async function sendPasswordReset(email: string) {
   if (!isSupabaseConfigured) throw new Error(supabaseConfigError);
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(window.location.origin)}`, {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(PRODUCTION_AUTH_REDIRECT_URL)}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.trim() }),
