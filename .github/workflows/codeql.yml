@@ -30,12 +30,13 @@ jobs:
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           category: "/language:javascript-typescript"
+          output: codeql-results
 
       - name: Archive CodeQL SARIF for review
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: codeql-sarif
-          path: ../results/*.sarif
+          path: codeql-results/*.sarif
           if-no-files-found: error
           retention-days: 7
