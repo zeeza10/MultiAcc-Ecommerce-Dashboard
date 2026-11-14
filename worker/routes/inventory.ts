@@ -89,6 +89,26 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
   const isClientUser = auth.user.role === 'CLIENT_USER';
   const options = { client3plId: auth.user.clientId, onlyClientProducts: isClientUser };
 
+  if (path === '/inventory/allocations' && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('inventory.manage')) return json({ error: 'Inventory management permission is required.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const allocated = Number(body.allocatedQuantity);
+    const reserved = Number(body.reservedQuantity || 0);
+    if (!Number.isSafeInteger(allocated) || !Number.isSafeInteger(reserved) || allocated < 0 || reserved < 0 || reserved > allocated) {
+      return json({ error: 'Allocated and reserved quantities must be valid whole numbers.' }, 400);
+    }
+    const { data, error } = await auth.repositoryContext.supabase.rpc('set_marketplace_inventory_allocation', {
+      p_organization_id: auth.organizationId,
+      p_marketplace_account_id: String(body.marketplaceAccountId || ''),
+      p_product_id: String(body.productId || ''),
+      p_allocated_quantity: allocated,
+      p_reserved_quantity: reserved,
+      p_source: String(body.source || 'MANUAL'),
+    });
+    if (error) throw new Error(error.message || 'Store inventory allocation failed.');
+    return json({ allocation: data }, 201);
+  }
+
   if (path === '/inventory/balances' && request.method === 'GET') {
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') {
