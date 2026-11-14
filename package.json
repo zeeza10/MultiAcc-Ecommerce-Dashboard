@@ -14,7 +14,8 @@
     "cf:dev": "wrangler dev",
     "cf:dry-run": "wrangler deploy --dry-run",
     "cf:typegen": "wrangler types",
-    "test": "tsx --test worker/*.test.ts"
+    "test": "tsx --test worker/*.test.ts",
+    "check:migrations": "node scripts/verify-migrations.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

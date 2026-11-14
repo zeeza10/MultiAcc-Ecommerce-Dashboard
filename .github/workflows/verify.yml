@@ -23,6 +23,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Dependency vulnerability audit
         run: npm audit --audit-level=high
+      - name: Migration version consistency
+        run: npm run check:migrations
       - name: TypeScript check
         run: npm run lint
       - name: Worker boundary tests
