@@ -78,7 +78,7 @@ export const api = {
     if (accountId && accountId !== 'ALL') url += `&accountId=${encodeURIComponent(accountId)}`;
     return request<{ kpis: any; userRole: string }>(url);
   },
-  getCharts: () => request<any>('/dashboard/charts'),
+  getCharts: (accountId?: string) => request<any>(`/dashboard/charts${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Orders
   getOrders: (params: { status?: string; accountId?: string; search?: string } = {}) => {
