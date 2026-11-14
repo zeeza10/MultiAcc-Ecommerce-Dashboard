@@ -33,7 +33,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
 
   const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${session.access_token}`);
+  headers.set('Authorization', `Bearer ${session.access_token}`);\n  const organizationId = window.localStorage.getItem('nexusops_active_organization_id');\n  if (organizationId) headers.set('X-Organization-Id', organizationId);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');
   }
