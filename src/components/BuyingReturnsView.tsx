@@ -331,6 +331,111 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       {/* Tab: Purchase Orders */}
       {subTab === 'POS' && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-sm text-gray-900">Purchase Orders</h2>
+              <p className="text-xs text-gray-500">Create a draft, approve it, then receive goods against the approved order.</p>
+            </div>
+            <button
+              onClick={openPoForm}
+              disabled={!suppliers.some(supplier => supplier.isActive) || !products.some(product => product.status === 'ACTIVE')}
+              className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40"
+            >
+              + Create Purchase Order
+            </button>
+          </div>
+
+          {showPoForm && (
+            <form onSubmit={handleCreatePurchaseOrder} className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-gray-900">New Purchase Order</h3>
+                  <p className="text-xs text-gray-500">A new order is saved as DRAFT and must be approved before receiving.</p>
+                </div>
+                <button type="button" onClick={() => setShowPoForm(false)} className="text-xs text-gray-500 hover:text-gray-900">Close</button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="text-xs font-medium text-gray-600">Supplier
+                  <select required value={poSupplierId} onChange={e => { setPoSupplierId(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                    <option value="">Select supplier</option>
+                    {suppliers.filter(supplier => supplier.isActive).map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.currency})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600">Expected Delivery Date
+                  <input type="date" value={poExpectedDate} onChange={e => { setPoExpectedDate(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Tax Amount ({poCurrency})
+                  <input type="number" min="0" step="0.01" value={poTaxAmount} onChange={e => { setPoTaxAmount(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-800">Order Lines</h4>
+                  <button type="button" onClick={() => { setPoLines(lines => [...lines, { productId: '', quantity: '1', unitCost: '0.00' }]); refreshPoRequestId(); }} className="text-xs font-semibold text-indigo-700">+ Add Item</button>
+                </div>
+                {poLines.map((line, index) => {
+                  const selectedProduct = products.find(product => product.id === line.productId);
+                  return (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <label className="md:col-span-6 text-xs font-medium text-gray-600">Product
+                        <select required value={line.productId} onChange={e => {
+                          const product = products.find(item => item.id === e.target.value);
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? {
+                            ...item,
+                            productId: e.target.value,
+                            unitCost: product ? (product.costPriceMinor / 100).toFixed(2) : item.unitCost,
+                          } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                          <option value="">Select product</option>
+                          {products.filter(product => product.status === 'ACTIVE').map(product => (
+                            <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="md:col-span-2 text-xs font-medium text-gray-600">Quantity
+                        <input required type="number" min="1" step="1" value={line.quantity} onChange={e => {
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? { ...item, quantity: e.target.value } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                      </label>
+                      <label className="md:col-span-3 text-xs font-medium text-gray-600">Unit Cost ({poCurrency})
+                        <input required type="number" min="0" step="0.01" value={line.unitCost} onChange={e => {
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? { ...item, unitCost: e.target.value } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                      </label>
+                      <div className="md:col-span-1 flex items-center justify-between md:justify-end gap-2">
+                        <span className="text-xs font-bold text-gray-800">{formatPoMoney((Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100))}</span>
+                        <button type="button" disabled={poLines.length <= 1} onClick={() => { setPoLines(lines => lines.filter((_, lineIndex) => lineIndex !== index)); refreshPoRequestId(); }} className="text-rose-600 disabled:opacity-30" aria-label="Remove purchase order line">×</button>
+                      </div>
+                      {selectedProduct && <div className="md:col-span-12 text-[11px] text-gray-500">SKU: {selectedProduct.sku} · Product currency: {selectedProduct.currency}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <label className="block text-xs font-medium text-gray-600">Purchase Order Notes
+                <textarea rows={2} maxLength={2000} value={poNotes} onChange={e => { setPoNotes(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Delivery instructions, supplier reference, or terms..." />
+              </label>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>Subtotal: <strong>{formatPoMoney(poSubtotalMinor)}</strong></div>
+                  <div>Tax: <strong>{formatPoMoney(poTaxMinor)}</strong></div>
+                  <div className="text-sm text-gray-900">Total: <strong>{formatPoMoney(poTotalMinor)}</strong></div>
+                </div>
+                <button type="submit" disabled={savingPo || !poSupplierId || poLines.length === 0 || poLines.some(line => !line.productId)} className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold disabled:opacity-50">
+                  {savingPo ? 'Creating...' : 'Save Draft Purchase Order'}
+                </button>
+              </div>
+            </form>
+          )}
+
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
