@@ -202,13 +202,13 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      OAuth: {acc.authStatus}
+                      Stored account status: {acc.authStatus}
                     </span>
                   </div>
 
                   <div className="bg-slate-50 border border-slate-200 rounded-md p-2.5 text-xs space-y-1">
                     <div className="flex justify-between text-gray-600">
-                      <span>Token Validity:</span>
+                      <span>Recorded token expiry:</span>
                       <span className="font-semibold text-gray-700">{acc.tokenExpiresAt ? 'Stored expiry recorded (not live-verified)' : 'No token expiry recorded'}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
@@ -231,7 +231,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       onClick={() => handleReconnect(acc.id)}
                       disabled={!integrationReady}
                       title={!integrationReady ? integrationMessage : undefined}
-                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition"
+                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Renew OAuth
                     </button>
@@ -239,7 +239,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                     <button
                       onClick={() => handleSync(acc.id)}
                       disabled={!integrationReady || isSyncing}
-                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50"
+                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                       <span>{isSyncing ? 'Polling...' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
