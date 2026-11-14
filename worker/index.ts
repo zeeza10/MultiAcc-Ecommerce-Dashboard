@@ -4,6 +4,8 @@
  * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
 import { handleApiRequest } from './api';
+import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
+import { withBrowserSecurityHeaders } from './security-headers';
 
 export interface Env {
   ASSETS?: {
@@ -22,6 +24,7 @@ export interface ExecutionContext {
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const secure = (response: Response) => withBrowserSecurityHeaders(response, url.protocol === 'https:');
     const requestOrigin = request.headers.get('Origin');
     const configuredOrigin = env.ALLOWED_ORIGIN;
     const sameOrigin = requestOrigin === url.origin;
@@ -39,23 +42,26 @@ export default {
 
     if (request.method === 'OPTIONS') {
       if (requestOrigin && !allowedOrigin) {
-        return new Response(null, { status: 403, headers: corsHeaders });
+        return secure(new Response(null, { status: 403, headers: corsHeaders }));
       }
-      return new Response(null, { status: 204, headers: corsHeaders });
+      return secure(new Response(null, { status: 204, headers: corsHeaders }));
     }
 
     if (url.pathname.startsWith('/api/')) {
-      const response = await handleApiRequest(request, env);
+      const tooLarge = await exceedsApiRequestBodyLimit(request);
+      const response = tooLarge
+        ? Response.json({ error: `Request body exceeds the maximum allowed size of ${MAX_API_REQUEST_BODY_BYTES} bytes.` }, { status: 413 })
+        : await handleApiRequest(request, env);
       const headers = new Headers(response.headers);
       for (const [key, value] of corsHeaders.entries()) headers.set(key, value);
-      return new Response(response.body, {
+      return secure(new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
         headers,
-      });
+      }));
     }
 
-    if (env.ASSETS) return env.ASSETS.fetch(request);
-    return new Response('Not Found', { status: 404 });
+    if (env.ASSETS) return secure(await env.ASSETS.fetch(request));
+    return secure(new Response('Not Found', { status: 404 }));
   },
 };
