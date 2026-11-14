@@ -30,54 +30,32 @@ interface DashboardViewProps {
 }
 
 const INITIAL_KPIS = {
-  totalOrders: 10,
-  pendingOrders: 8,
-  revenueMinor: 64710,
-  lowStockItems: 1,
-  totalStockUnits: 359,
-  inventoryValueMinor: 690600,
-  supplierPayablesMinor: 144000,
-  clientReceivablesMinor: 36000,
-  storageRevenueMinor: 21600,
-  outstandingPaymentsMinor: 21600,
+  totalOrders: 0,
+  pendingOrders: 0,
+  revenueMinor: 0,
+  lowStockItems: 0,
+  totalStockUnits: 0,
+  inventoryValueMinor: 0,
+  supplierPayablesMinor: 0,
+  clientReceivablesMinor: 0,
+  storageRevenueMinor: 0,
+  outstandingPaymentsMinor: 0,
   currency: 'GBP',
   activePhase: 'ALL',
 };
 
 const INITIAL_CHARTS = {
-  trend: [
-    { date: '11-01', orders: 0, revenue: 0 },
-    { date: '11-02', orders: 0, revenue: 0 },
-    { date: '11-03', orders: 0, revenue: 0 },
-    { date: '11-04', orders: 0, revenue: 0 },
-    { date: '11-05', orders: 1, revenue: 74.99 },
-    { date: '11-06', orders: 2, revenue: 129.13 },
-    { date: '11-07', orders: 7, revenue: 442.98 },
-  ],
-  statusCounts: {
-    New: 3,
-    Confirmed: 3,
-    Allocated: 1,
-    Picked: 1,
-    Packed: 1,
-    Shipped: 1,
-    Delivered: 1,
-  },
+  trend: [],
+  statusCounts: {},
   stockByState: {
-    available: 357,
-    reserved: 12,
-    onHand: 359,
-    incoming: 50,
-    damaged: 2,
+    available: 0,
+    reserved: 0,
+    onHand: 0,
+    incoming: 0,
+    damaged: 0,
     quarantined: 0,
   },
-  topSkus: [
-    { sku: 'APX-SPK-100', name: 'Apex SoundPulse Rugged Waterproof Speaker', units: 4, revenue: 199.96 },
-    { sku: 'NX-CAM-002', name: 'Nexus 4K Ultra Wide StreamCam with Stereo Mic', units: 3, revenue: 179.97 },
-    { sku: 'EBAY-UNMAPPED-USB-CABLE', name: 'Braided Type-C Fast Charging Cable 2M', units: 2, revenue: 37.98 },
-    { sku: 'NX-AUD-001', name: 'Nexus Pro Active Noise-Cancelling Headphones', units: 2, revenue: 179.98 },
-    { sku: 'NX-HUB-005', name: 'Nexus 8-in-1 Aluminum USB-C Hub 100W PD', units: 2, revenue: 59.98 },
-  ],
+  topSkus: [],
 };
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
