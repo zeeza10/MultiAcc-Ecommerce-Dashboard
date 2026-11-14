@@ -2,6 +2,11 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
+  // Client finance views are not yet scoped to a single 3PL client across every ledger relation.
+  // Deny them until invoice/payment/expense/ledger queries share a verified client boundary.
+  if (auth.user.role === 'CLIENT_USER') {
+    return json({ error: 'Client-scoped finance access is not available yet.' }, 403);
+  }
   if (path === '/finance/invoices' && request.method === 'GET') {
     const { data: invoices, error } = await auth.repositoryContext.supabase
       .from('invoices')
