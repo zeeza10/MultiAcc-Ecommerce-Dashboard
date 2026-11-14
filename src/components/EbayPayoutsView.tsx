@@ -219,7 +219,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             {formatMoney(balances?.confirmedMinor ?? 0, currency)}
           </div>
           <div className="text-xs text-emerald-600/80 mt-2">
-            Reconciled 100% against bank statements
+            Confirmed deposits recorded in the workspace database
           </div>
         </div>
 
