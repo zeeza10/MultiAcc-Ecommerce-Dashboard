@@ -631,7 +631,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
           onlyClientProducts: auth.user.role === 'CLIENT_USER',
         }),
         auth.permissions.has('*') || auth.permissions.has('finance.view')
-          ? auth.repositoryContext.supabase.from('invoices').select('total_minor,paid_amount_minor,currency,status').eq('organization_id', auth.organizationId)
+          ? auth.repositoryContext.supabase.from('invoices').select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date').eq('organization_id', auth.organizationId)
           : Promise.resolve({ data: [], error: null }),
         auth.permissions.has('*') || auth.permissions.has('finance.view')
           ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId)
@@ -658,6 +658,26 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => sum + (Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0)), 0);
       const invoices = invoiceResult.data || [];
       const expenses = expenseResult.data || [];
+      const outstandingForCurrency = (row: any) =>
+        String(row.currency || '').trim() === currency
+        && !['PAID', 'VOID', 'DRAFT'].includes(String(row.status).toUpperCase())
+        ? Math.max(0, Number(row.total_minor || 0) - Number(row.paid_amount_minor || 0))
+        : 0;
+      const supplierPayablesMinor = invoices
+        .filter(row => row.recipient_type === 'SUPPLIER')
+        .reduce((sum, row) => sum + outstandingForCurrency(row), 0);
+      const clientReceivablesMinor = invoices
+        .filter(row => row.recipient_type === 'CLIENT')
+        .reduce((sum, row) => sum + outstandingForCurrency(row), 0);
+      const storageRevenueMinor = invoices
+        .filter(row => row.invoice_type === 'STORAGE'
+          && String(row.currency || '').trim() === currency
+          && !['DRAFT', 'VOID'].includes(String(row.status).toUpperCase())
+          && String(row.issue_date || '') >= start.toISOString().slice(0, 10))
+        .reduce((sum, row) => sum + Number(row.total_minor || 0), 0);
+      const outstandingPaymentsMinor = invoices
+        .filter(row => String(row.status).toUpperCase() === 'OVERDUE')
+        .reduce((sum, row) => sum + outstandingForCurrency(row), 0);
       return json({ kpis: {
         totalOrders: activeOrders.length,
         pendingOrders: pendingOrders.length,
@@ -665,16 +685,14 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         lowStockItems,
         totalStockUnits,
         inventoryValueMinor,
-        supplierPayablesMinor: 0,
-        clientReceivablesMinor: invoices.filter(row => !['PAID', 'VOID'].includes(String(row.status).toUpperCase()))
-          .reduce((sum, row) => sum + Math.max(0, Number(row.total_minor || 0) - Number(row.paid_amount_minor || 0)), 0),
-        storageRevenueMinor: 0,
-        outstandingPaymentsMinor: invoices.reduce((sum, row) => sum + Math.max(0, Number(row.total_minor || 0) - Number(row.paid_amount_minor || 0)), 0),
+        supplierPayablesMinor,
+        clientReceivablesMinor,
+        storageRevenueMinor,
+        outstandingPaymentsMinor,
         currency,
         activePhase: 'ALL',
       }, userRole: auth.user.role, dataCoverage: {
-        supplierPayables: 'not-yet-implemented',
-        storageRevenue: 'not-yet-implemented',
+        financeInvoices: invoices.length,
         expenseRecords: expenses.length,
       } });
     }
