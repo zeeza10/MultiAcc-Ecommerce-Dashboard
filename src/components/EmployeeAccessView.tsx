@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock3, KeyRound, Mail, Plus, RefreshCw, S
 import { supabase } from '../lib/supabase';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { AdminMfaSetup } from './AdminMfaSetup';
 
 type Role = {
   id: string; organization_id: string | null; code: string; name: string;
@@ -210,6 +211,8 @@ export const EmployeeAccessView: React.FC = () => {
       {error && <div role="alert" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
       {notice && <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
 
+      <AdminMfaSetup />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2 text-sm text-slate-500"><Users className="h-4 w-4" /> Employees</div><div className="mt-2 text-2xl font-bold text-slate-900">{access.members.length}</div><div className="text-xs text-slate-500">{access.members.filter(member => member.is_active).length} active</div></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2 text-sm text-slate-500"><Shield className="h-4 w-4" /> Available roles</div><div className="mt-2 text-2xl font-bold text-slate-900">{access.roles.length}</div><div className="text-xs text-slate-500">{access.roles.filter(role => role.is_custom).length} custom roles</div></div>
@@ -231,7 +234,7 @@ export const EmployeeAccessView: React.FC = () => {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <label className="text-xs font-semibold text-slate-600">Full name<input required value={inviteName} onChange={e=>setInviteName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900" placeholder="Employee name" /></label>
               <label className="text-xs font-semibold text-slate-600">Work email<input required type="email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900" placeholder="name@company.com" /></label>
-              <label className="text-xs font-semibold text-slate-600">Assign role<select required value={inviteRole} onChange={e=>setInviteRole(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}{role.code==='SUPER_ADMIN'?' — full organization access':''}</option>)}</select></label>
+              <label className="text-xs font-semibold text-slate-600">Assign role<select required value={inviteRole} onChange={e=>setInviteRole(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900">{access.roles.map(role=><option key={role.id} value={role.id} disabled={role.code==='SUPER_ADMIN'}>{role.name}{role.code==='SUPER_ADMIN'?' — full organization access (MFA required)':''}</option>)}</select></label>
               <div className="flex items-end"><button disabled={saving || !inviteRole} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"><Mail className="h-4 w-4" />{saving?'Sending…':'Send invitation'}</button></div>
             </div>
             <p className="mt-3 text-xs text-slate-500">The employee receives a secure Supabase invitation email. New accounts are linked to this organization and the selected role after invitation creation.</p>
