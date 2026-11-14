@@ -109,8 +109,8 @@ export const api = {
     }),
 
   // Inventory & Ledger
-  getBalances: () => request<{ balances: StockBalance[] }>('/inventory/balances'),
-  getStockLedger: () => request<{ ledger: StockLedgerEntry[] }>('/inventory/ledger'),
+  getBalances: (accountId?: string) => request<{ balances: StockBalance[] }>(`/inventory/balances${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getStockLedger: (accountId?: string) => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Stock Adjustments
   getAdjustments: () => request<{ adjustments: StockAdjustment[] }>('/stock/adjustments'),
@@ -172,20 +172,20 @@ export const api = {
     }),
 
   // Phase 4: Finance
-  getInvoices: () => request<{ invoices: Invoice[] }>('/finance/invoices'),
+  getInvoices: (accountId?: string) => request<{ invoices: Invoice[] }>(`/finance/invoices${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   voidInvoice: (id: string, reason: string) =>
     request<{ success: boolean; invoice: Invoice }>(`/finance/invoices/${id}/void`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
-  getPayments: () => request<{ payments: Payment[] }>('/finance/payments'),
+  getPayments: (accountId?: string) => request<{ payments: Payment[] }>(`/finance/payments${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   recordPayment: (payload: any) =>
     request<{ payment: Payment }>('/finance/payments', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  getExpenses: () => request<{ expenses: Expense[] }>('/finance/expenses'),
-  getFinancialLedger: () => request<{ ledger: FinancialLedgerEntry[] }>('/finance/ledger'),
+  getExpenses: (accountId?: string) => request<{ expenses: Expense[] }>(`/finance/expenses${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getFinancialLedger: (accountId?: string) => request<{ ledger: FinancialLedgerEntry[] }>(`/finance/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Reports
   getReport: (id: string, params: { startDate?: string; endDate?: string; accountId?: string; sku?: string } = {}) => {
