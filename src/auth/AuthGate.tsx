@@ -17,6 +17,8 @@ export const useAuth = () => {
   return value;
 };
 
+const PRODUCTION_AUTH_REDIRECT_URL = 'https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/';
+
 type Workspace = { organization_id: string; role: { code: string } | { code: string }[]; organization: { name: string } | { name: string }[] };
 const toOne = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
 
@@ -113,14 +115,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       await runAuth(async () => {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(), password,
-          options: { data: { full_name: fullName.trim() }, emailRedirectTo: window.location.origin },
+          options: { data: { full_name: fullName.trim() }, emailRedirectTo: PRODUCTION_AUTH_REDIRECT_URL },
         });
         if (!error && !data.session) setMessage('Account created. Check your email to verify the address, then sign in.');
         return { error };
       });
     } else {
       await runAuth(async () => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: PRODUCTION_AUTH_REDIRECT_URL });
         if (!error) setMessage('Password reset email sent. Follow the link to choose a new password.');
         return { error };
       });
