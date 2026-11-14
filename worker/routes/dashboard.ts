@@ -2,7 +2,7 @@ import { SupabaseInventoryRepository } from '../../server/repositories/inventory
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
-export async function handleDashboardRoute(path: string, url: URL, auth: AuthContext): Promise<Response | null> {
+export async function handleDashboardRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/dashboard/kpis' && request.method === 'GET') {
     const period = url.searchParams.get('period') || '30D';
     const accountId = url.searchParams.get('accountId');
