@@ -26,6 +26,8 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('GET', '/ebay/accounts'), 'marketplace.view');
     assert.equal(permissionByRoute('POST', '/ebay/exceptions/exception-id/resolve'), 'marketplace.manage');
     assert.equal(permissionByRoute('GET', '/audit-logs'), 'audit.view');
+    assert.equal(permissionByRoute('GET', '/access/overview'), 'users.manage');
+    assert.equal(permissionByRoute('POST', '/access/invitations'), 'users.manage');
     assert.equal(permissionByRoute('GET', '/3pl/clients'), 'fulfilment.view');
   });
 

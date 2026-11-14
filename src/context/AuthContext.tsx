@@ -44,12 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [workspaceName, setWorkspaceName] = useState('NexusOps');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -93,9 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const roleRow = toOne(member.role as Workspace['role']);
     const orgRow = toOne(member.organization as Workspace['organization']);
-    const allowedRoles = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
     const role = roleRow?.code;
-    if (!role || !allowedRoles.includes(role)) {
+    const allowedRoles = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
+    if (!role || (!allowedRoles.includes(role) && !role.startsWith('CUSTOM_'))) {
       throw new Error('Your organization role is not configured. Contact an administrator.');
     }
 
@@ -204,24 +202,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (mode === 'signup') {
-      await runAuth(async () => {
-        const { data, error: signupError } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { full_name: fullName.trim() },
-            emailRedirectTo: getAuthRedirectUrl(),
-          },
-        });
-        if (!signupError && !data.session) {
-          setMessage('Account created. Check your email to verify the address, then sign in.');
-        }
-        return { error: signupError };
-      });
-      return;
-    }
-
     await runAuth(async () => {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: getAuthRedirectUrl(),
@@ -231,30 +211,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return { error: resetError };
     });
-  };
-
-  const createWorkspace = async () => {
-    setBusy(true);
-    setError('');
-    setMessage('');
-    try {
-      const slug = workspaceName.toLowerCase().trim().normalize('NFKD')
-        .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55);
-      if (workspaceName.trim().length < 2 || !slug) {
-        throw new Error('Enter a valid workspace name.');
-      }
-      const { error: createError } = await supabase.rpc('bootstrap_organization', {
-        p_name: workspaceName.trim(),
-        p_slug: slug,
-      });
-      if (createError) throw createError;
-      const { data } = await supabase.auth.getSession();
-      await loadAccount(data.session);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Workspace could not be created.');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const signOut = useCallback(async () => {
@@ -289,11 +245,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="mb-7">
           <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">NexusOps</div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">
-            {signedInWithoutWorkspace ? 'Workspace access' : mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
+            {signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {signedInWithoutWorkspace
-              ? 'Your email is authenticated, but this account is not yet a member of a workspace.'
+              ? 'This account has no active organization invitation. Contact your organization administrator.'
               : 'Secure sign-in powered by Supabase Authentication.'}
           </p>
         </div>
@@ -303,26 +259,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         {signedInWithoutWorkspace ? (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
-              Workspace name
-              <input value={workspaceName} onChange={event => setWorkspaceName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
-            </label>
-            <button disabled={busy} onClick={createWorkspace} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">
-              {busy ? 'Creating…' : 'Create my workspace'}
-            </button>
-            <p className="text-xs text-slate-500">
-              Creating a workspace makes your account its initial workspace administrator. If you were invited to an existing workspace, sign out and ask its administrator to add your account.
-            </p>
-            <button onClick={signOut} className="w-full py-2 text-sm text-slate-600">Sign out</button>
+            <p className="text-sm text-slate-600">Your sign-in succeeded, but no active organization membership was found. Ask your organization Super Admin to send or renew your invitation.</p>
+            <button onClick={signOut} className="w-full rounded-lg border border-slate-300 py-3 text-sm font-semibold text-slate-700">Sign out</button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            {mode === 'signup' && (
-              <label className="block text-sm font-medium text-slate-700">
-                Full name
-                <input required value={fullName} onChange={event => setFullName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" autoComplete="name" />
-              </label>
-            )}
             <label className="block text-sm font-medium text-slate-700">
               Email
               <input required type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
@@ -335,12 +276,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               </label>
             )}
             <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">
-              {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : recoveryActive ? 'Update password' : 'Send reset link'}
+              {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : recoveryActive ? 'Update password' : 'Send reset link'}
             </button>
             <div className="flex flex-wrap justify-between gap-3 text-sm">
-              <button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setMessage(''); }} className="text-indigo-600">
-                {mode === 'login' ? 'Create an account' : 'Back to sign in'}
-              </button>
               {mode === 'login' && (
                 <button type="button" onClick={() => { setMode('reset'); setError(''); setMessage(''); }} className="text-slate-500">
                   Forgot password?

@@ -291,5 +291,9 @@ export const api = {
     }),
   resetDemo: () => request<{ success: boolean; message: string }>('/system/reset-demo', { method: 'POST' }),
   getHealth: () => request<{ success: boolean; message: string; platform: string }>('/health'),
+  inviteEmployee: (payload: { email: string; fullName: string; roleId: string }) =>
+    request<{ success: boolean; invitationId: string; email: string; message: string }>('/access/invitations', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
 };
 

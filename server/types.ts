@@ -9,7 +9,8 @@ export type UserRole =
   | 'WAREHOUSE_STAFF'
   | 'FINANCE_USER'
   | 'CLIENT_USER'
-  | 'VIEWER';
+  | 'VIEWER'
+  | (string & {});
 
 export type OwnerType = 'OPERATOR' | 'CLIENT';
 

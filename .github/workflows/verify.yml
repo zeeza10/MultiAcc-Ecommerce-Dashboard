@@ -2,7 +2,7 @@ name: Verify application
 
 on:
   push:
-    branches: [main, phase-3-worker-api-foundation]
+    branches: [main, phase-3-worker-api-foundation, feature/employee-access-control]
   pull_request:
     branches: [main]
 
