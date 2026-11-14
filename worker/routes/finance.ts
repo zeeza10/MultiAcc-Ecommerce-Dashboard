@@ -2,6 +2,26 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
+  if (path === '/finance/allocations' && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('finance.manage')) return json({ error: 'Finance management permission is required.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const amountMinor = Number(body.amountMinor);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return json({ error: 'Allocation amount must be a positive whole number of minor currency units.' }, 400);
+    const sourceType = String(body.sourceType || '').toUpperCase();
+    if (!['INVOICE','EXPENSE','PAYMENT','JOURNAL_ENTRY'].includes(sourceType)) return json({ error: 'Unsupported finance source type.' }, 400);
+    const { data, error } = await auth.repositoryContext.supabase.rpc('allocate_marketplace_finance', {
+      p_organization_id: auth.organizationId,
+      p_marketplace_account_id: String(body.marketplaceAccountId || ''),
+      p_source_type: sourceType,
+      p_source_id: String(body.sourceId || ''),
+      p_amount_minor: amountMinor,
+      p_currency: String(body.currency || 'GBP').toUpperCase(),
+      p_note: body.note == null ? null : String(body.note),
+    });
+    if (error) throw new Error(error.message || 'Store finance allocation failed.');
+    return json({ allocation: data }, 201);
+  }
+
   if (path === '/finance/payments' && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
     const amountMinor = Number(body.amountMinor);
