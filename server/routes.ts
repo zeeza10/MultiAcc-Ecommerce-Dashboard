@@ -4,6 +4,7 @@ import type { RepositoryContext } from './repositories/context';
 import { SupabaseProductRepository } from './repositories/productRepository';
 import { SupabaseInventoryRepository } from './repositories/inventoryRepository';
 import { SupabaseOrderRepository } from './repositories/orderRepository';
+import { SupabasePurchasingRepository } from './repositories/purchasingRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -644,6 +645,30 @@ apiRouter.post('/stock/adjustments/:id/decision', async (req: Request, res: Resp
     }
     console.error('Transactional stock adjustment decision failed:', error);
     res.status(500).json({ error: 'The stock adjustment decision could not be saved.' });
+  }
+});
+
+apiRouter.get('/suppliers', async (req: Request, res: Response) => {
+  try {
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    res.json({ suppliers: await repository.listSuppliers() });
+  } catch (error) {
+    console.error('PostgreSQL supplier listing failed:', error);
+    res.status(500).json({ error: 'Suppliers could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
+  try {
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    const [purchaseOrders, receipts] = await Promise.all([
+      repository.listPurchaseOrders(),
+      repository.listGoodsReceipts(),
+    ]);
+    res.json({ purchaseOrders, receipts });
+  } catch (error) {
+    console.error('PostgreSQL purchasing listing failed:', error);
+    res.status(500).json({ error: 'Purchase orders and receipts could not be loaded from the workspace database.' });
   }
 });
 
