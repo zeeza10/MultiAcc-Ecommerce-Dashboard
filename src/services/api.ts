@@ -101,7 +101,7 @@ export const api = {
     }),
 
   // Products
-  getProducts: () => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>('/products'),
+  getProducts: (accountId?: string) => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   createProduct: (payload: any) =>
     request<{ product: Product }>('/products', {
       method: 'POST',
