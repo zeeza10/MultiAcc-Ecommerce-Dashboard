@@ -275,6 +275,7 @@ set search_path = public, private, pg_temp
 as $function$
 declare
   v_actor uuid := auth.uid();
+  v_role text;
   v_po public.purchase_orders%rowtype;
   v_supplier_name text;
   v_before jsonb;
@@ -287,6 +288,14 @@ begin
   if p_organization_id is null
      or not private.has_org_permission(p_organization_id, 'purchasing.manage') then
     raise exception 'You are not authorized to approve purchase orders in this workspace.' using errcode = '42501';
+  end if;
+  select r.code into v_role
+  from public.organization_members m
+  join public.roles r on r.id = m.role_id
+  where m.organization_id = p_organization_id and m.user_id = v_actor and m.is_active = true
+  limit 1;
+  if v_role is null or v_role = 'CLIENT_USER' then
+    raise exception 'Active non-client workspace membership is required.' using errcode = '42501';
   end if;
 
   select * into v_po
