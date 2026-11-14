@@ -1,0 +1,12 @@
+REVOKE EXECUTE ON FUNCTION public.confirm_payout_deposit(uuid,uuid,text) FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_packaging_job(uuid,uuid,date,text,integer,bigint,uuid,text) FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_shipping_job(uuid,uuid,date,text,text,text,numeric,bigint,bigint,text,uuid) FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_client_finance_payments(uuid) FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.record_finance_payment(uuid,uuid,bigint,text,date,text,text) FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.void_finance_invoice(uuid,uuid,text) FROM anon, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.confirm_payout_deposit(uuid,uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_packaging_job(uuid,uuid,date,text,integer,bigint,uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_shipping_job(uuid,uuid,date,text,text,text,numeric,bigint,bigint,text,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_client_finance_payments(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_finance_payment(uuid,uuid,bigint,text,date,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.void_finance_invoice(uuid,uuid,text) TO authenticated;
