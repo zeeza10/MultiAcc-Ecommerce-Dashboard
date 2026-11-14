@@ -101,7 +101,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
  }
  if(url.searchParams.get('format')==='csv'){
   if(!auth.permissions.has('*')&&!auth.permissions.has('reports.export')) return json({error:'You do not have permission to export reports.'},403);
-  const body=[report.columns.map(csv).join(','),...report.data.map((row:any)=>report.columns.map((col:string)=>csv(row[Object.keys(row).find(k=>k.toLowerCase().replace(/([a-z])([A-Z])/g,'$1 $2')===col.toLowerCase())||''])).join(','))].join('\n');
+  const body=[report.columns.map(csv).join(','),...report.data.map((row:any)=>Object.values(row).map(csv).join(','))].join('\n');
   return new Response(body,{status:200,headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${id}.csv"`,'Cache-Control':'no-store'}});
  }
  return json(report);
