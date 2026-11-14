@@ -25,6 +25,7 @@ import { EditOrderModal } from './EditOrderModal';
 interface OrdersViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   initialFilter?: any;
   onOpenNewOrder: () => void;
 }
@@ -34,6 +35,7 @@ const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('
 export const OrdersView: React.FC<OrdersViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   initialFilter,
   onOpenNewOrder,
 }) => {
@@ -56,7 +58,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   useEffect(() => {
     loadOrders();
     loadProducts();
-  }, [statusFilter, currentUser.id]);
+  }, [statusFilter, currentUser.id, selectedStoreId]);
 
   const loadProducts = async () => {
     try {
@@ -73,6 +75,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       const res = await api.getOrders({
         status: statusFilter === 'PENDING_GROUP' ? undefined : statusFilter,
         search,
+        accountId: selectedStoreId,
       });
 
 
