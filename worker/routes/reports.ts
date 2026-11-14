@@ -63,7 +63,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const [adjustments,products]=await Promise.all([rows(auth,'stock_adjustments','id,adjustment_number,product_id,quantity_delta,reason_code,status,note,created_at','created_at',url),rows(auth,'products','id,sku')]);
   const pmap=new Map<string, string>(products.map((x:any)=>[String(x.id),String(x.sku)] as [string,string]));
   const data=adjustments.map((x:any)=>({adjustment:x.adjustment_number,sku:pmap.get(x.product_id)||'—',delta:x.quantity_delta,reason:x.reason_code,status:x.status,note:x.note||'',date:x.created_at}));
-  report=result(id,{adjustments:data.length,pending:data.filter(x=>x.status==='PENDING_APPROVAL').length},['Adjustment','SKU','Delta','Reason','Status','Note','Date'],data);
+  report=result(id,{adjustments:data.length,pending:data.filter((x:any)=>x.status==='PENDING_APPROVAL').length},['Adjustment','SKU','Delta','Reason','Status','Note','Date'],data);
  }else if(id==='R-08'){
   const [pos,suppliers,items]=await Promise.all([rows(auth,'purchase_orders','id,po_number,supplier_id,status,total_minor,expected_date,created_at','created_at',url),rows(auth,'suppliers','id,name'),rows(auth,'purchase_order_items','purchase_order_id,ordered_qty,received_qty')]);
   const smap=new Map<string, string>(suppliers.map((x:any)=>[String(x.id),String(x.name)] as [string,string]));
