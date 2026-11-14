@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { RepositoryContext } from './repositories/context';
 import { SupabaseProductRepository } from './repositories/productRepository';
 import { SupabaseInventoryRepository } from './repositories/inventoryRepository';
+import { SupabaseOrderRepository } from './repositories/orderRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -231,6 +232,43 @@ apiRouter.use(requireRoutePermission);
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
   res.json({ user: getActiveUser(req), organizationId: (req as AuthenticatedRequest).organizationId });
+});
+
+apiRouter.get('/orders', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const repository = new SupabaseOrderRepository(getRepositoryContext(req));
+    const orders = await repository.listOrders({
+      status: typeof req.query.status === 'string' ? req.query.status : undefined,
+      accountId: typeof req.query.accountId === 'string' ? req.query.accountId : undefined,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      client3plId: user.clientId,
+      onlyClientOrders: user.role === 'CLIENT_USER',
+    });
+    res.json({ orders });
+  } catch (error) {
+    console.error('PostgreSQL order listing failed:', error);
+    res.status(500).json({ error: 'Orders could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.get('/orders/:id', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const repository = new SupabaseOrderRepository(getRepositoryContext(req));
+    const result = await repository.getOrder(req.params.id, {
+      client3plId: user.clientId,
+      onlyClientOrders: user.role === 'CLIENT_USER',
+    });
+    if (!result) {
+      res.status(404).json({ error: 'Order was not found in this workspace.' });
+      return;
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('PostgreSQL order detail lookup failed:', error);
+    res.status(500).json({ error: 'Order details could not be loaded from the workspace database.' });
+  }
 });
 
 /**
