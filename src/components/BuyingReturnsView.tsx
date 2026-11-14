@@ -447,7 +447,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                     <th className="py-2.5 px-3">Date (UTC)</th>
                     <th className="py-2.5 px-3">Expected Date</th>
                     <th className="py-2.5 px-3">Items & Qty</th>
-                    <th className="py-2.5 px-3">Total (£)</th>
+                    <th className="py-2.5 px-3">Total</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -484,17 +484,25 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         ))}
                       </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
-                        £{((po.totalMinor || 0) / 100).toFixed(2)}
+                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || 'GBP' }).format((po.totalMinor || 0) / 100)}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {po.status !== 'RECEIVED' && po.status !== 'CLOSED' && (
+                        {po.status === 'DRAFT' ? (
+                          <button
+                            onClick={() => void handleApprovePurchaseOrder(po.id)}
+                            disabled={approvingPoId === po.id}
+                            className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition shadow-2xs disabled:opacity-50"
+                          >
+                            {approvingPoId === po.id ? 'Approving...' : 'Approve'}
+                          </button>
+                        ) : ['APPROVED', 'SENT', 'PARTIALLY_RECEIVED'].includes(po.status) ? (
                           <button
                             onClick={() => openReceiveModal(po)}
                             className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition shadow-2xs"
                           >
                             Receive Goods
                           </button>
-                        )}
+                        ) : <span className="text-[11px] text-gray-400">—</span>}
                       </td>
                     </tr>
                   ))}
