@@ -69,17 +69,15 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     } });
   }
 
-  // Client finance views are not yet scoped to a single 3PL client across every ledger relation.
-  // Deny them until invoice/payment/expense/ledger queries share a verified client boundary.
-  if (auth.user.role === 'CLIENT_USER') {
-    return json({ error: 'Client-scoped finance access is not available yet.' }, 403);
-  }
   if (path === '/finance/invoices' && request.method === 'GET') {
-    const { data: invoices, error } = await auth.repositoryContext.supabase
-      .from('invoices')
+    let invoicesQuery = auth.repositoryContext.supabase.from('invoices')
       .select('id,invoice_number,invoice_type,recipient_type,recipient_id,recipient_name,issue_date,due_date,subtotal_minor,vat_rate_percent,vat_amount_minor,total_minor,paid_amount_minor,currency,status,void_reason,is_immutable,created_at')
-      .eq('organization_id', auth.organizationId)
-      .order('created_at', { ascending: false });
+      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false });
+    if (auth.user.role === 'CLIENT_USER') {
+      if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
+      invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId);
+    }
+    const { data: invoices, error } = await invoicesQuery;
     if (error) throw error;
     const ids = (invoices || []).map(row => row.id);
     const { data: items, error: itemError } = ids.length
@@ -105,18 +103,38 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/payments' && request.method === 'GET') {
-    const { data: payments, error } = await auth.repositoryContext.supabase
-      .from('payments')
+    let clientInvoiceIds: string[] | null = null;
+    let clientRecipientName = '';
+    if (auth.user.role === 'CLIENT_USER') {
+      if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
+      const { data: clientInvoices, error: clientInvoiceError } = await auth.repositoryContext.supabase.from('invoices')
+        .select('id,recipient_name').eq('organization_id', auth.organizationId)
+        .eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId);
+      if (clientInvoiceError) throw clientInvoiceError;
+      clientInvoiceIds = (clientInvoices || []).map(row => row.id);
+      clientRecipientName = clientInvoices?.[0]?.recipient_name || '';
+      if (clientInvoiceIds.length === 0) return json({ payments: [] });
+    }
+    const { data: clientAllocations, error: clientAllocationError } = clientInvoiceIds
+      ? await auth.repositoryContext.supabase.from('payment_allocations').select('payment_id')
+          .eq('organization_id', auth.organizationId).in('invoice_id', clientInvoiceIds)
+      : { data: [], error: null };
+    if (clientAllocationError) throw clientAllocationError;
+    const clientPaymentIds = clientInvoiceIds ? [...new Set((clientAllocations || []).map(row => row.payment_id))] : null;
+    if (clientPaymentIds && clientPaymentIds.length === 0) return json({ payments: [] });
+    let paymentsQuery = auth.repositoryContext.supabase.from('payments')
       .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at')
-      .eq('organization_id', auth.organizationId)
-      .order('payment_date', { ascending: false });
+      .eq('organization_id', auth.organizationId).order('payment_date', { ascending: false });
+    if (clientPaymentIds) paymentsQuery = paymentsQuery.in('id', clientPaymentIds);
+    const { data: payments, error } = await paymentsQuery;
     if (error) throw error;
     const paymentIds = (payments || []).map(row => row.id);
-    const { data: allocations, error: allocationError } = paymentIds.length
-      ? await auth.repositoryContext.supabase.from('payment_allocations')
-          .select('id,payment_id,invoice_id,amount_minor')
-          .eq('organization_id', auth.organizationId).in('payment_id', paymentIds)
-      : { data: [], error: null };
+    let allocationsQuery = auth.repositoryContext.supabase.from('payment_allocations')
+      .select('id,payment_id,invoice_id,amount_minor').eq('organization_id', auth.organizationId);
+    if (paymentIds.length) allocationsQuery = allocationsQuery.in('payment_id', paymentIds);
+    else allocationsQuery = allocationsQuery.in('payment_id', ['00000000-0000-0000-0000-000000000000']);
+    if (clientInvoiceIds) allocationsQuery = allocationsQuery.in('invoice_id', clientInvoiceIds);
+    const { data: allocations, error: allocationError } = await allocationsQuery;
     if (allocationError) throw allocationError;
     const invoiceIds = [...new Set((allocations || []).map(row => row.invoice_id))];
     const { data: invoices, error: invoiceError } = invoiceIds.length
@@ -132,8 +150,8 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       allocationsByPayment.set(allocation.payment_id, rows);
     }
     return json({ payments: (payments || []).map(row => ({
-      id: row.id, paymentNumber: row.payment_number, amountMinor: Number(row.amount_minor), paymentMethod: row.payment_method,
-      paymentDate: row.payment_date, reference: row.reference || '', payerName: row.payer_name || '',
+      id: row.id, paymentNumber: row.payment_number, amountMinor: auth.user.role === 'CLIENT_USER' ? (allocationsByPayment.get(row.id) || []).reduce((sum: number, allocation: any) => sum + Number(allocation.amountMinor || 0), 0) : Number(row.amount_minor), paymentMethod: row.payment_method,
+      paymentDate: row.payment_date, reference: row.reference || '', payerName: auth.user.role === 'CLIENT_USER' ? clientRecipientName : (row.payer_name || ''),
       allocations: allocationsByPayment.get(row.id) || [], unallocatedCreditMinor: Number(row.unallocated_credit_minor),
       recordedBy: row.recorded_by || '', createdAt: row.created_at,
     })) });
