@@ -1,3 +1,9 @@
+-- Order lifecycle writes are now restricted to the audited transactional RPCs.
+revoke insert, update, delete on table public.orders, public.order_items,
+  public.order_status_history, public.order_shipments from public, anon, authenticated;
+grant select on table public.orders, public.order_items,
+  public.order_status_history, public.order_shipments to authenticated;
+
 -- Transactional order lifecycle: reserve, release, dispatch, history and audit.
 create or replace function private.transition_workspace_order(
   p_organization_id uuid,
