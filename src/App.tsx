@@ -21,7 +21,7 @@ import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
-import { useAuth } from './auth/AuthGate';
+import { useAuth } from './context/AuthContext';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
@@ -38,7 +38,7 @@ const DEFAULT_CONFIG: SystemConfig = {
 };
 
 export default function App() {
-  const { user: authenticatedUser, signOut, organizationName } = useAuth();
+  const { user: authenticatedUser, signOut, organizationName, permissions } = useAuth();
   const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -71,9 +71,11 @@ export default function App() {
 
     const timer = setTimeout(async () => {
       try {
+        const canViewOrders = permissions.includes('*') || permissions.includes('orders.view');
+        const canViewProducts = permissions.includes('*') || permissions.includes('products.view');
         const [ordRes, prodRes] = await Promise.all([
-          api.getOrders({ search: globalSearch }),
-          api.getProducts(),
+          canViewOrders ? api.getOrders({ search: globalSearch }) : Promise.resolve({ orders: [] }),
+          canViewProducts ? api.getProducts() : Promise.resolve({ products: [] }),
         ]);
         const s = globalSearch.toLowerCase();
         const matchedProds = prodRes.products.filter(
@@ -89,15 +91,16 @@ export default function App() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [globalSearch]);
+  }, [globalSearch, permissions]);
 
   const initApp = async () => {
     setLoading(true);
     try {
+      const canViewMarketplace = permissions.includes('*') || permissions.includes('marketplace.view');
       const [cfgRes, notifRes, excRes] = await Promise.all([
         api.getConfig(),
         api.getNotifications(),
-        api.getExceptions(),
+        canViewMarketplace ? api.getExceptions() : Promise.resolve({ exceptions: [] }),
       ]);
       setConfig(cfgRes.config);
       setNotifications(notifRes.notifications);
@@ -110,6 +113,7 @@ export default function App() {
   };
 
   const handleTriggerSync = async () => {
+    if (!permissions.includes('*') && !permissions.includes('marketplace.manage')) return;
     setIsSyncing(true);
     try {
       const accRes = await api.getEbayAccounts();
@@ -118,7 +122,9 @@ export default function App() {
       }
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
-        api.getExceptions(),
+        permissions.includes('*') || permissions.includes('marketplace.view')
+          ? api.getExceptions()
+          : Promise.resolve({ exceptions: [] }),
       ]);
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
@@ -167,6 +173,10 @@ export default function App() {
         onOpenNewOrder={() => setShowNewOrderModal(true)}
         onTriggerSync={handleTriggerSync}
         isSyncing={isSyncing}
+        canSyncEbay={permissions.includes('*') || permissions.includes('marketplace.manage')}
+        canAdjustStock={permissions.includes('*') || permissions.includes('inventory.adjust')}
+        canCreateOrder={permissions.includes('*') || permissions.includes('orders.create')}
+        canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
         globalSearch={globalSearch}
         setGlobalSearch={setGlobalSearch}
         selectedStoreId={selectedStoreId}
@@ -261,6 +271,7 @@ export default function App() {
           activeTab={activeTab}
           onNavigate={handleNavigate}
           currentUser={currentUser}
+          permissions={permissions}
           config={config}
           unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}

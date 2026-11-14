@@ -21,7 +21,7 @@ import {
 
 export const apiRouter = Router();
 
-type AuthenticatedRequest = Request & { nexusUser?: User; organizationId?: string };
+type AuthenticatedRequest = Request & { nexusUser?: User; organizationId?: string; permissions?: Set<string> };
 
 const getActiveUser = (req: Request): User => {
   const user = (req as AuthenticatedRequest).nexusUser;
@@ -44,6 +44,7 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
+    // Use the caller's JWT for every lookup so Supabase RLS remains in force.
     const userClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -55,32 +56,72 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
     }
 
     const { data: profile, error: profileError } = await userClient
-      .from('profiles').select('id,full_name,is_active,two_factor_enabled,created_at')
-      .eq('id', authData.user.id).maybeSingle();
+      .from('profiles')
+      .select('id,full_name,is_active,two_factor_enabled,created_at')
+      .eq('id', authData.user.id)
+      .maybeSingle();
     if (profileError || !profile || !profile.is_active) {
       res.status(403).json({ error: 'Your account is inactive or its profile is unavailable.' });
       return;
     }
 
-    const { data: membership, error: membershipError } = await userClient
+    const requestedOrganizationId = req.header('x-organization-id')?.trim();
+    let membershipQuery = userClient
       .from('organization_members')
-      .select('organization_id,client_3pl_id,roles(code)')
-      .eq('user_id', authData.user.id).eq('is_active', true).limit(1).maybeSingle();
-    if (membershipError || !membership) {
-      res.status(403).json({ error: 'You are not an active member of a workspace.' });
+      .select('organization_id,role_id,client_3pl_id,roles(code)')
+      .eq('user_id', authData.user.id)
+      .eq('is_active', true);
+
+    if (requestedOrganizationId) {
+      membershipQuery = membershipQuery.eq('organization_id', requestedOrganizationId).limit(1);
+    } else {
+      membershipQuery = membershipQuery.order('joined_at', { ascending: true }).limit(2);
+    }
+
+    const { data: memberships, error: membershipError } = await membershipQuery;
+    if (membershipError) {
+      res.status(403).json({ error: 'Workspace membership could not be verified.' });
+      return;
+    }
+    if (!memberships?.length) {
+      res.status(403).json({ error: 'You are not an active member of the requested workspace.' });
+      return;
+    }
+    if (!requestedOrganizationId && memberships.length > 1) {
+      res.status(409).json({ error: 'Select an active workspace before making API requests.' });
       return;
     }
 
+    const membership = memberships[0];
     const roleRelation = (membership as any).roles;
     const roleCode = Array.isArray(roleRelation) ? roleRelation[0]?.code : roleRelation?.code;
-    const validRoles: UserRole[] = ['SUPER_ADMIN','OPS_MANAGER','WAREHOUSE_STAFF','FINANCE_USER','CLIENT_USER','VIEWER'];
+    const validRoles: UserRole[] = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
     if (!validRoles.includes(roleCode)) {
       res.status(403).json({ error: 'Your workspace role is not valid.' });
       return;
     }
 
+    const { data: rolePermissionRows, error: permissionsError } = await userClient
+      .from('role_permissions')
+      .select('permissions(code)')
+      .eq('role_id', membership.role_id);
+    if (permissionsError) {
+      res.status(403).json({ error: 'Workspace permissions could not be verified.' });
+      return;
+    }
+
+    const permissions = new Set<string>(
+      roleCode === 'SUPER_ADMIN'
+        ? ['*']
+        : (rolePermissionRows || []).map((row: any) => {
+            const relation = row.permissions;
+            return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+          }).filter((code: unknown): code is string => typeof code === 'string'),
+    );
+
     const request = req as AuthenticatedRequest;
     request.organizationId = membership.organization_id;
+    request.permissions = permissions;
     request.nexusUser = {
       id: authData.user.id,
       email: authData.user.email || '',
@@ -99,11 +140,79 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+const routePermissionRules: Array<{ method: string; path: RegExp; permission: string | null }> = [
+  { method: 'GET', path: /^\/(auth\/me|me)\/?$/, permission: null },
+  { method: 'GET', path: /^\/dashboard\/(kpis|charts)\/?$/, permission: 'dashboard.view' },
+  { method: 'GET', path: /^\/orders\/?$/, permission: 'orders.view' },
+  { method: 'GET', path: /^\/orders\/[^/]+\/?$/, permission: 'orders.view' },
+  { method: 'POST', path: /^\/orders\/?$/, permission: 'orders.create' },
+  { method: 'POST', path: /^\/orders\/[^/]+\/transition\/?$/, permission: 'orders.edit' },
+  { method: 'PUT', path: /^\/orders\/[^/]+\/?$/, permission: 'orders.edit' },
+  { method: 'GET', path: /^\/products\/?$/, permission: 'products.view' },
+  { method: 'POST', path: /^\/products\/?$/, permission: 'products.create' },
+  { method: 'GET', path: /^\/inventory\/(balances|ledger)\/?$/, permission: 'inventory.view' },
+  { method: 'GET', path: /^\/stock\/adjustments\/?$/, permission: 'inventory.view' },
+  { method: 'POST', path: /^\/stock\/adjustments\/?$/, permission: 'inventory.adjust' },
+  { method: 'POST', path: /^\/stock\/adjustments\/[^/]+\/decision\/?$/, permission: 'inventory.adjust' },
+  { method: 'GET', path: /^\/ebay\/(accounts|exceptions)\/?$/, permission: 'marketplace.view' },
+  { method: 'POST', path: /^\/ebay\/accounts\/[^/]+\/(sync|connect)\/?$/, permission: 'marketplace.manage' },
+  { method: 'POST', path: /^\/ebay\/exceptions\/[^/]+\/resolve\/?$/, permission: 'marketplace.manage' },
+  { method: 'GET', path: /^\/(suppliers|purchase-orders)\/?$/, permission: 'purchasing.view' },
+  { method: 'POST', path: /^\/purchase-orders\/[^/]+\/receive\/?$/, permission: 'purchasing.manage' },
+  { method: 'GET', path: /^\/returns\/?$/, permission: 'returns.view' },
+  { method: 'POST', path: /^\/returns\/[^/]+\/disposition\/?$/, permission: 'returns.manage' },
+  { method: 'GET', path: /^\/3pl\/(clients|storage-snapshots)\/?$/, permission: 'fulfilment.view' },
+  { method: 'POST', path: /^\/3pl\/billing-preview\/?$/, permission: 'fulfilment.view' },
+  { method: 'GET', path: /^\/finance\/(invoices|payments|expenses|ledger)\/?$/, permission: 'finance.view' },
+  { method: 'POST', path: /^\/finance\/invoices\/[^/]+\/void\/?$/, permission: 'finance.manage' },
+  { method: 'POST', path: /^\/finance\/payments\/?$/, permission: 'finance.manage' },
+  { method: 'GET', path: /^\/reports\/[^/]+\/?$/, permission: 'reports.view' },
+  { method: 'GET', path: /^\/audit-logs\/?$/, permission: 'audit.view' },
+  { method: 'GET', path: /^\/notifications\/?$/, permission: 'dashboard.view' },
+  { method: 'POST', path: /^\/notifications\/[^/]+\/dismiss\/?$/, permission: 'dashboard.view' },
+  { method: 'GET', path: /^\/(system\/config|config)\/?$/, permission: 'dashboard.view' },
+  { method: 'POST', path: /^\/system\/config\/?$/, permission: 'settings.manage' },
+  { method: 'POST', path: /^\/system\/(reset-demo|reload)\/?$/, permission: 'settings.manage' },
+  { method: 'GET', path: /^\/users\/?$/, permission: 'users.manage' },
+  { method: 'GET', path: /^\/exceptions\/?$/, permission: 'marketplace.view' },
+  { method: 'GET', path: /^\/payouts\/?$/, permission: 'finance.view' },
+  { method: 'POST', path: /^\/payouts\/[^/]+\/confirm-deposit\/?$/, permission: 'finance.manage' },
+  { method: 'GET', path: /^\/reconciliation\/?$/, permission: 'finance.view' },
+  { method: 'GET', path: /^\/warehouse-services\/(summary|packaging|shipping)\/?$/, permission: 'fulfilment.view' },
+  { method: 'POST', path: /^\/warehouse-services\/(packaging|shipping)\/?$/, permission: 'fulfilment.manage' },
+  { method: 'GET', path: /^\/dropshipping\/calculations\/?$/, permission: 'products.view' },
+  { method: 'POST', path: /^\/dropshipping\/calculations\/?$/, permission: 'products.create' },
+];
+
+const requireRoutePermission = (req: Request, res: Response, next: NextFunction) => {
+  const rule = routePermissionRules.find(item => item.method === req.method && item.path.test(req.path));
+  if (!rule) {
+    res.status(403).json({ error: 'No authorization rule is configured for this endpoint.' });
+    return;
+  }
+  if (rule.permission === null) {
+    next();
+    return;
+  }
+
+  const permissions = (req as AuthenticatedRequest).permissions;
+  const requiredPermission = req.path.startsWith('/reports/') && req.query.format === 'csv'
+    ? 'reports.export'
+    : rule.permission;
+
+  if (!permissions?.has('*') && !permissions?.has(requiredPermission)) {
+    res.status(403).json({ error: 'You do not have permission to perform this action in the selected workspace.' });
+    return;
+  }
+  next();
+};
+
 /**
  * AUTHENTICATION
  * All business routes below require a verified Supabase user and active workspace membership.
  */
 apiRouter.use(requireSupabaseUser);
+apiRouter.use(requireRoutePermission);
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
   res.json({ user: getActiveUser(req), organizationId: (req as AuthenticatedRequest).organizationId });

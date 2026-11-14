@@ -28,6 +28,7 @@ interface SidebarProps {
   activeTab: NavItem;
   onNavigate: (tab: NavItem) => void;
   currentUser: User;
+  permissions: string[];
   config: SystemConfig;
   unreadAlertCount: number;
   pendingExceptionsCount: number;
@@ -40,12 +41,14 @@ interface NavMenuItem {
   phase: 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
   badge?: string | number;
   allowedRoles?: string[];
+  permission?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onNavigate,
   currentUser,
+  permissions,
   config,
   unreadAlertCount,
   pendingExceptionsCount,
@@ -54,6 +57,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Filter items allowed for this user role per SRS Matrix S4
   const isAllowedForRole = (item: NavMenuItem) => {
+    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
+    if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
     if (currentUser.role === 'SUPER_ADMIN') return true;
 
     if (currentUser.role === 'CLIENT_USER') {
@@ -97,12 +102,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navGroups: { title: string; items: NavMenuItem[] }[] = [
     {
       title: 'Overview',
-      items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, phase: 'P1' }],
+      items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, phase: 'P1', permission: 'dashboard.view' }],
     },
     {
       title: 'Sales',
       items: [
-        { id: 'orders', label: 'Orders', icon: ShoppingCart, phase: 'P1' },
+        { id: 'orders', label: 'Orders', icon: ShoppingCart, phase: 'P1', permission: 'orders.view' },
         {
           id: 'ebay-accounts',
           label: 'eBay Accounts',
@@ -110,53 +115,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
           phase: 'P1',
           badge: pendingExceptionsCount > 0 ? `${pendingExceptionsCount} Exc` : undefined,
         },
-        { id: 'customers', label: 'Customers', icon: Users, phase: 'P2' },
-        { id: 'returns', label: 'Returns', icon: RotateCcw, phase: 'P2' },
+        { id: 'customers', label: 'Customers', icon: Users, phase: 'P2', permission: 'orders.view' },
+        { id: 'returns', label: 'Returns', icon: RotateCcw, phase: 'P2', permission: 'returns.view' },
       ],
     },
     {
       title: 'Stock & Costing',
       items: [
-        { id: 'products', label: 'Products & SKUs', icon: Package, phase: 'P1' },
-        { id: 'inventory', label: 'Inventory & Ledger', icon: Layers, phase: 'P1' },
-        { id: 'adjustments', label: 'Stock Adjustments', icon: Sliders, phase: 'P1' },
-        { id: 'dropshipping', label: 'Dropship Calculator', icon: TrendingUp, phase: 'P1' },
-        { id: 'warehouse', label: 'Warehouse Hub', icon: Warehouse, phase: 'P2' },
-        { id: 'locations', label: 'Locations & Bins', icon: MapPin, phase: 'P2' },
+        { id: 'products', label: 'Products & SKUs', icon: Package, phase: 'P1', permission: 'products.view' },
+        { id: 'inventory', label: 'Inventory & Ledger', icon: Layers, phase: 'P1', permission: 'inventory.view' },
+        { id: 'adjustments', label: 'Stock Adjustments', icon: Sliders, phase: 'P1', permission: 'inventory.adjust' },
+        { id: 'dropshipping', label: 'Dropship Calculator', icon: TrendingUp, phase: 'P1', permission: 'products.view' },
+        { id: 'warehouse', label: 'Warehouse Hub', icon: Warehouse, phase: 'P2', permission: 'inventory.view' },
+        { id: 'locations', label: 'Locations & Bins', icon: MapPin, phase: 'P2', permission: 'inventory.view' },
       ],
     },
     {
       title: 'Buying & Receiving',
       items: [
-        { id: 'suppliers', label: 'Suppliers', icon: Truck, phase: 'P2' },
-        { id: 'purchase-orders', label: 'Purchase Orders', icon: Boxes, phase: 'P2' },
+        { id: 'suppliers', label: 'Suppliers', icon: Truck, phase: 'P2', permission: 'purchasing.view' },
+        { id: 'purchase-orders', label: 'Purchase Orders', icon: Boxes, phase: 'P2', permission: 'purchasing.view' },
       ],
     },
     {
       title: 'Warehouse Services & 3PL',
       items: [
-        { id: 'warehouse-services', label: 'Warehouse Services', icon: Boxes, phase: 'P3' },
-        { id: '3pl-clients', label: '3PL Clients', icon: Users, phase: 'P3' },
-        { id: 'fulfilment', label: 'Pick & Pack', icon: Package, phase: 'P3' },
-        { id: 'shipping', label: 'Shipping & Parcels', icon: Truck, phase: 'P1' },
-        { id: 'storage', label: 'Storage Billing', icon: Warehouse, phase: 'P3' },
+        { id: 'warehouse-services', label: 'Warehouse Services', icon: Boxes, phase: 'P3', permission: 'fulfilment.view' },
+        { id: '3pl-clients', label: '3PL Clients', icon: Users, phase: 'P3', permission: 'fulfilment.view' },
+        { id: 'fulfilment', label: 'Pick & Pack', icon: Package, phase: 'P3', permission: 'fulfilment.view' },
+        { id: 'shipping', label: 'Shipping & Parcels', icon: Truck, phase: 'P1', permission: 'fulfilment.view' },
+        { id: 'storage', label: 'Storage Billing', icon: Warehouse, phase: 'P3', permission: 'fulfilment.view' },
       ],
     },
     {
       title: 'Finance & Payouts',
       items: [
-        { id: 'payouts', label: 'eBay Payouts & Treasury', icon: CreditCard, phase: 'P4' },
-        { id: 'reconciliation', label: 'Reconciliation', icon: Receipt, phase: 'P4' },
-        { id: 'invoices', label: 'Invoices', icon: FileText, phase: 'P4' },
-        { id: 'payments', label: 'Payments', icon: CreditCard, phase: 'P4' },
-        { id: 'expenses', label: 'Expenses', icon: Receipt, phase: 'P4' },
-        { id: 'profitability', label: 'Profitability', icon: TrendingUp, phase: 'P4' },
+        { id: 'payouts', label: 'eBay Payouts & Treasury', icon: CreditCard, phase: 'P4', permission: 'finance.view' },
+        { id: 'reconciliation', label: 'Reconciliation', icon: Receipt, phase: 'P4', permission: 'finance.view' },
+        { id: 'invoices', label: 'Invoices', icon: FileText, phase: 'P4', permission: 'finance.view' },
+        { id: 'payments', label: 'Payments', icon: CreditCard, phase: 'P4', permission: 'finance.view' },
+        { id: 'expenses', label: 'Expenses', icon: Receipt, phase: 'P4', permission: 'finance.view' },
+        { id: 'profitability', label: 'Profitability', icon: TrendingUp, phase: 'P4', permission: 'finance.view' },
       ],
     },
     {
       title: 'System & Reports',
       items: [
-        { id: 'reports', label: 'Reports (14)', icon: BarChart3, phase: 'P1' },
+        { id: 'reports', label: 'Reports (14)', icon: BarChart3, phase: 'P1', permission: 'reports.view' },
         {
           id: 'notifications',
           label: 'Notifications',
@@ -164,8 +169,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           phase: 'P1',
           badge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
         },
-        { id: 'audit-log', label: 'Audit Log', icon: History, phase: 'P1' },
-        { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1' },
+        { id: 'audit-log', label: 'Audit Log', icon: History, phase: 'P1', permission: 'audit.view' },
+        { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1', permission: 'settings.manage' },
       ],
     },
 

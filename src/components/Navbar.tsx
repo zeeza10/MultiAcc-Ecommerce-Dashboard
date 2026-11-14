@@ -27,6 +27,10 @@ interface NavbarProps {
   onOpenNewOrder: () => void;
   onTriggerSync: () => void;
   isSyncing: boolean;
+  canSyncEbay: boolean;
+  canAdjustStock: boolean;
+  canCreateOrder: boolean;
+  canManageSettings: boolean;
   globalSearch: string;
   setGlobalSearch: (s: string) => void;
   selectedStoreId?: string;
@@ -46,6 +50,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewOrder,
   onTriggerSync,
   isSyncing,
+  canSyncEbay,
+  canAdjustStock,
+  canCreateOrder,
+  canManageSettings,
   globalSearch,
   setGlobalSearch,
   selectedStoreId = 'ALL',
@@ -93,6 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="text-slate-400">Roadmap Phase:</span>
             <button
               onClick={() => setShowPhaseMenu(!showPhaseMenu)}
+              disabled={!canManageSettings}
               className="font-medium text-amber-400 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1"
             >
               <span>{config.activeReleasePhase === 'ALL' ? 'All Phases Active (Full Suite)' : `Phase ${config.activeReleasePhase.replace('P', '')}`}</span>
@@ -100,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {showPhaseMenu && (
+          {canManageSettings && showPhaseMenu && (
             <div className="absolute right-4 top-8 w-64 bg-white text-gray-900 rounded-lg shadow-xl border border-gray-200 p-2 z-50 text-xs">
               <div className="font-semibold text-gray-700 px-2 py-1 border-b border-gray-100 mb-1">
                 Select Active Release Phase
@@ -181,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Action Controls & Role Switcher */}
         <div className="flex items-center space-x-3">
           {/* Quick Actions */}
-          <button
+          {canSyncEbay && <button
             onClick={onTriggerSync}
             disabled={isSyncing}
             title="Poll eBay Accounts for New Orders"
@@ -189,25 +198,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync eBay'}</span>
-          </button>
+          </button>}
 
-          {currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER' && (
+          {(canAdjustStock || canCreateOrder) && (
             <div className="hidden sm:flex items-center space-x-2">
-              <button
+              {canAdjustStock && <button
                 onClick={onOpenNewAdjustment}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Adjust Stock</span>
-              </button>
+              </button>}
 
-              <button
+              {canCreateOrder && <button
                 onClick={onOpenNewOrder}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-xs transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Order</span>
-              </button>
+              </button>}
             </div>
           )}
 
