@@ -249,6 +249,15 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       : true
   );
 
+  const poCurrency = suppliers.find(supplier => supplier.id === poSupplierId)?.currency || 'GBP';
+  const poSubtotalMinor = poLines.reduce((sum, line) =>
+    sum + (Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100), 0);
+  const poTaxMinor = Math.round((Number.parseFloat(poTaxAmount) || 0) * 100);
+  const poTotalMinor = poSubtotalMinor + poTaxMinor;
+  const formatPoMoney = (minor: number) => new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: poCurrency,
+  }).format(minor / 100);
+
   return (
     <div className="space-y-4">
       {/* Header */}
