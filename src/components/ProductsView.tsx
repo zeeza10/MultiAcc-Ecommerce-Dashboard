@@ -12,7 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { Product, User, SystemConfig } from '../types';
+import { Product, User, SystemConfig, Client3PL } from '../types';
 
 interface ProductsViewProps {
   currentUser: User;
@@ -26,6 +26,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   initialFilter,
 }) => {
   const [products, setProducts] = useState<any[]>([]);
+  const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterLowStockOnly, setFilterLowStockOnly] = useState(initialFilter?.filter === 'LOW_STOCK');
@@ -49,8 +50,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const res = await api.getProducts();
-      setProducts(res.products);
+      const [res, clientRes] = await Promise.all([
+        api.getProducts(),
+        api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
+      ]);
+      setProducts(res.products || []);
+      setClients(clientRes.clients || []);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
@@ -262,7 +267,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                               : 'bg-indigo-100 text-indigo-800'
                           }`}
                         >
-                          {p.ownerType === 'OPERATOR' ? 'Operator' : '3PL Apex'}
+                          {p.ownerType === 'OPERATOR' ? 'Operator' : (clients.find(client => client.id === p.ownerId)?.companyName || '3PL Client')}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-500 text-[11px]">
