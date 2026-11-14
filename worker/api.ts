@@ -12,6 +12,7 @@ import { handleReportRoute } from './routes/reports';
 import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
+import { handleAccessRoute } from './routes/access';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -131,6 +132,8 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   }
 
   try {
+    const accessResponse = await handleAccessRoute(path, request, auth, env);
+    if (accessResponse) return accessResponse;
     const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
     if (dashboardResponse) return dashboardResponse;
     const marketplaceResponse = await handleMarketplaceRoute(path, request, auth);
