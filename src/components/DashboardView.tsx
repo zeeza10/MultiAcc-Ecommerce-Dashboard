@@ -213,7 +213,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? (kpis.lowStockItems == null ? '—' : kpis.lowStockItems) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700 font-medium">
-              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'At or below reorder threshold'}</span>
+              <span>{kpis?.storeScoped ? 'Store-allocated products at reorder threshold' : 'At or below reorder threshold'}</span>
             </div>
           </div>
 
@@ -230,7 +230,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? (kpis.totalStockUnits == null ? '—' : kpis.totalStockUnits) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'On hand + damaged + quarantine'}</span>
+              <span>{kpis?.storeScoped ? 'Allocated units reserved for this store' : 'On hand + damaged + quarantine'}</span>
             </div>
           </div>
 
@@ -247,7 +247,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.inventoryValueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'Weighted avg cost valuation'}</span>
+              <span>{kpis?.storeScoped ? 'Allocated units × product cost' : 'Weighted avg cost valuation'}</span>
             </div>
           </div>
 
@@ -257,14 +257,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-white border border-gray-200 hover:border-indigo-400 rounded-lg p-3.5 shadow-2xs cursor-pointer transition group hover:shadow-xs"
           >
             <div className="flex items-center justify-between text-gray-500">
-              <span className="text-xs font-medium">7. Supplier Payables</span>
+              <span className="text-xs font-medium">{kpis?.storeScoped ? '7. Net Marketplace Payout' : '7. Supplier Payables'}</span>
               <Receipt className="w-4 h-4 text-purple-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? formatMoney(kpis.supplierPayablesMinor) : '—'}
+              {kpis ? formatMoney(kpis.storeScoped ? kpis.netPayoutMinor : kpis.supplierPayablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid PO receipts / GRNI'}</span>
+              <span>{kpis?.storeScoped ? `${kpis.payoutCount || 0} payout records from this store` : 'Unpaid PO receipts / GRNI'}</span>
             </div>
           </div>
 
@@ -274,14 +274,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-white border border-gray-200 hover:border-indigo-400 rounded-lg p-3.5 shadow-2xs cursor-pointer transition group hover:shadow-xs"
           >
             <div className="flex items-center justify-between text-gray-500">
-              <span className="text-xs font-medium">8. Client Receivables</span>
+              <span className="text-xs font-medium">{kpis?.storeScoped ? '8. Marketplace Fees' : '8. Client Receivables'}</span>
               <Building className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? formatMoney(kpis.clientReceivablesMinor) : '—'}
+              {kpis ? formatMoney(kpis.storeScoped ? kpis.marketplaceFeesMinor : kpis.clientReceivablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid issued 3PL invoices'}</span>
+              <span>{kpis?.storeScoped ? 'Fees recorded in marketplace payouts' : 'Unpaid issued 3PL invoices'}</span>
             </div>
           </div>
 
@@ -291,14 +291,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-white border border-gray-200 hover:border-indigo-400 rounded-lg p-3.5 shadow-2xs cursor-pointer transition group hover:shadow-xs"
           >
             <div className="flex items-center justify-between text-gray-500">
-              <span className="text-xs font-medium">9. Storage Revenue</span>
+              <span className="text-xs font-medium">{kpis?.storeScoped ? '9. Marketplace Refunds' : '9. Storage Revenue'}</span>
               <Archive className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? formatMoney(kpis.storageRevenueMinor) : '—'}
+              {kpis ? formatMoney(kpis.storeScoped ? kpis.marketplaceRefundsMinor : kpis.storageRevenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Storage charges billed'}</span>
+              <span>{kpis?.storeScoped ? 'Refunds recorded in marketplace payouts' : 'Storage charges billed'}</span>
             </div>
           </div>
 
@@ -308,14 +308,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-white border border-gray-200 hover:border-rose-400 rounded-lg p-3.5 shadow-2xs cursor-pointer transition group hover:shadow-xs"
           >
             <div className="flex items-center justify-between text-gray-500">
-              <span className="text-xs font-medium">10. Overdue Balances</span>
+              <span className="text-xs font-medium">{kpis?.storeScoped ? '10. Store Allocated Expenses' : '10. Overdue Balances'}</span>
               <AlertCircle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? formatMoney(kpis.outstandingPaymentsMinor) : '—'}
+              {kpis ? formatMoney(kpis.storeScoped ? kpis.storeAllocatedExpensesMinor : kpis.outstandingPaymentsMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700">
-              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Receivables past due date'}</span>
+              <span>{kpis?.storeScoped ? 'Only expenses explicitly allocated to this store' : 'Receivables past due date'}</span>
             </div>
           </div>
         </div>
@@ -412,7 +412,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Warehouse Stock Breakdown</h3>
-              <p className="text-[11px] text-gray-500">Units partitioned across ledger stock states (S7.2)</p>
+              <p className="text-[11px] text-gray-500">{selectedStoreId === 'ALL' ? 'Physical warehouse stock from ledger states' : 'Stock allocated to the selected marketplace store'}</p>
             </div>
             <button
               onClick={() => onNavigate('inventory')}
