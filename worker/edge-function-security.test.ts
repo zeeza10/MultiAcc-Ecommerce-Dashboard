@@ -10,6 +10,8 @@ import {
 describe("employee invitation function request guards", () => {
   it("allows the configured application origin and server-to-server calls", () => {
     assert.equal(isAllowedInvitationOrigin(INVITATION_APP_ORIGIN), true);
+    assert.equal(isAllowedInvitationOrigin("http://localhost:5173"), true);
+    assert.equal(isAllowedInvitationOrigin("http://127.0.0.1:5173"), true);
     assert.equal(isAllowedInvitationOrigin(null), true);
     assert.equal(isAllowedInvitationOrigin("https://attacker.example"), false);
   });
@@ -18,6 +20,7 @@ describe("employee invitation function request guards", () => {
     const allowed = corsHeadersForInvitation(INVITATION_APP_ORIGIN);
     const denied = corsHeadersForInvitation("https://attacker.example");
     assert.equal(allowed["Access-Control-Allow-Origin"], INVITATION_APP_ORIGIN);
+    assert.equal(corsHeadersForInvitation("http://localhost:5173")["Access-Control-Allow-Origin"], "http://localhost:5173");
     assert.equal(denied["Access-Control-Allow-Origin"], undefined);
   });
 
