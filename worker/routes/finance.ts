@@ -152,7 +152,14 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       ids.push(row.order_id);
       ordersByPayout.set(row.payout_id, ids);
     }
-    return json({ payouts: (payouts || []).map(row => ({
+    const payoutRows = payouts || [];
+    const balances = {
+      totalSalesMinor: payoutRows.reduce((sum, row) => sum + Number(row.total_sales_minor || 0), 0),
+      totalFeesMinor: payoutRows.reduce((sum, row) => sum + Number(row.total_fees_minor || 0), 0),
+      confirmedMinor: payoutRows.filter(row => ['RECONCILED','CLEARED','BANK_CONFIRMED'].includes(row.bank_deposit_status)).reduce((sum, row) => sum + Number(row.net_payout_minor || 0), 0),
+      pendingDepositMinor: payoutRows.filter(row => !['RECONCILED','CLEARED','BANK_CONFIRMED'].includes(row.bank_deposit_status)).reduce((sum, row) => sum + Number(row.net_payout_minor || 0), 0),
+    };
+    return json({ balances, payouts: payoutRows.map(row => ({
       id: row.id, payoutId: row.payout_reference, marketplaceAccountId: row.marketplace_account_id,
       accountName: accountNames.get(row.marketplace_account_id) || '', totalSalesMinor: Number(row.total_sales_minor),
       totalFeesMinor: Number(row.total_fees_minor), refundsMinor: Number(row.refunds_minor),
