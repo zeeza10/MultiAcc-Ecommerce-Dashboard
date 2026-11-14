@@ -6,6 +6,7 @@ import { SupabaseProductRepository } from '../../server/repositories/productRepo
 import { SupabaseInventoryRepository } from '../../server/repositories/inventoryRepository';
 import { SupabaseWarehouseRepository } from '../../server/repositories/warehouseRepository';
 
+// Store-aware inventory reads use marketplace allocations while preserving the physical workspace ledger for All Stores.
 export async function handleInventoryRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/warehouses' && request.method === 'GET') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot view the workspace-wide warehouse layout.' }, 403);
