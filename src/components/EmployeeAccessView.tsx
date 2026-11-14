@@ -102,9 +102,7 @@ export const EmployeeAccessView: React.FC = () => {
   const selectedMember = access.members.find(member => member.user_id === selectedMemberId) || null;
   const selectedMemberRole = selectedMember ? access.roles.find(role => role.id === selectedMember.role_id) : null;
   const openMemberPermissions = (member: Member) => {
-    const defaults = selectedMemberRole?.id === member.role_id
-      ? (selectedMemberRole.permissions || [])
-      : (access.roles.find(role => role.id === member.role_id)?.permissions || []);
+    const defaults = access.roles.find(role => role.id === member.role_id)?.permissions || [];
     const overrides = member.permission_overrides || [];
     const effective = new Set(defaults);
     overrides.forEach(item => item.effect === 'GRANT' ? effective.add(item.code) : effective.delete(item.code));
@@ -297,7 +295,7 @@ export const EmployeeAccessView: React.FC = () => {
                     <td className="px-4 py-3"><select disabled={saving || !member.is_active || member.user_id===user.id} value={member.role_id} onChange={e=>void changeRole(member,e.target.value)} className="max-w-[220px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(member.joined_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${member.is_active?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{member.is_active?<CheckCircle2 className="h-3 w-3"/>:<XCircle className="h-3 w-3"/>}{member.is_active?'Active':'Suspended'}</span></td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button><button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,!member.is_active)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.is_active?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.is_active?<><UserMinus className="h-3.5 w-3.5"/>Suspend & revoke</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button></div></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id || member.role_code==='SUPER_ADMIN'} title={member.role_code==='SUPER_ADMIN'?'Super Admin has protected organization-wide access':''} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button><button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,!member.is_active)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.is_active?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.is_active?<><UserMinus className="h-3.5 w-3.5"/>Suspend & revoke</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button></div></td>
                   </tr>)}
                   {!access.members.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No employee memberships found.</td></tr>}
                 </tbody>
