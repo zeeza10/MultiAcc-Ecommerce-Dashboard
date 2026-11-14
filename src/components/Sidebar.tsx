@@ -55,47 +55,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const currentPhase = config.activeReleasePhase;
 
-  // Filter items allowed for this user role per SRS Matrix S4
+  // Effective permissions already combine role defaults with Super Admin's
+  // user-specific GRANT/DENY overrides. Do not apply hard-coded role filters
+  // here, otherwise an explicit user-level grant could never reveal a module.
   const isAllowedForRole = (item: NavMenuItem) => {
-    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
     if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
-    if (currentUser.role === 'SUPER_ADMIN') return true;
-
-    if (currentUser.role === 'CLIENT_USER') {
-      const clientAllowed: NavItem[] = [
-        'dashboard',
-        'orders',
-        'products',
-        'inventory',
-        '3pl-clients',
-        'fulfilment',
-        'shipping',
-        'invoices',
-        'payments',
-        'profitability',
-        'reports',
-        'notifications',
-      ];
-      return clientAllowed.includes(item.id);
-    }
-
-    if (currentUser.role === 'WAREHOUSE_STAFF') {
-      const warehouseForbidden: NavItem[] = [
-        'ebay-accounts',
-        'invoices',
-        'payments',
-        'expenses',
-        'profitability',
-        'settings',
-      ];
-      return !warehouseForbidden.includes(item.id);
-    }
-
-    if (currentUser.role === 'FINANCE_USER') {
-      const financeForbidden: NavItem[] = ['warehouse', 'locations', 'adjustments'];
-      return !financeForbidden.includes(item.id);
-    }
-
+    if (permissions.includes('*')) return true;
+    if (item.permission && !permissions.includes(item.permission)) return false;
     return true;
   };
 
