@@ -1,143 +1,330 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  bootstrapOrganization,
-  clearPasswordRecoverySession,
-  hasPasswordRecoverySession,
-  getAuthenticatedUser,
-  getActiveOrganizationId,
-  isSupabaseConfigured,
-  loadMemberships,
-  OrganizationMembership,
-  sendPasswordReset,
-  signIn,
-  signOut,
-  signUp,
-  SupabaseAuthUser,
-  supabaseConfigError,
-  updatePassword,
-  setActiveOrganizationId,
-} from '../services/supabaseAuth';
+import type { Session } from '@supabase/supabase-js';
+import type { User } from '../types';
+import { supabase } from '../lib/supabase';
 
-interface AuthContextValue {
-  configured: boolean;
-  passwordRecovery: boolean;
-  configError: string;
-  loading: boolean;
-  user: SupabaseAuthUser | null;
-  memberships: OrganizationMembership[];
-  activeMembership: OrganizationMembership | null;
-  error: string;
-  clearError: () => void;
-  signInWithPassword: (email: string, password: string) => Promise<void>;
-  signUpWithPassword: (email: string, password: string, fullName: string) => Promise<{ confirmationRequired: boolean }>;
-  signOutUser: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  changePassword: (password: string) => Promise<void>;
-  createOrganization: (name: string, slug: string) => Promise<void>;
-  selectOrganization: (organizationId: string) => void;
-  reloadMemberships: () => Promise<void>;
-}
+type AuthContextValue = {
+  session: Session;
+  user: User;
+  organizationId: string;
+  organizationName: string;
+  signOut: () => Promise<void>;
+};
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SupabaseAuthUser | null>(null);
-  const [memberships, setMemberships] = useState<OrganizationMembership[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [passwordRecovery, setPasswordRecovery] = useState(hasPasswordRecoverySession());
+export function useAuth() {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used inside AuthProvider.');
+  return value;
+}
 
-  const hydrate = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
+type Workspace = {
+  organization_id: string;
+  role: { code: string } | { code: string }[];
+  organization: { name: string } | { name: string }[];
+};
+
+const toOne = <T,>(value: T | T[] | null): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value;
+
+const getAuthRedirectUrl = () => window.location.origin;
+
+/**
+ * The single application authentication provider and route boundary.
+ * It owns the Supabase SDK session, profile, organization membership and
+ * the existing sign-in/onboarding screens. Application children render only
+ * after an authenticated user has an active organization membership.
+ */
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [appUser, setAppUser] = useState<User | null>(null);
+  const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [recoveryActive, setRecoveryActive] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [workspaceName, setWorkspaceName] = useState('NexusOps');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const loadAccount = useCallback(async (activeSession: Session | null) => {
+    setSession(activeSession);
+    setAppUser(null);
+    setWorkspace(null);
+    if (!activeSession?.user) return;
+
+    const authUser = activeSession.user;
+    const [{ data: profile, error: profileError }, { data: member, error: memberError }] = await Promise.all([
+      supabase.from('profiles')
+        .select('id,full_name,is_active,two_factor_enabled,created_at')
+        .eq('id', authUser.id)
+        .maybeSingle(),
+      supabase.from('organization_members')
+        .select('organization_id,is_active,role:roles(code),organization:organizations(name)')
+        .eq('user_id', authUser.id)
+        .eq('is_active', true)
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (profileError) throw profileError;
+    if (memberError) throw memberError;
+    if (profile && !profile.is_active) {
+      throw new Error('Your account has been disabled. Contact your organization administrator.');
     }
-    const authenticatedUser = await getAuthenticatedUser();
-    setPasswordRecovery(hasPasswordRecoverySession());
-    setUser(authenticatedUser);
-    if (authenticatedUser) {
-      try {
-        const rows = await loadMemberships();
-        setMemberships(rows);
-        const selected = getActiveOrganizationId();
-        if (!rows.some((row) => row.organization_id === selected)) {
-          if (rows[0]) setActiveOrganizationId(rows[0].organization_id);
-          else localStorage.removeItem('nexusops_active_organization_id');
-        }
-      } catch (err: any) {
-        setError(err.message || 'Unable to load organization membership.');
-        setMemberships([]);
-      }
-    } else {
-      setMemberships([]);
+    if (!profile) throw new Error('Your account profile is not ready. Please contact support.');
+    if (!member) return;
+
+    const roleRow = toOne(member.role as Workspace['role']);
+    const orgRow = toOne(member.organization as Workspace['organization']);
+    const allowedRoles = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
+    const role = roleRow?.code;
+    if (!role || !allowedRoles.includes(role)) {
+      throw new Error('Your organization role is not configured. Contact an administrator.');
     }
-    setLoading(false);
+
+    setWorkspace({ id: member.organization_id, name: orgRow?.name || 'Workspace' });
+    setAppUser({
+      id: authUser.id,
+      email: authUser.email || '',
+      name: profile.full_name || authUser.email || 'User',
+      role: role as User['role'],
+      isActive: true,
+      twoFactorEnabled: profile.two_factor_enabled,
+      failedLoginAttempts: 0,
+      createdAt: profile.created_at || authUser.created_at,
+    });
   }, []);
 
   useEffect(() => {
-    void hydrate();
-    const listener = () => { void hydrate(); };
-    window.addEventListener('nexusops-auth-change', listener);
-    const timer = window.setInterval(() => { void hydrate(); }, 4 * 60 * 1000);
-    return () => {
-      window.removeEventListener('nexusops-auth-change', listener);
-      window.clearInterval(timer);
-    };
-  }, [hydrate]);
+    let alive = true;
 
-  const activeMembership = useMemo(() => {
-    const selected = getActiveOrganizationId();
-    return memberships.find((row) => row.organization_id === selected) || memberships[0] || null;
-  }, [memberships]);
-
-  const value: AuthContextValue = {
-    configured: isSupabaseConfigured,
-    passwordRecovery,
-    configError: supabaseConfigError,
-    loading,
-    user,
-    memberships,
-    activeMembership,
-    error,
-    clearError: () => setError(''),
-    signInWithPassword: async (email, password) => {
-      setError('');
-      await signIn(email, password);
-      await hydrate();
-    },
-    signUpWithPassword: async (email, password, fullName) => {
-      setError('');
-      const result = await signUp(email, password, fullName);
-      if (result.session) await hydrate();
-      return { confirmationRequired: !result.session };
-    },
-    signOutUser: async () => {
-      await signOut();
-      setUser(null);
-      setMemberships([]);
-    },
-    requestPasswordReset: async (email) => { await sendPasswordReset(email); },
-    changePassword: async (password) => { await updatePassword(password); clearPasswordRecoverySession(); setPasswordRecovery(false); },
-    createOrganization: async (name, slug) => {
-      setError('');
-      await bootstrapOrganization(name, slug);
-      await hydrate();
-    },
-    selectOrganization: (organizationId) => {
-      if (!memberships.some((row) => row.organization_id === organizationId)) {
-        throw new Error('You are not a member of this organization.');
+    void supabase.auth.getSession().then(async ({ data, error: sessionError }) => {
+      if (!alive) return;
+      if (sessionError) setError(sessionError.message);
+      try {
+        await loadAccount(data.session);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Unable to load account.');
+      } finally {
+        if (alive) setLoading(false);
       }
-      setActiveOrganizationId(organizationId);
-      setMemberships((current) => [...current]);
-    },
-    reloadMemberships: hydrate,
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryActive(true);
+        setMode('reset');
+      }
+      // Defer Supabase reads until the auth callback has released its internal lock.
+      window.setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await loadAccount(nextSession);
+          setError('');
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : 'Unable to load account.');
+        } finally {
+          if (alive) setLoading(false);
+        }
+      }, 0);
+    });
+
+    return () => {
+      alive = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [loadAccount]);
+
+  const runAuth = async (action: () => Promise<{ error: Error | null }>) => {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await action();
+      if (result.error) throw result.error;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Authentication failed.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside AuthProvider.');
-  return context;
+    if (mode === 'reset' && recoveryActive) {
+      await runAuth(async () => {
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (!updateError) {
+          setMessage('Password updated. Please sign in with your new password.');
+          setRecoveryActive(false);
+          await supabase.auth.signOut();
+          setMode('login');
+          setPassword('');
+        }
+        return { error: updateError };
+      });
+      return;
+    }
+
+    if (mode === 'login') {
+      await runAuth(() => supabase.auth.signInWithPassword({ email: email.trim(), password }));
+      return;
+    }
+
+    if (mode === 'signup') {
+      await runAuth(async () => {
+        const { data, error: signupError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { full_name: fullName.trim() },
+            emailRedirectTo: getAuthRedirectUrl(),
+          },
+        });
+        if (!signupError && !data.session) {
+          setMessage('Account created. Check your email to verify the address, then sign in.');
+        }
+        return { error: signupError };
+      });
+      return;
+    }
+
+    await runAuth(async () => {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: getAuthRedirectUrl(),
+      });
+      if (!resetError) {
+        setMessage('Password reset email sent. Follow the link to choose a new password.');
+      }
+      return { error: resetError };
+    });
+  };
+
+  const createWorkspace = async () => {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const slug = workspaceName.toLowerCase().trim().normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55);
+      if (workspaceName.trim().length < 2 || !slug) {
+        throw new Error('Enter a valid workspace name.');
+      }
+      const { error: createError } = await supabase.rpc('bootstrap_organization', {
+        p_name: workspaceName.trim(),
+        p_slug: slug,
+      });
+      if (createError) throw createError;
+      const { data } = await supabase.auth.getSession();
+      await loadAccount(data.session);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Workspace could not be created.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOut = useCallback(async () => {
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) throw signOutError;
+    setAppUser(null);
+    setWorkspace(null);
+  }, []);
+
+  const value = useMemo(
+    () => session && appUser && workspace
+      ? { session, user: appUser, organizationId: workspace.id, organizationName: workspace.name, signOut }
+      : null,
+    [session, appUser, workspace, signOut],
+  );
+
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Loading secure session…</div>;
+  }
+
+  if (value && !recoveryActive) {
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  }
+
+  const signedInWithoutWorkspace = !!session && !recoveryActive;
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-8">
+        <div className="mb-7">
+          <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">NexusOps</div>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">
+            {signedInWithoutWorkspace ? 'Workspace access' : mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            {signedInWithoutWorkspace
+              ? 'Your email is authenticated, but this account is not yet a member of a workspace.'
+              : 'Secure sign-in powered by Supabase Authentication.'}
+          </p>
+        </div>
+
+        {error && <div role="alert" className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
+        {message && <div role="status" className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">{message}</div>}
+
+        {signedInWithoutWorkspace ? (
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Workspace name
+              <input value={workspaceName} onChange={event => setWorkspaceName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+            </label>
+            <button disabled={busy} onClick={createWorkspace} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">
+              {busy ? 'Creating…' : 'Create my workspace'}
+            </button>
+            <p className="text-xs text-slate-500">
+              Creating a workspace makes your account its initial workspace administrator. If you were invited to an existing workspace, sign out and ask its administrator to add your account.
+            </p>
+            <button onClick={signOut} className="w-full py-2 text-sm text-slate-600">Sign out</button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            {mode === 'signup' && (
+              <label className="block text-sm font-medium text-slate-700">
+                Full name
+                <input required value={fullName} onChange={event => setFullName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" autoComplete="name" />
+              </label>
+            )}
+            <label className="block text-sm font-medium text-slate-700">
+              Email
+              <input required type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+            </label>
+            {(mode !== 'reset' || recoveryActive) && (
+              <label className="block text-sm font-medium text-slate-700">
+                {recoveryActive ? 'New password' : 'Password'}
+                <input required minLength={10} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={event => setPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+                <span className="mt-1 block text-xs text-slate-400">Use at least 10 characters.</span>
+              </label>
+            )}
+            <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">
+              {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : recoveryActive ? 'Update password' : 'Send reset link'}
+            </button>
+            <div className="flex flex-wrap justify-between gap-3 text-sm">
+              <button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setMessage(''); }} className="text-indigo-600">
+                {mode === 'login' ? 'Create an account' : 'Back to sign in'}
+              </button>
+              {mode === 'login' && (
+                <button type="button" onClick={() => { setMode('reset'); setError(''); setMessage(''); }} className="text-slate-500">
+                  Forgot password?
+                </button>
+              )}
+              {mode === 'reset' && (
+                <button type="button" onClick={() => setMode('login')} className="text-slate-500">Back to sign in</button>
+              )}
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
 }
