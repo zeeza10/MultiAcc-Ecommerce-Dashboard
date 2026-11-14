@@ -916,13 +916,13 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                     <label className="block text-gray-600 font-medium mb-1">Target Disposition Outcome</label>
                     <select
                       value={returnDispositions[line.id] || 'RESTOCK'}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setReturnDispositions({
                           ...returnDispositions,
                           [line.id]: e.target.value,
                         });
                         setReturnRequestId(window.crypto.randomUUID());
-                      }
+                      }}
                       className="w-full border border-gray-300 rounded p-1.5 bg-white font-medium"
                     >
                       <option value="RESTOCK">Restock (Re-enter sellable On-Hand)</option>
