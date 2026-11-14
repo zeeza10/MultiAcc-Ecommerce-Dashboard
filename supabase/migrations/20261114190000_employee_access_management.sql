@@ -38,7 +38,6 @@ begin
     values(v_invitation.organization_id,new.id,v_invitation.role_id,true,v_invitation.invited_by)
     on conflict(organization_id,user_id) do update
       set role_id=excluded.role_id,is_active=true,invited_by=excluded.invited_by;
-    update public.user_invitations set accepted_at=now() where id=v_invitation.id;
   end if;
   return new;
 end;
@@ -280,3 +279,24 @@ end;
 $$;
 revoke all on function public.get_org_employee_access(uuid) from public, anon;
 grant execute on function public.get_org_employee_access(uuid) to authenticated;
+
+create or replace function public.mark_org_invitation_accepted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.email_confirmed_at is not null and old.email_confirmed_at is null then
+    update public.user_invitations
+    set accepted_at=now()
+    where lower(email)=lower(new.email)
+      and accepted_at is null and revoked_at is null and expires_at>now();
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists on_auth_user_invitation_accepted on auth.users;
+create trigger on_auth_user_invitation_accepted
+after update of email_confirmed_at on auth.users
+for each row execute procedure public.mark_org_invitation_accepted();
