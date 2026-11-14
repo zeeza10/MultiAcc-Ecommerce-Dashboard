@@ -54,7 +54,7 @@ BEGIN
   END IF;
 
   IF p_email IS NULL OR length(trim(p_email)) > 254
-     OR trim(p_email) !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$' THEN
+     OR trim(p_email) !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$' THEN
     RAISE EXCEPTION 'Enter a valid work email address' USING errcode = '22023';
   END IF;
 
