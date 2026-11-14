@@ -8,6 +8,7 @@ import { SupabasePurchasingRepository } from './repositories/purchasingRepositor
 import { SupabaseWarehouseRepository } from './repositories/warehouseRepository';
 import { SupabaseReturnRepository } from './repositories/returnRepository';
 import { resolveEffectivePermissions } from '../worker/permission-overrides';
+import { permissionByRoute as workerPermissionByRoute } from '../worker/permissions';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -226,12 +227,17 @@ const routePermissionRules: Array<{ method: string; path: RegExp; permission: st
 ];
 
 const requireRoutePermission = (req: Request, res: Response, next: NextFunction) => {
-  const rule = routePermissionRules.find(item => item.method === req.method && item.path.test(req.path));
-  if (!rule) {
+  // Prefer the production Worker's canonical permission map. Retain the legacy
+  // Express map only for development-only endpoints not yet present in Worker.
+  const workerPermission = workerPermissionByRoute(req.method, req.path);
+  const legacyRule = routePermissionRules.find(item => item.method === req.method && item.path.test(req.path));
+  const mappedPermission = workerPermission === undefined ? legacyRule?.permission : workerPermission;
+
+  if (mappedPermission === undefined) {
     res.status(403).json({ error: 'No authorization rule is configured for this endpoint.' });
     return;
   }
-  if (rule.permission === null) {
+  if (mappedPermission === null) {
     next();
     return;
   }
@@ -239,7 +245,7 @@ const requireRoutePermission = (req: Request, res: Response, next: NextFunction)
   const permissions = (req as AuthenticatedRequest).permissions;
   const requiredPermission = req.path.startsWith('/reports/') && req.query.format === 'csv'
     ? 'reports.export'
-    : rule.permission;
+    : mappedPermission;
 
   if (!permissions?.has('*') && !permissions?.has(requiredPermission)) {
     res.status(403).json({ error: 'You do not have permission to perform this action in the selected workspace.' });
