@@ -553,7 +553,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                             setReceiveInputs({
                               ...receiveInputs,
                               [line.productId]: { ...input, received: parseInt(e.target.value, 10) || 0 },
-                            })
+                            });
+                            setReceiptRequestId(window.crypto.randomUUID());
                           }
                           className="w-full border border-gray-300 rounded p-1.5 font-bold"
                         />
@@ -567,7 +568,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                             setReceiveInputs({
                               ...receiveInputs,
                               [line.productId]: { ...input, damaged: parseInt(e.target.value, 10) || 0 },
-                            })
+                            });
+                            setReceiptRequestId(window.crypto.randomUUID());
                           }
                           className="w-full border border-gray-300 rounded p-1.5 font-bold text-rose-700"
                         />
@@ -581,7 +583,10 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                 <label className="block font-semibold text-gray-700 mb-1">Receiving / Discrepancy Note</label>
                 <textarea
                   value={discrepancyNote}
-                  onChange={(e) => setDiscrepancyNote(e.target.value)}
+                  onChange={(e) => {
+                    setDiscrepancyNote(e.target.value);
+                    setReceiptRequestId(window.crypto.randomUUID());
+                  }}
                   placeholder="e.g. Inbound pallet 1 of 2. Remainder backordered by supplier."
                   className="w-full border border-gray-300 rounded p-2"
                   rows={2}
