@@ -7,6 +7,7 @@ import { SupabaseOrderRepository } from './repositories/orderRepository';
 import { SupabasePurchasingRepository } from './repositories/purchasingRepository';
 import { SupabaseWarehouseRepository } from './repositories/warehouseRepository';
 import { SupabaseReturnRepository } from './repositories/returnRepository';
+import { resolveEffectivePermissions } from '../worker/permission-overrides';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -109,8 +110,12 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
     const roleRelation = (membership as any).roles;
     const roleCode = Array.isArray(roleRelation) ? roleRelation[0]?.code : roleRelation?.code;
     const validRoles: UserRole[] = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
-    if (!validRoles.includes(roleCode)) {
+    if (typeof roleCode !== 'string' || (!validRoles.includes(roleCode as UserRole) && !roleCode.startsWith('CUSTOM_'))) {
       res.status(403).json({ error: 'Your workspace role is not valid.' });
+      return;
+    }
+    if (roleCode === 'CLIENT_USER' && !membership.client_3pl_id) {
+      res.status(403).json({ error: 'Your client account is not linked to this workspace. Contact your workspace administrator.' });
       return;
     }
 
@@ -123,14 +128,30 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const permissions = new Set<string>(
-      roleCode === 'SUPER_ADMIN'
-        ? ['*']
-        : (rolePermissionRows || []).map((row: any) => {
-            const relation = row.permissions;
-            return Array.isArray(relation) ? relation[0]?.code : relation?.code;
-          }).filter((code: unknown): code is string => typeof code === 'string'),
+    const rolePermissionCodes = (rolePermissionRows || []).map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string');
+
+    const { data: overrideRows, error: overrideError } = await userClient
+      .from('organization_member_permission_overrides')
+      .select('effect,permissions(code)')
+      .eq('organization_id', membership.organization_id)
+      .eq('user_id', authData.user.id);
+    if (overrideError) {
+      res.status(403).json({ error: 'Individual workspace permissions could not be verified.' });
+      return;
+    }
+
+    const overrides = (overrideRows || []).map((row: any) => {
+      const relation = row.permissions;
+      const code = Array.isArray(relation) ? relation[0]?.code : relation?.code;
+      return { effect: row.effect, code };
+    }).filter((row: any): row is { effect: 'GRANT' | 'DENY'; code: string } =>
+      (row.effect === 'GRANT' || row.effect === 'DENY') && typeof row.code === 'string',
     );
+
+    const permissions = resolveEffectivePermissions(roleCode, rolePermissionCodes, overrides);
 
     const request = req as AuthenticatedRequest;
     request.organizationId = membership.organization_id;
@@ -150,6 +171,7 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
       supabase: userClient,
       organizationId: membership.organization_id,
       userId: authData.user.id,
+      client3plId: membership.client_3pl_id || undefined,
       permissions,
     };
     next();
