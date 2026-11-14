@@ -63,11 +63,11 @@ begin
     raise exception 'Adjustment quantity must be a non-zero whole number.' using errcode = '22023';
   end if;
 
-  if p_target_state not in ('ON_HAND', 'DAMAGED', 'QUARANTINED', 'MISSING') then
+  if p_target_state is null or p_target_state not in ('ON_HAND', 'DAMAGED', 'QUARANTINED', 'MISSING') then
     raise exception 'Invalid target stock state.' using errcode = '22023';
   end if;
 
-  if p_reason_code not in ('damage', 'loss', 'found', 'count_correction', 'quarantine', 'write_off') then
+  if p_reason_code is null or p_reason_code not in ('damage', 'loss', 'found', 'count_correction', 'quarantine', 'write_off') then
     raise exception 'Invalid stock adjustment reason.' using errcode = '22023';
   end if;
 
@@ -113,14 +113,14 @@ begin
     v_threshold_value_minor := 5000;
   end if;
 
-  v_value_minor := abs(p_quantity_delta::numeric) * coalesce(v_product.cost_price_minor, 0)::numeric;
+  v_value_minor := abs(p_quantity_delta::numeric) * greatest(coalesce(v_product.cost_price_minor, 0), 0)::numeric;
   if v_value_minor > 9223372036854775807::numeric then
     raise exception 'Adjustment value exceeds the supported monetary range.' using errcode = '22003';
   end if;
 
   v_requires_approval :=
-    abs(p_quantity_delta::bigint) > coalesce(v_threshold_quantity, 10)
-    or v_value_minor > coalesce(v_threshold_value_minor, 5000);
+    abs(p_quantity_delta::bigint) > greatest(coalesce(v_threshold_quantity, 10), 0)
+    or v_value_minor > greatest(coalesce(v_threshold_value_minor, 5000), 0);
 
   -- Serialize adjustment numbering per organization to avoid concurrent duplicates.
   perform pg_advisory_xact_lock(hashtext(p_organization_id::text));
@@ -273,7 +273,7 @@ begin
     and m.is_active = true
   limit 1;
 
-  if v_role_code not in ('OPS_MANAGER', 'SUPER_ADMIN') then
+  if v_role_code is null or v_role_code not in ('OPS_MANAGER', 'SUPER_ADMIN') then
     raise exception 'Only Operations Manager or Super Admin can approve stock adjustments.' using errcode = '42501';
   end if;
 
