@@ -43,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [appUser, setAppUser] = useState<User | null>(null);
   const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
@@ -261,6 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) throw signOutError;
+    window.localStorage.removeItem('nexusops_active_organization_id');
+    setPermissions([]);
     setAppUser(null);
     setWorkspace(null);
   }, []);
