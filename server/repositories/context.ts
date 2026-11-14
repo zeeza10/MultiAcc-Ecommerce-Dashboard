@@ -1,9 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { User } from '../types';
 
-export interface AuthenticatedApiContext {
+export interface RepositoryContext {
   supabase: SupabaseClient;
   organizationId: string;
-  user: User;
+  userId: string;
   permissions: Set<string>;
 }
