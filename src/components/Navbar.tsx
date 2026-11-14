@@ -16,8 +16,8 @@ import { User, NotificationItem, SystemConfig } from '../types';
 
 interface NavbarProps {
   currentUser: User;
-  onSignOut: () => void;
   organizationName: string;
+  onSignOut: () => void;
   config: SystemConfig;
   onUpdateConfig: (cfg: Partial<SystemConfig>) => void;
   notifications: NotificationItem[];
@@ -35,8 +35,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
-  onSignOut,
   organizationName,
+  onSignOut,
   config,
   onUpdateConfig,
   notifications,
@@ -51,7 +51,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedStoreId = 'ALL',
   onStoreChange,
 }) => {
-  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
@@ -82,10 +81,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center space-x-3">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px] font-semibold tracking-wide border border-amber-500/40">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            AUTHENTICATED SESSION
+            AUTHENTICATED WORKSPACE
           </span>
           <span className="text-slate-400 hidden sm:inline">
-            Supabase identity verified. Business data migration is being completed module by module.
+            Signed in to {organizationName}. Your access is controlled by your workspace role.
           </span>
         </div>
 
@@ -280,33 +279,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Authenticated account menu — demo role switching removed */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-2 pl-2 pr-3 py-1 rounded-md border border-gray-300 hover:border-gray-400 bg-gray-50 text-left"
-            >
-              <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-xs">
-                {currentUser.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="hidden lg:block text-left">
-                <div className="text-xs font-semibold text-gray-900 leading-tight truncate max-w-[130px]">{currentUser.name}</div>
-                <div className="text-[10px] text-gray-500">{currentUser.role.replace('_', ' ')}</div>
-              </div>
-            </button>
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 text-xs">
-                <div className="px-3 py-3 border-b border-gray-100">
-                  <div className="font-bold text-gray-900">{currentUser.name}</div>
-                  <div className="text-gray-500 text-[11px]">{currentUser.email}</div>
-                  <div className="mt-2 text-[11px] text-slate-600">Workspace: <span className="font-semibold text-slate-800">{organizationName}</span></div>
-                  <div className="mt-2">{getRoleBadge(currentUser.role)}</div>
-                </div>
-                <button onClick={() => { setShowUserMenu(false); onSignOut(); }} className="w-full text-left px-3 py-3 text-rose-700 hover:bg-rose-50 font-semibold">
-                  Sign out
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+            <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-xs">{currentUser.name.charAt(0).toUpperCase()}</div>
+            <div className="hidden sm:block text-left">
+              <div className="text-xs font-semibold text-gray-900">{currentUser.name}</div>
+              <div className="text-[10px] text-gray-500">{currentUser.email}</div>
+            </div>
+            {getRoleBadge(currentUser.role)}
+            <button onClick={onSignOut} className="ml-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">Sign out</button>
           </div>
         </div>
       </div>
