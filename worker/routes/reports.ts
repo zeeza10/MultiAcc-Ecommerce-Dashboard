@@ -44,10 +44,20 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
    report=result(id,{orders:orders.length,statuses:grouped.size},['Status','Orders','Gross Value'],data);
   }
  }else if(['R-03','R-05','R-07'].includes(id)){
-  const [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
+  let [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
   const balances=new Map<string,any>();
-  for(const p of products){balances.set(p.id,{product:p,onHand:0,reserved:0,incoming:0,damaged:0,quarantined:0,missing:0});}
-  for(const l of ledger){const b=balances.get(l.product_id);if(!b)continue;const state=String(l.stock_state).toLowerCase();if(state==='on_hand')b.onHand+=Number(l.quantity_delta);else if(state==='reserved')b.reserved+=Number(l.quantity_delta);else if(state==='incoming')b.incoming+=Number(l.quantity_delta);else if(state==='damaged')b.damaged+=Number(l.quantity_delta);else if(state==='quarantined')b.quarantined+=Number(l.quantity_delta);else if(state==='missing')b.missing+=Number(l.quantity_delta);}
+  if(accountId&&accountId!=='ALL'){
+   const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_inventory_allocations')
+    .select('product_id,allocated_quantity,reserved_quantity').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId);
+   if(error)throw new Error('Store inventory allocations could not be loaded.');
+   const ids=[...new Set((allocations||[]).map((x:any)=>x.product_id))];
+   products=products.filter((p:any)=>ids.includes(p.id));
+   for(const p of products){balances.set(p.id,{product:p,onHand:0,reserved:0,incoming:0,damaged:0,quarantined:0,missing:0});}
+   for(const a of allocations||[]){const b=balances.get(a.product_id);if(!b)continue;b.onHand=Number(a.allocated_quantity||0);b.reserved=Number(a.reserved_quantity||0);}
+  }else{
+   for(const p of products){balances.set(p.id,{product:p,onHand:0,reserved:0,incoming:0,damaged:0,quarantined:0,missing:0});}
+   for(const l of ledger){const b=balances.get(l.product_id);if(!b)continue;const state=String(l.stock_state).toLowerCase();if(state==='on_hand')b.onHand+=Number(l.quantity_delta);else if(state==='reserved')b.reserved+=Number(l.quantity_delta);else if(state==='incoming')b.incoming+=Number(l.quantity_delta);else if(state==='damaged')b.damaged+=Number(l.quantity_delta);else if(state==='quarantined')b.quarantined+=Number(l.quantity_delta);else if(state==='missing')b.missing+=Number(l.quantity_delta);}
+  }
   let items=[...balances.values()];
   if(skuFilter)items=items.filter(x=>String(x.product.sku).toUpperCase().includes(skuFilter));
   const data=items.map(x=>{const p=x.product,available=Math.max(0,x.onHand-x.reserved),value=x.onHand*Number(p.cost_price_minor||0);return {sku:p.sku,product:p.name,owner:p.owner_type,onHand:x.onHand,reserved:x.reserved,available,incoming:x.incoming,damaged:x.damaged,quarantined:x.quarantined,reorderLevel:p.reorder_level,unitCost:money(p.cost_price_minor),inventoryValue:money(value),status:available<=Number(p.reorder_level||0)?'LOW_STOCK':'HEALTHY'};});
@@ -55,7 +65,8 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   if(id==='R-05'){const low=data.filter(x=>Number(x.available)<=Number(x.reorderLevel));report=result(id,{lowStockSkus:low.length},['SKU','Product','Available','Reorder Level','Status'],low.map(x=>({sku:x.sku,product:x.product,available:x.available,reorderLevel:x.reorderLevel,status:x.status})));}
   if(id==='R-07')report=result(id,{inventoryValue:money(data.reduce((s,x)=>s+Number(String(x.inventoryValue).replace(/[^0-9.-]/g,''))*100,0)),skus:data.length},['SKU','Product','On Hand','Unit Cost','Inventory Value'],data.map(x=>({sku:x.sku,product:x.product,onHand:x.onHand,unitCost:x.unitCost,inventoryValue:x.inventoryValue})));
  }else if(id==='R-04'){
-  const [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at','created_at',url),rows(auth,'products','id,sku,name')]);
+  const [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id','created_at',url),rows(auth,'products','id,sku,name')]);
+  if(accountId&&accountId!=='ALL')ledger=ledger.filter((x:any)=>x.marketplace_account_id===accountId);
   const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
   report=result(id,{movements:data.length},['Timestamp','SKU','Product','Delta','State','Source','Reference','Note'],data);
