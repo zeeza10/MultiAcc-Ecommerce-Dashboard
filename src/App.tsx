@@ -304,6 +304,7 @@ export default function App() {
             <OrdersView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               initialFilter={tabFilterState}
               onOpenNewOrder={() => setShowNewOrderModal(true)}
             />
