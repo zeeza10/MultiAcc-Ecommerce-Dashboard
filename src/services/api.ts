@@ -123,6 +123,8 @@ export const api = {
 
   // Phase 2: Purchasing & Returns
   getSuppliers: () => request<{ suppliers: Supplier[] }>('/suppliers'),
+  createSupplier: (payload: { name: string; code: string; contactName?: string; email?: string; phone?: string; paymentTermsDays: number; currency: string; leadTimeDays: number }) =>
+    request<{ supplier: Supplier }>('/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
   getPurchaseOrders: () => request<{ purchaseOrders: PurchaseOrder[]; receipts: any[] }>('/purchase-orders'),
   createPurchaseOrder: (payload: { supplierId: string; expectedDate?: string; notes?: string; taxMinor: number; lines: Array<{ productId: string; orderedQty: number; unitCostMinor: number }> }, idempotencyKey: string) =>
     request<{ purchaseOrder: PurchaseOrder }>('/purchase-orders', {
