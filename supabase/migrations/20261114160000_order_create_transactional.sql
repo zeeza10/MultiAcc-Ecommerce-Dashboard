@@ -134,7 +134,7 @@ begin
 
     -- The catalog price is authoritative; client-supplied price/SKU/name are ignored.
     v_unit_price := greatest(v_product.selling_price_minor, 0);
-    v_line_tax := round(v_unit_price::numeric * v_quantity * v_vat_rate / 100)::bigint;
+    v_line_tax := round(v_unit_price::numeric * v_quantity * v_vat_rate / 100);
     v_line_total := v_unit_price::numeric * v_quantity::numeric;
     if v_line_total > 9223372036854775807::numeric or v_line_tax > 9223372036854775807::numeric then
       raise exception 'Order line amount exceeds the supported monetary range.' using errcode = '22003';
