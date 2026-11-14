@@ -122,19 +122,19 @@ const permissionByRoute = (method: string, path: string): string | null | undefi
   if (method === 'POST' && path === '/stock/adjustments') return 'inventory.adjust';
   if (method === 'POST' && /^\/stock\/adjustments\/[^/]+\/decision$/.test(path)) return 'inventory.adjust';
   if (method === 'GET' && path === '/orders') return 'orders.view';
-  if (method === 'GET' && /^\\/orders\\/[^/]+$/.test(path)) return 'orders.view';
+  if (method === 'GET' && /^\/orders\/[^/]+$/.test(path)) return 'orders.view';
   if (method === 'POST' && path === '/orders') return 'orders.create';
-  if (method === 'POST' && /^\\/orders\\/[^/]+\\/transition$/.test(path)) return 'orders.edit';
+  if (method === 'POST' && /^\/orders\/[^/]+\/transition$/.test(path)) return 'orders.edit';
   if (method === 'GET' && path === '/suppliers') return 'purchasing.view';
   if (method === 'POST' && path === '/suppliers') return 'purchasing.manage';
   if (method === 'POST' && path === '/purchase-orders') return 'purchasing.manage';
-  if (method === 'POST' && /^\\/purchase-orders\\/[^/]+\\/(approve|receive)$/.test(path)) return 'purchasing.manage';
+  if (method === 'POST' && /^\/purchase-orders\/[^/]+\/(approve|receive)$/.test(path)) return 'purchasing.manage';
   if (method === 'GET' && path === '/purchase-orders') return 'purchasing.view';
   if (method === 'GET' && path === '/returns') return 'returns.view';
-  if (method === 'POST' && /^\\/returns\\/[^/]+\\/disposition$/.test(path)) return 'returns.manage';
+  if (method === 'POST' && /^\/returns\/[^/]+\/disposition$/.test(path)) return 'returns.manage';
   if (method === 'GET' && path === '/warehouses') return 'inventory.view';
   if (method === 'POST' && path === '/warehouses') return 'inventory.manage';
-  if (method === 'POST' && /^\\/warehouses\\/[^/]+\\/locations$/.test(path)) return 'inventory.manage';
+  if (method === 'POST' && /^\/warehouses\/[^/]+\/locations$/.test(path)) return 'inventory.manage';
   return undefined;
 };
 
@@ -175,7 +175,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       return json({ orders });
     }
 
-    const orderDetailMatch = path.match(/^\\/orders\\/([^/]+)$/);
+    const orderDetailMatch = path.match(/^\/orders\/([^/]+)$/);
     if (orderDetailMatch && request.method === 'GET') {
       const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderDetailMatch[1], {
         client3plId: auth.user.clientId,
@@ -191,7 +191,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       return json({ order }, 201);
     }
 
-    const orderTransitionMatch = path.match(/^\\/orders\\/([^/]+)\\/transition$/);
+    const orderTransitionMatch = path.match(/^\/orders\/([^/]+)\/transition$/);
     if (orderTransitionMatch && request.method === 'POST') {
       if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot transition workspace orders.' }, 403);
       const body = await request.json() as Record<string, unknown>;
@@ -239,7 +239,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       return json({ purchaseOrder }, 201);
     }
 
-    const purchaseOrderActionMatch = path.match(/^\\/purchase-orders\\/([^/]+)\\/(approve|receive)$/);
+    const purchaseOrderActionMatch = path.match(/^\/purchase-orders\/([^/]+)\/(approve|receive)$/);
     if (purchaseOrderActionMatch && request.method === 'POST') {
       const repository = new SupabasePurchasingRepository(auth.repositoryContext);
       if (purchaseOrderActionMatch[2] === 'approve') {
@@ -273,7 +273,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       return json({ returns });
     }
 
-    const returnDispositionMatch = path.match(/^\\/returns\\/([^/]+)\\/disposition$/);
+    const returnDispositionMatch = path.match(/^\/returns\/([^/]+)\/disposition$/);
     if (returnDispositionMatch && request.method === 'POST') {
       if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot process workspace returns.' }, 403);
       const body = await request.json() as Record<string, unknown>;
@@ -305,7 +305,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       return json({ warehouse }, 201);
     }
 
-    const locationCreateMatch = path.match(/^\\/warehouses\\/([^/]+)\\/locations$/);
+    const locationCreateMatch = path.match(/^\/warehouses\/([^/]+)\/locations$/);
     if (locationCreateMatch && request.method === 'POST') {
       const body = await request.json() as Record<string, unknown>;
       const location = await new SupabaseWarehouseRepository(auth.repositoryContext).createLocation({
