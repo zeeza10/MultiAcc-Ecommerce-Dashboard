@@ -14,6 +14,7 @@ import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
 import { handleAccessRoute } from './routes/access';
 import { resolveEffectivePermissions } from './permission-overrides';
+import { enforceRateLimit } from './rate-limits';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -138,8 +139,27 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
 
   const path = url.pathname.slice('/api/v1'.length).replace(/\/$/, '') || '/';
+  // Apply an IP-based edge limit before Supabase token verification to reduce
+  // unauthenticated abuse and avoid spending database/auth resources first.
+  if (env.API_IP_RATE_LIMITER) {
+    const connectingIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const limited = await enforceRateLimit(env.API_IP_RATE_LIMITER, `ip:${connectingIp}`, 'API request');
+    if (limited) return limited;
+  }
   const auth = await authenticate(request, env);
   if (auth instanceof Response) return auth;
+
+  const generalLimiter = request.method === 'GET'
+    ? env.API_READ_RATE_LIMITER
+    : env.API_WRITE_RATE_LIMITER;
+  if (generalLimiter) {
+    const limited = await enforceRateLimit(generalLimiter, auth.user.id, 'API request');
+    if (limited) return limited;
+  }
+  if (request.method === 'POST' && path === '/access/invitations' && env.INVITATION_RATE_LIMITER) {
+    const limited = await enforceRateLimit(env.INVITATION_RATE_LIMITER, auth.user.id, 'Invitation request');
+    if (limited) return limited;
+  }
 
   if (request.method === 'GET' && (path === '/auth/me' || path === '/me')) {
     return json({ user: { ...auth.user, isActive: true }, organizationId: auth.organizationId });
