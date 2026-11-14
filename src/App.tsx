@@ -148,18 +148,6 @@ export default function App() {
     setGlobalSearch('');
   };
 
-  const handleResetDemo = async () => {
-    try {
-      await api.resetDemo();
-      await initApp();
-      alert('Database restored to clean, verified baseline demo dataset.');
-    } catch (err: any) {
-      alert(`Reset failed: ${err.message}`);
-    }
-  };
-
-
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navigation */}
@@ -441,8 +429,7 @@ export default function App() {
               currentUser={currentUser}
               config={config}
               onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
-              onResetDemo={handleResetDemo}
-            />
+                  />
           )}
         </main>
       </div>
