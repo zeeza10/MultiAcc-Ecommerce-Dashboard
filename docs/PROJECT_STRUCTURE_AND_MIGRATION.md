@@ -34,6 +34,8 @@ As route coverage grows, split the current dispatcher into domain modules withou
 - `worker/routes/dashboard.ts` (implemented): KPIs, chart aggregates and dashboard summaries.
 - `worker/routes/marketplace.ts` (implemented): account metadata, sync history, exception queue and SKU exception resolution. Never return credential ciphertext or tokens.
 - `worker/routes/system.ts` (implemented): audit logs and notification reads/dismissal.
+- `worker/routes/fulfilment.ts` (implemented): 3PL clients, storage, packaging and shipping reads.
+- `worker/routes/finance.ts` (implemented): invoices, payments, expenses, ledger, payouts and reconciliation reads.
 - `worker/routes/inventory.ts`: products, balances, stock ledger and adjustments.
 - `worker/routes/orders.ts`: order reads, creation and state transitions.
 - `worker/routes/purchasing.ts`: suppliers, purchase orders and goods receipts.
