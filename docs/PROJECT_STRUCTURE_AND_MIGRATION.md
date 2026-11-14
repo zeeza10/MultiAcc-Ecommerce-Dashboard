@@ -1,0 +1,61 @@
+# Project Structure and Migration Boundaries
+
+This document describes the current repository layout and the target boundaries for the ongoing migration. The migration is incremental: preserve existing screens, database tables, workflows and business rules while moving API execution to Cloudflare Workers.
+
+## Current top-level structure
+
+- `src/`: React + TypeScript application.
+  - `src/App.tsx`: application shell, navigation and authenticated workspace flow.
+  - `src/auth/`: authentication gate and session entry points.
+  - `src/components/`: business screens and reusable UI, grouped by operational domain.
+  - `src/services/api.ts`: typed frontend API facade. Components should call this facade rather than issuing fetch requests directly.
+  - `src/lib/supabase.ts`: browser Supabase client for Auth/session management.
+  - `src/types.ts`: shared frontend-facing domain types.
+- `worker/`: Cloudflare Worker entry point and authenticated API dispatcher.
+  - `worker/index.ts`: request routing, CORS and static asset serving.
+  - `worker/api.ts`: API authentication, permission checks and current route handlers.
+  - `worker/*.test.ts`: Worker boundary tests.
+- `server/`: legacy Express implementation and reusable domain repositories.
+  - `server/repositories/`: Supabase-backed domain persistence adapters reused by the Worker.
+  - `server/routes.ts`, `server/engine.ts`, `server/db.ts`: legacy route/business logic and file-backed compatibility code. Keep until each workflow has a tested Worker replacement.
+- `supabase/`: migrations and database configuration.
+- `docs/`: architecture, rollout, setup and operational documentation.
+- `public/`: static assets and client-facing resources.
+
+## Target Worker organization
+
+As route coverage grows, split the current dispatcher into domain modules without changing public API paths:
+
+- `worker/auth/`: bearer-token validation, active profile/workspace resolution and permission helpers.
+- `worker/routes/dashboard.ts`: KPIs, chart aggregates and dashboard summaries.
+- `worker/routes/marketplace.ts`: account metadata, sync history and exception queue. Never return credential ciphertext or tokens.
+- `worker/routes/inventory.ts`: products, balances, stock ledger and adjustments.
+- `worker/routes/orders.ts`: order reads, creation and state transitions.
+- `worker/routes/purchasing.ts`: suppliers, purchase orders and goods receipts.
+- `worker/routes/returns.ts`: return processing.
+- `worker/routes/warehouse.ts`: warehouse layout and location management.
+- `worker/routes/fulfilment.ts`: 3PL clients, storage, packaging and shipping.
+- `worker/routes/finance.ts`: invoices, payments, expenses, ledger, payouts and reconciliation.
+- `worker/routes/system.ts`: notifications, audit log and safe configuration endpoints.
+- `worker/shared/`: response helpers, validation, pagination and typed request context.
+
+## Non-negotiable architecture rules
+
+1. Browser code uses Supabase Auth for sign-in/session and the Worker for business APIs.
+2. Worker requests validate the caller's Supabase JWT and active organization membership.
+3. Worker database access uses the caller JWT, never a service-role key for ordinary user requests; PostgreSQL RLS remains a second tenant-isolation boundary.
+4. Every organization-owned query is constrained by the resolved organization and, where applicable, the user's 3PL client scope.
+5. Marketplace credential ciphertext, refresh tokens and access tokens are never returned to browser clients.
+6. Financial, inventory and fulfilment writes use validated, transactional database RPCs/repositories with audit and idempotency controls where required.
+7. A workflow is removed from Express only after equivalent Worker behavior, authorization, tenant-isolation and regression tests pass.
+8. No production deployment, schema reset or destructive data migration is part of this branch.
+
+## Current migration coverage
+
+- Worker: auth/session identity, Products, Inventory, Stock Adjustments, Orders, Suppliers, Purchase Orders, Goods Receipts, Returns, Warehouse, read-only Finance, read-only 3PL, dashboard aggregates, marketplace account metadata, exception queue, audit reads and notification reads/dismissal.
+- Still gated: eBay OAuth/token lifecycle and sync execution; financial and 3PL writes; complete report/export workflows; remaining settings and dropshipping endpoints.
+- UI must not present hard-coded sample metrics as live business data. Unavailable metrics must be explicitly marked or left at a neutral empty state until their source calculation is implemented.
+
+## Validation gates
+
+For every module: schema and RLS review → route implementation → frontend API contract alignment → authorization and tenant-isolation tests → TypeScript check → unit tests → production build → Cloudflare Preview runtime checks. Production remains unchanged until all gates pass.
