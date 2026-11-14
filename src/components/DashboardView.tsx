@@ -19,11 +19,12 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { MarketplaceAccount, SystemConfig, User } from '../types';
+import { SystemConfig, User } from '../types';
 
 interface DashboardViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onNavigate: (tab: any, filterState?: any) => void;
   onOpenNewAdjustment: () => void;
   onOpenNewOrder: () => void;
@@ -32,13 +33,12 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   onNavigate,
   onOpenNewAdjustment,
   onOpenNewOrder,
 }) => {
   const [period, setPeriod] = useState('30D');
-  const [selectedAccount, setSelectedAccount] = useState('ALL');
-  const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
   const [kpis, setKpis] = useState<any>(null);
   const [charts, setCharts] = useState<any>(null);
   const [exceptions, setExceptions] = useState<any[]>([]);
@@ -46,15 +46,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     loadDashboardData();
-  }, [period, selectedAccount, currentUser.id]);
+  }, [period, selectedStoreId, currentUser.id]);
 
   const loadDashboardData = async () => {
     setLoading(true);
     try {
       const results = await Promise.allSettled([
-        api.getKPIs(period, selectedAccount),
-        api.getCharts(),
-        api.getEbayAccounts(),
+        api.getKPIs(period, selectedStoreId),
+        api.getCharts(selectedStoreId),
         api.getExceptions(),
       ]);
 
@@ -64,11 +63,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (results[1].status === 'fulfilled' && results[1].value) {
         setCharts(results[1].value);
       }
-      if (results[2].status === 'fulfilled' && results[2].value?.accounts) {
-        setAccounts(results[2].value.accounts);
-      }
-      if (results[3].status === 'fulfilled' && results[3].value?.exceptions) {
-        setExceptions(results[3].value.exceptions.filter((e: any) => e.status === 'PENDING'));
+      if (results[2].status === 'fulfilled' && results[2].value?.exceptions) {
+        setExceptions(results[2].value.exceptions.filter((e: any) => e.status === 'PENDING'));
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -98,23 +94,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {currentUser.role !== 'CLIENT_USER' && (
-            <div className="flex items-center space-x-1.5 bg-white border border-gray-300 rounded-md px-2.5 py-1 text-xs shadow-2xs">
-              <span className="text-gray-400 font-medium">Channel:</span>
-              <select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="bg-transparent font-medium text-gray-800 focus:outline-none cursor-pointer"
-              >
-                <option value="ALL">All Marketplace Accounts</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.marketplace.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+    
 
           <div className="flex items-center space-x-1 bg-white border border-gray-300 rounded-md p-0.5 text-xs shadow-2xs">
             {['7D', '30D', '90D', 'YTD'].map((p) => (
