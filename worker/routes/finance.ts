@@ -149,6 +149,8 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
 
   if (path === '/finance/payments' && request.method === 'GET') {
     let clientInvoiceIds: string[] | null = null;
+    let storeInvoiceIds: string[] | null = null;
+    let storePaymentAmounts = new Map<string, number>();
     let clientRecipientName = '';
     if (auth.user.role === 'CLIENT_USER') {
       if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
@@ -174,11 +176,16 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     else {
       const accountId = url.searchParams.get('accountId');
       if (accountId && accountId !== 'ALL') {
-        const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
-          .from('marketplace_finance_allocations').select('source_id')
-          .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'PAYMENT');
-        if (allocationError) throw allocationError;
-        const ids = [...new Set((allocations || []).map(row => row.source_id))];
+        const [paymentAllocations, invoiceAllocations] = await Promise.all([
+          auth.repositoryContext.supabase.from('marketplace_finance_allocations').select('source_id,amount_minor')
+            .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'PAYMENT'),
+          auth.repositoryContext.supabase.from('marketplace_finance_allocations').select('source_id')
+            .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'INVOICE'),
+        ]);
+        if (paymentAllocations.error || invoiceAllocations.error) throw paymentAllocations.error || invoiceAllocations.error;
+        const ids = [...new Set((paymentAllocations.data || []).map(row => row.source_id))];
+        storeInvoiceIds = [...new Set((invoiceAllocations.data || []).map(row => row.source_id))];
+        storePaymentAmounts = new Map((paymentAllocations.data || []).map(row => [row.source_id, Number(row.amount_minor)]));
         paymentsQuery = ids.length ? paymentsQuery.in('id', ids) : paymentsQuery.in('id', ['00000000-0000-0000-0000-000000000000']);
       }
     }
@@ -190,6 +197,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     if (paymentIds.length) allocationsQuery = allocationsQuery.in('payment_id', paymentIds);
     else allocationsQuery = allocationsQuery.in('payment_id', ['00000000-0000-0000-0000-000000000000']);
     if (clientInvoiceIds) allocationsQuery = allocationsQuery.in('invoice_id', clientInvoiceIds);
+    else if (storeInvoiceIds) allocationsQuery = allocationsQuery.in('invoice_id', storeInvoiceIds.length ? storeInvoiceIds : ['00000000-0000-0000-0000-000000000000']);
     const { data: allocations, error: allocationError } = await allocationsQuery;
     if (allocationError) throw allocationError;
     const invoiceIds = [...new Set((allocations || []).map(row => row.invoice_id))];
@@ -206,7 +214,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       allocationsByPayment.set(allocation.payment_id, rows);
     }
     return json({ payments: (payments || []).map(row => ({
-      id: row.id, paymentNumber: row.payment_number, amountMinor: auth.user.role === 'CLIENT_USER' ? (allocationsByPayment.get(row.id) || []).reduce((sum: number, allocation: any) => sum + Number(allocation.amountMinor || 0), 0) : Number(row.amount_minor), paymentMethod: row.payment_method,
+      id: row.id, paymentNumber: row.payment_number, amountMinor: auth.user.role === 'CLIENT_USER' ? (allocationsByPayment.get(row.id) || []).reduce((sum: number, allocation: any) => sum + Number(allocation.amountMinor || 0), 0) : (storePaymentAmounts.has(row.id) ? storePaymentAmounts.get(row.id)! : Number(row.amount_minor)), paymentMethod: row.payment_method,
       paymentDate: row.payment_date, reference: row.reference || '', payerName: auth.user.role === 'CLIENT_USER' ? clientRecipientName : (row.payer_name || ''),
       allocations: allocationsByPayment.get(row.id) || [], unallocatedCreditMinor: Number(row.unallocated_credit_minor),
       recordedBy: row.recorded_by || '', createdAt: row.created_at,
