@@ -96,6 +96,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-slate-400 hidden sm:inline">
             Signed in to {organizationName}. Your access is controlled by your workspace role.
           </span>
+          {marketplaceAccounts.length > 0 && marketplaceAccounts.every((account) => account.isDemo === true) && (
+            <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-amber-300">
+              DEMO DATA — DATABASE SEEDED
+            </span>
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
