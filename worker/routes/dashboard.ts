@@ -154,6 +154,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const netPayoutMinor = storePayouts.reduce((sum, row) => sum + Number(row.net_payout_minor || 0), 0);
     const marketplaceFeesMinor = storePayouts.reduce((sum, row) => sum + Number(row.total_fees_minor || 0), 0);
     const marketplaceRefundsMinor = storePayouts.reduce((sum, row) => sum + Number(row.refunds_minor || 0), 0);
+    const storeAllocatedExpensesMinor = expenses.filter(row => String(row.currency || '').trim() === currency)
+      .reduce((sum, row) => sum + Number(row.amount_minor || 0), 0);
     const productById = new Map(products.map(product => [product.id, product]));
     const lowStockItems = balances.filter(balance =>
       Number(balance.available || 0) <= Number(productById.get(balance.productId)?.low_stock_threshold || 0)
@@ -201,6 +203,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       netPayoutMinor: storeScoped ? netPayoutMinor : null,
       marketplaceFeesMinor: storeScoped ? marketplaceFeesMinor : null,
       marketplaceRefundsMinor: storeScoped ? marketplaceRefundsMinor : null,
+      storeAllocatedExpensesMinor: storeScoped ? storeAllocatedExpensesMinor : null,
       payoutCount: storeScoped ? storePayouts.length : null,
       storeScoped,
       currency,
