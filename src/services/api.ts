@@ -52,6 +52,23 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return payload as T;
 }
 
+async function requestBlob(endpoint: string): Promise<Blob> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+  const headers = new Headers({ Authorization: `Bearer ${session.access_token}` });
+  const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
+  if (organizationId) headers.set('X-Organization-Id', organizationId);
+  const response = await fetch(`/api/v1${endpoint}`, { headers });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error || `Report export failed (${response.status}).`);
+  }
+  if (!(response.headers.get('content-type') || '').includes('text/csv')) {
+    throw new Error('The report export did not return a CSV file.');
+  }
+  return response.blob();
+}
+
 export const api = {
   // Auth
 
@@ -178,6 +195,14 @@ export const api = {
     if (params.accountId) q.set('accountId', params.accountId);
     if (params.sku) q.set('sku', params.sku);
     return request<any>(`/reports/${id}?${q.toString()}`);
+  },
+  exportReport: (id: string, params: { startDate?: string; endDate?: string; accountId?: string; sku?: string } = {}) => {
+    const q = new URLSearchParams({ format: 'csv' });
+    if (params.startDate) q.set('startDate', params.startDate);
+    if (params.endDate) q.set('endDate', params.endDate);
+    if (params.accountId) q.set('accountId', params.accountId);
+    if (params.sku) q.set('sku', params.sku);
+    return requestBlob(`/reports/${id}?${q.toString()}`);
   },
 
   // Order Editing
