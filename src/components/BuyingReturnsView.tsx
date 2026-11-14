@@ -549,7 +549,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         <input
                           type="number"
                           value={input.received}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setReceiveInputs({
                               ...receiveInputs,
                               [line.productId]: { ...input, received: parseInt(e.target.value, 10) || 0 },
