@@ -37,6 +37,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [selectedReturn, setSelectedReturn] = useState<ReturnOrder | null>(null);
   const [receiveInputs, setReceiveInputs] = useState<Record<string, { received: number; damaged: number }>>({});
   const [discrepancyNote, setDiscrepancyNote] = useState('');
+  const [receiptRequestId, setReceiptRequestId] = useState('');
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -82,6 +83,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     });
     setReceiveInputs(initialInputs);
     setDiscrepancyNote('');
+    setReceiptRequestId(window.crypto.randomUUID());
   };
 
   const handleConfirmReceipt = async () => {
@@ -95,8 +97,9 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     }));
 
     try {
-      await api.receivePO(selectedPo.id, items, discrepancyNote);
+      await api.receivePO(selectedPo.id, items, discrepancyNote, receiptRequestId);
       setSelectedPo(null);
+      setReceiptRequestId('');
       loadData();
     } catch (err: any) {
       alert(err.message || 'Receipt recording failed');
