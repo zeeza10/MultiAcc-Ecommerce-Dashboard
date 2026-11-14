@@ -48,7 +48,7 @@ export async function handleAccessRoute(
         invitationId,
         email,
         fullName,
-        redirectTo: new URL('/', request.url).toString(),
+        redirectTo: new URL('/accept-invitation', request.url).toString(),
       }),
     });
 

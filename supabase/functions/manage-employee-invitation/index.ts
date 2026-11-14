@@ -46,6 +46,21 @@ Deno.serve(async (request: Request) => {
     return Response.json({ error: "Invitation is invalid or expired" }, { status: 400, headers: cors });
   }
 
+  let invitationRedirect: URL;
+  try {
+    invitationRedirect = new URL(body.redirectTo || "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/accept-invitation");
+  } catch {
+    return Response.json({ error: "Invitation redirect URL is invalid" }, { status: 400, headers: cors });
+  }
+  if (
+    invitationRedirect.origin !== "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev" ||
+    invitationRedirect.pathname !== "/accept-invitation" ||
+    invitationRedirect.search ||
+    invitationRedirect.hash
+  ) {
+    return Response.json({ error: "Invitation redirect URL is not allowed" }, { status: 400, headers: cors });
+  }
+
   const { data: role, error: roleError } = await admin.from("roles").select("code").eq("id", invite.role_id).maybeSingle();
   if (roleError || !role) return Response.json({ error: "Assigned role could not be verified" }, { status: 400, headers: cors });
   if (role.code === "SUPER_ADMIN") {
@@ -92,7 +107,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const { data: invited, error: inviteUserError } = await admin.auth.admin.inviteUserByEmail(body.email, {
-    redirectTo: body.redirectTo || url,
+    redirectTo: invitationRedirect.toString(),
     data: body.fullName ? { full_name: body.fullName } : {},
   });
   if (inviteUserError || !invited.user) {

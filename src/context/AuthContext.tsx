@@ -46,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
+  const [inviteSetupActive, setInviteSetupActive] = useState(() => window.location.pathname === '/accept-invitation');
+  const [inviteConfirmPassword, setInviteConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -200,6 +202,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
 
+    if (inviteSetupActive) {
+      if (!session) {
+        setError('This invitation link is invalid or expired. Ask your Super Admin to send a new invitation.');
+        return;
+      }
+      if (password.length < 12) {
+        setError('Choose a password with at least 12 characters.');
+        return;
+      }
+      if (password !== inviteConfirmPassword) {
+        setError('The passwords do not match.');
+        return;
+      }
+      await runAuth(async () => {
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (!updateError) {
+          setPassword('');
+          setInviteConfirmPassword('');
+          setInviteSetupActive(false);
+          window.history.replaceState({}, '', '/');
+          setMessage('Your account password is set. Opening your workspace…');
+          await loadAccount(session);
+        }
+        return { error: updateError };
+      });
+      return;
+    }
+
     if (mode === 'reset' && recoveryActive) {
       await runAuth(async () => {
         const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -251,11 +281,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Loading secure session…</div>;
   }
 
-  if (value && !recoveryActive) {
+  if (value && !recoveryActive && !inviteSetupActive) {
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
   }
 
-  const signedInWithoutWorkspace = !!session && !recoveryActive;
+  const signedInWithoutWorkspace = !!session && !recoveryActive && !inviteSetupActive;
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -263,19 +293,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="mb-7">
           <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">NexusOps</div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">
-            {signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
+            {inviteSetupActive ? 'Set up your account' : signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {signedInWithoutWorkspace
-              ? 'This account has no active organization invitation. Contact your organization administrator.'
-              : 'Secure sign-in powered by Supabase Authentication.'}
+            {inviteSetupActive
+              ? session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
+              : signedInWithoutWorkspace
+                ? 'This account has no active organization invitation. Contact your organization administrator.'
+                : 'Secure sign-in powered by Supabase Authentication.'}
           </p>
         </div>
 
         {error && <div role="alert" className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
         {message && <div role="status" className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">{message}</div>}
 
-        {signedInWithoutWorkspace ? (
+        {inviteSetupActive ? (
+          session ? (
+            <form onSubmit={submit} className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                New password
+                <input required minLength={12} type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+                <span className="mt-1 block text-xs text-slate-400">Use at least 12 characters. Do not reuse a password from another service.</span>
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Confirm password
+                <input required minLength={12} type="password" autoComplete="new-password" value={inviteConfirmPassword} onChange={event => setInviteConfirmPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+              </label>
+              <button disabled={busy} className="w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white disabled:opacity-50">
+                {busy ? 'Setting up account…' : 'Set password and continue'}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">For your security, this link cannot be reused. Contact your Super Admin for a fresh invitation.</p>
+              <a href="/" className="block w-full rounded-lg border border-slate-300 py-3 text-center text-sm font-semibold text-slate-700">Return to sign in</a>
+            </div>
+          )
+        ) : signedInWithoutWorkspace ? (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">Your sign-in succeeded, but no active organization membership was found. Ask your organization Super Admin to send or renew your invitation.</p>
             <button onClick={signOut} className="w-full rounded-lg border border-slate-300 py-3 text-sm font-semibold text-slate-700">Sign out</button>
