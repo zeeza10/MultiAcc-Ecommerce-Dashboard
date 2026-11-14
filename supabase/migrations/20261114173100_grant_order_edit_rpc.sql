@@ -1,1 +1,0 @@
-grant execute on function private.update_workspace_order(uuid,uuid,jsonb) to authenticated;
