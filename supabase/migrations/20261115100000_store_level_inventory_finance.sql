@@ -3,6 +3,9 @@
 ALTER TABLE public.marketplace_accounts
   ADD CONSTRAINT marketplace_accounts_id_org_unique UNIQUE (id, organization_id);
 
+ALTER TABLE public.products
+  ADD CONSTRAINT products_id_org_unique UNIQUE (id, organization_id);
+
 CREATE TABLE IF NOT EXISTS public.marketplace_inventory_allocations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -19,9 +22,6 @@ CREATE TABLE IF NOT EXISTS public.marketplace_inventory_allocations (
     REFERENCES public.products(id, organization_id) ON DELETE CASCADE,
   CONSTRAINT marketplace_inventory_alloc_unique UNIQUE (marketplace_account_id, product_id)
 );
-
-ALTER TABLE public.products
-  ADD CONSTRAINT products_id_org_unique UNIQUE (id, organization_id);
 
 ALTER TABLE public.stock_ledger
   ADD COLUMN IF NOT EXISTS marketplace_account_id uuid;
@@ -112,13 +112,14 @@ BEGIN
     SELECT organization_id, amount_minor, currency INTO v_org, v_amount, v_currency
     FROM public.payments WHERE id = NEW.source_id;
   ELSIF NEW.source_type = 'JOURNAL_ENTRY' THEN
-    SELECT je.organization_id, COALESCE(SUM(jel.debit_minor),0)::bigint, 'GBP'
+    SELECT je.organization_id, COALESCE(SUM(jel.debit_minor),0)::bigint, org.base_currency
       INTO v_org, v_amount, v_currency
     FROM public.journal_entries je
+    JOIN public.organizations org ON org.id=je.organization_id
     LEFT JOIN public.journal_entry_lines jel
       ON jel.journal_entry_id = je.id AND jel.organization_id = je.organization_id
     WHERE je.id = NEW.source_id
-    GROUP BY je.organization_id;
+    GROUP BY je.organization_id, org.base_currency;
   END IF;
 
   IF v_org IS NULL OR v_org <> NEW.organization_id THEN
@@ -311,6 +312,8 @@ FOR ALL TO authenticated USING (
 
 REVOKE ALL ON FUNCTION private.set_marketplace_inventory_allocation(uuid,uuid,uuid,integer,integer,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION private.allocate_marketplace_finance(uuid,uuid,text,uuid,bigint,char,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.set_marketplace_inventory_allocation(uuid,uuid,uuid,integer,integer,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.allocate_marketplace_finance(uuid,uuid,text,uuid,bigint,char,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_marketplace_inventory_allocation(uuid,uuid,uuid,integer,integer,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.allocate_marketplace_finance(uuid,uuid,text,uuid,bigint,char,text) TO authenticated;
 
