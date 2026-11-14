@@ -234,10 +234,6 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 
 /**
  * PRODUCTS — first organization-scoped PostgreSQL persistence slice.
- * These handlers run before the legacy demo-data safety gate below.
- */
-/**
- * PRODUCTS — first organization-scoped PostgreSQL persistence slice.
  * Registered before the legacy demo-data gate so only this migrated domain
  * can use real tenant data while unported demo-backed routes remain disabled.
  */
