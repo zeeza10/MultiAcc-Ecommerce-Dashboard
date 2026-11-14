@@ -16,6 +16,7 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('PUT', '/orders/order-id'), 'orders.edit');
     assert.equal(permissionByRoute('PATCH', '/orders/order-id'), undefined);
     assert.equal(permissionByRoute('GET', '/inventory/balances'), 'inventory.view');
+    assert.equal(permissionByRoute('POST', '/inventory/allocations'), 'inventory.manage');
     assert.equal(permissionByRoute('POST', '/stock/adjustments'), 'inventory.adjust');
     assert.equal(permissionByRoute('GET', '/purchase-orders'), 'purchasing.view');
     assert.equal(permissionByRoute('POST', '/returns/return-id/disposition'), 'returns.manage');
@@ -34,6 +35,7 @@ describe('Worker route permission policy', () => {
   it('allows only explicitly supported routes and methods', () => {
     assert.equal(permissionByRoute('POST', '/finance/invoices/invoice-id/void'), 'finance.manage');
     assert.equal(permissionByRoute('POST', '/finance/payments'), 'finance.manage');
+    assert.equal(permissionByRoute('POST', '/finance/allocations'), 'finance.manage');
     assert.equal(permissionByRoute('GET', '/system/config'), null);
     assert.equal(permissionByRoute('POST', '/system/config'), 'settings.manage');
     assert.equal(permissionByRoute('DELETE', '/products'), undefined);
