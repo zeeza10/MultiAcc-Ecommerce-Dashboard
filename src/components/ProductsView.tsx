@@ -17,6 +17,7 @@ import { Product, User, SystemConfig, Client3PL } from '../types';
 interface ProductsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   initialFilter?: any;
 }
 
@@ -25,6 +26,7 @@ const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('
 export const ProductsView: React.FC<ProductsViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   initialFilter,
 }) => {
   const [products, setProducts] = useState<any[]>([]);
@@ -47,13 +49,14 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   useEffect(() => {
     loadProducts();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadProducts = async () => {
     setLoading(true);
+    setProducts([]);
     try {
       const [res, clientRes] = await Promise.all([
-        api.getProducts(),
+        api.getProducts(selectedStoreId),
         api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setProducts(res.products || []);
