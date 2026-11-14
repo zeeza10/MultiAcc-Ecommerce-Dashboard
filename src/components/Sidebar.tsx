@@ -28,6 +28,7 @@ interface SidebarProps {
   activeTab: NavItem;
   onNavigate: (tab: NavItem) => void;
   currentUser: User;
+  permissions: string[];
   config: SystemConfig;
   unreadAlertCount: number;
   pendingExceptionsCount: number;
@@ -39,13 +40,16 @@ interface NavMenuItem {
   icon: React.ElementType;
   phase: 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
   badge?: string | number;
-  allowedRoles?: string[];\n  permission?: string;
+  allowedRoles?: string[];
+  permission?: string;
+  permission?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onNavigate,
   currentUser,
+  permissions,
   config,
   unreadAlertCount,
   pendingExceptionsCount,
@@ -53,7 +57,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const currentPhase = config.activeReleasePhase;
 
   // Filter items allowed for this user role per SRS Matrix S4
-  const isAllowedForRole = (item: NavMenuItem) => {\n    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;\n    if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
+  const isAllowedForRole = (item: NavMenuItem) => {
+    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
+    if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
+    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
+    if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
     if (currentUser.role === 'SUPER_ADMIN') return true;
 
     if (currentUser.role === 'CLIENT_USER') {
