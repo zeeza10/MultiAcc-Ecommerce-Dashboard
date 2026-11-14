@@ -1,4 +1,4 @@
-import type { Order, OrderLine, OrderStatus, OwnerType } from '../types';
+import type { Order, OrderLine, OwnerType } from '../types';
 import type { RepositoryContext } from './context';
 
 type OrderRow = {
