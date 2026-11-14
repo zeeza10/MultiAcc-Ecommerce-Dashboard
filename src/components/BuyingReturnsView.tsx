@@ -606,12 +606,14 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <button
-                            onClick={() => openReturnModal(ret)}
-                            className="px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md transition"
-                          >
-                            Inspect & Dispose
-                          </button>
+                          {['OPEN', 'RECEIVED'].includes(ret.status) ? (
+                            <button
+                              onClick={() => openReturnModal(ret)}
+                              className="px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md transition"
+                            >
+                              Inspect & Dispose
+                            </button>
+                          ) : <span className="text-xs text-gray-400">Processed</span>}
                         </td>
                       </tr>
                     );
