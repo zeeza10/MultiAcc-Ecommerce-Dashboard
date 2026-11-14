@@ -35,11 +35,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [newSku, setNewSku] = useState('');
   const [newName, setNewName] = useState('');
   const [newBarcode, setNewBarcode] = useState('');
-  const [newCategory, setNewCategory] = useState('Audio');
-  const [newCost, setNewCost] = useState('25.00');
-  const [newPrice, setNewPrice] = useState('59.99');
-  const [newThreshold, setNewThreshold] = useState('15');
-  const [newReorder, setNewReorder] = useState('50');
+  const [newCategory, setNewCategory] = useState('');
+  const [newCost, setNewCost] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newThreshold, setNewThreshold] = useState('');
+  const [newReorder, setNewReorder] = useState('');
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
