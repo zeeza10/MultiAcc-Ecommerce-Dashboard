@@ -36,11 +36,9 @@ As route coverage grows, split the current dispatcher into domain modules withou
 - `worker/routes/system.ts` (implemented): audit logs and notification reads/dismissal.
 - `worker/routes/fulfilment.ts` (implemented): 3PL clients, storage, packaging and shipping reads.
 - `worker/routes/finance.ts` (implemented): invoices, payments, expenses, ledger, payouts and reconciliation reads.
-- `worker/routes/inventory.ts`: products, balances, stock ledger and adjustments.
-- `worker/routes/orders.ts`: order reads, creation and state transitions.
-- `worker/routes/purchasing.ts`: suppliers, purchase orders and goods receipts.
-- `worker/routes/returns.ts`: return processing.
-- `worker/routes/warehouse.ts`: warehouse layout and location management.
+- `worker/routes/inventory.ts` (implemented): product catalog, balances, stock ledger, stock adjustments, warehouses and locations.
+- `worker/routes/orders-purchasing.ts` (implemented): order reads, creation/transitions, suppliers, purchase orders and goods receipts.
+- `worker/routes/returns.ts` (implemented): return reads and disposition processing.
 - `worker/routes/fulfilment.ts`: 3PL clients, storage, packaging and shipping.
 - `worker/routes/finance.ts`: invoices, payments, expenses, ledger, payouts and reconciliation.
 - `worker/routes/system.ts` currently handles audit and notifications; extend it with safe configuration endpoints.
