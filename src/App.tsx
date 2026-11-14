@@ -41,6 +41,8 @@ export default function App() {
   const { user: authenticatedUser, signOut, organizationName, permissions } = useAuth();
   const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [initError, setInitError] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
@@ -56,7 +58,7 @@ export default function App() {
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
   const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
   const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
@@ -105,12 +107,15 @@ export default function App() {
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
       setConfig(cfgRes.config);
+      setConfigLoaded(true);
+      setInitError('');
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
       setMarketplaceAccounts(accountsRes.accounts || []);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to initialize app:', err);
+      setInitError(err.message || 'Workspace data could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -147,6 +152,16 @@ export default function App() {
     setTabFilterState(filterState || null);
     setGlobalSearch('');
   };
+
+  if (loading && !configLoaded) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">Loading workspace data from Supabase…</div>;
+  }
+  if (!configLoaded) {
+    return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">
+      <p>{initError || 'Workspace configuration could not be loaded.'}</p>
+      <button onClick={initApp} className="px-4 py-2 rounded bg-indigo-600 text-white">Retry</button>
+    </div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
