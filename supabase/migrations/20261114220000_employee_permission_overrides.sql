@@ -19,6 +19,10 @@ drop policy if exists member_permission_overrides_admin_select on public.organiz
 create policy member_permission_overrides_admin_select
   on public.organization_member_permission_overrides for select to authenticated
   using (public.is_org_super_admin(organization_id));
+drop policy if exists member_permission_overrides_self_select on public.organization_member_permission_overrides;
+create policy member_permission_overrides_self_select
+  on public.organization_member_permission_overrides for select to authenticated
+  using (user_id=auth.uid());
 drop policy if exists member_permission_overrides_admin_write on public.organization_member_permission_overrides;
 create policy member_permission_overrides_admin_write
   on public.organization_member_permission_overrides for all to authenticated
