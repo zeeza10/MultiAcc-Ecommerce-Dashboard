@@ -46,10 +46,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const formatMoney = (minor: number, currency = config.baseCurrency) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
 
   useEffect(() => {
-    if (defaultTab) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab]);
+    if (currentUser.role === 'CLIENT_USER') setActiveTab(defaultTab === 'PAYMENTS' ? 'PAYMENTS' : 'INVOICES');
+    else if (defaultTab) setActiveTab(defaultTab);
+  }, [defaultTab, currentUser.role]);
 
   useEffect(() => {
     loadFinanceData();
