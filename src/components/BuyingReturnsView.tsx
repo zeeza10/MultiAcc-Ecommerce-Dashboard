@@ -555,7 +555,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                               [line.productId]: { ...input, received: parseInt(e.target.value, 10) || 0 },
                             });
                             setReceiptRequestId(window.crypto.randomUUID());
-                          }
+                          }}
                           className="w-full border border-gray-300 rounded p-1.5 font-bold"
                         />
                       </div>
@@ -564,7 +564,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         <input
                           type="number"
                           value={input.damaged}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setReceiveInputs({
                               ...receiveInputs,
                               [line.productId]: { ...input, damaged: parseInt(e.target.value, 10) || 0 },
