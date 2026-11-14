@@ -154,6 +154,9 @@ begin
       if not found then
         raise exception 'A return line does not belong to this return.' using errcode = '42501';
       end if;
+      if v_quantity_numeric < 1 or v_quantity_numeric > 1000000 then
+        raise exception 'Disposition quantity must be between 1 and 1,000,000.' using errcode = '22023';
+      end if;
       if v_quantity_numeric <> v_line.quantity then
         raise exception 'Disposition quantity must match the full returned quantity for SKU %.', v_line.sku using errcode = '22023';
       end if;
@@ -187,7 +190,7 @@ begin
           quantity_delta, stock_state, source_type, source_id,
           unit_cost_minor, note, created_by
         ) values (
-          p_organization_id, v_product.id, v_location_id, v_order.client_3pl_id,
+          p_organization_id, v_product.id, v_location_id, v_product.client_3pl_id,
           v_line.quantity, 'ON_HAND', 'RETURN_DISPOSITION', v_return.id,
           v_product.cost_price_minor,
           'Restocked returned goods from ' || v_return.return_number, v_actor
