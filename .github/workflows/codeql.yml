@@ -36,6 +36,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: codeql-sarif
-          path: results/*.sarif
-          if-no-files-found: ignore
+          path: ../results/*.sarif
+          if-no-files-found: error
           retention-days: 7
