@@ -29,35 +29,6 @@ interface DashboardViewProps {
   onOpenNewOrder: () => void;
 }
 
-const INITIAL_KPIS = {
-  totalOrders: 0,
-  pendingOrders: 0,
-  revenueMinor: 0,
-  lowStockItems: 0,
-  totalStockUnits: 0,
-  inventoryValueMinor: 0,
-  supplierPayablesMinor: 0,
-  clientReceivablesMinor: 0,
-  storageRevenueMinor: 0,
-  outstandingPaymentsMinor: 0,
-  currency: 'GBP',
-  activePhase: 'ALL',
-};
-
-const INITIAL_CHARTS = {
-  trend: [],
-  statusCounts: {},
-  stockByState: {
-    available: 0,
-    reserved: 0,
-    onHand: 0,
-    incoming: 0,
-    damaged: 0,
-    quarantined: 0,
-  },
-  topSkus: [],
-};
-
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   config,
@@ -68,10 +39,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [period, setPeriod] = useState('30D');
   const [selectedAccount, setSelectedAccount] = useState('ALL');
   const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
-  const [kpis, setKpis] = useState<any>(INITIAL_KPIS);
-  const [charts, setCharts] = useState<any>(INITIAL_CHARTS);
+  const [kpis, setKpis] = useState<any>(null);
+  const [charts, setCharts] = useState<any>(null);
   const [exceptions, setExceptions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
@@ -120,8 +91,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Operations Dashboard</h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {currentUser.role === 'CLIENT_USER'
-              ? 'Apex Electronics Ltd - Client Inventory & Orders Visibility'
-              : 'Enterprise overview: eBay synchronizations, inventory ledger, and order pipeline.'}
+              ? 'Your client inventory and orders visibility.'
+              : 'Workspace overview from your connected operational records.'}
           </p>
         </div>
 
@@ -240,7 +211,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <PoundSterling className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.revenueMinor)}
+              {kpis ? formatMoney(kpis.revenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Item totals excl. tax</span>
@@ -291,7 +262,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <CircleDollarSign className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.inventoryValueMinor)}
+              {kpis ? formatMoney(kpis.inventoryValueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Weighted avg cost valuation</span>
@@ -308,7 +279,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Receipt className="w-4 h-4 text-purple-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.supplierPayablesMinor)}
+              {kpis ? formatMoney(kpis.supplierPayablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Unpaid PO receipts / GRNI</span>
@@ -325,7 +296,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Building className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.clientReceivablesMinor)}
+              {kpis ? formatMoney(kpis.clientReceivablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Unpaid issued 3PL invoices</span>
@@ -342,7 +313,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Archive className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.storageRevenueMinor)}
+              {kpis ? formatMoney(kpis.storageRevenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Storage charges billed</span>
@@ -359,7 +330,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <AlertCircle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {formatMoney(kpis.outstandingPaymentsMinor)}
+              {kpis ? formatMoney(kpis.outstandingPaymentsMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700">
               <span>Receivables past due date</span>
@@ -380,7 +351,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Live Ledger</span>
           </div>
 
-          {charts?.trend && (
+          {charts?.trend?.length > 0 && (
             <div className="h-48 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-gray-100">
               {charts.trend.map((point: any, idx: number) => {
                 const heightPercent = Math.min(100, Math.max(15, (point.revenue / 250) * 100));
