@@ -393,7 +393,7 @@ export default function App() {
           )}
 
           {/* Phase 4 Payouts & Finance Modules */}
-          {(activeTab === 'payouts' || activeTab === 'reconciliation') && (
+          {(activeTab === 'payouts' || activeTab === 'reconciliation') && (permissions.includes('*') || permissions.includes('finance.manage')) && (
             <EbayPayoutsView
               currentUser={currentUser}
               selectedStoreId={selectedStoreId}
