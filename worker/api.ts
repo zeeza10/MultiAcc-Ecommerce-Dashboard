@@ -8,6 +8,7 @@ import { handleOrderPurchasingRoute } from './routes/orders-purchasing';
 import { handleReturnRoute } from './routes/returns';
 import { handleInventoryRoute } from './routes/inventory';
 import { handleDropshippingRoute } from './routes/dropshipping';
+import { handleReportRoute } from './routes/reports';
 import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
@@ -151,6 +152,8 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     if (inventoryResponse) return inventoryResponse;
     const dropshippingResponse = await handleDropshippingRoute(path, request, auth);
     if (dropshippingResponse) return dropshippingResponse;
+    const reportResponse = await handleReportRoute(path, request, url, auth);
+    if (reportResponse) return reportResponse;
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const expected = /required|must |invalid|unsupported|between|too long|not found|inactive|authorized|amount|select|decision|stock|adjustment/i.test(message);
