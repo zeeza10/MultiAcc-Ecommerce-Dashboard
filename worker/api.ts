@@ -763,7 +763,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       const { data: profiles } = actorIds.length
         ? await auth.repositoryContext.supabase.from('profiles').select('id,full_name').in('id', actorIds)
         : { data: [] };
-      const actorNames = new Map((profiles || []).map(row => [row.id, row.full_name || row.email || 'System']));
+      const actorNames = new Map((profiles || []).map(row => [row.id, row.full_name || 'System']));
       return json({ logs: (data || []).map(row => ({
         id: row.id, actorId: row.actor_id || '', actorName: actorNames.get(row.actor_id) || 'System',
         action: row.action, entity: row.entity, entityId: row.entity_id,
