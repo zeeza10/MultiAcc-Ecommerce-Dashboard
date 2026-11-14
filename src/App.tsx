@@ -327,6 +327,7 @@ export default function App() {
             <ProductsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               initialFilter={tabFilterState}
             />
           )}
