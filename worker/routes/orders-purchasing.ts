@@ -28,6 +28,20 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
     return result ? json(result) : json({ error: 'Order not found in this workspace.' }, 404);
   }
 
+  const orderEditMatch = path.match(/^\\/orders\\/([^/]+)$/);
+  if (orderEditMatch && request.method === 'PUT') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot edit workspace orders.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const { error } = await auth.repositoryContext.supabase.rpc('update_workspace_order', {
+      p_organization_id: auth.organizationId,
+      p_order_id: orderEditMatch[1],
+      p_order: body,
+    });
+    if (error) throw new Error(error.message || 'Order could not be updated.');
+    const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderEditMatch[1]);
+    return result ? json({ order: result.order }) : json({ error: 'Updated order could not be reloaded.' }, 500);
+  }
+
   if (path === '/orders' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace orders.' }, 403);
     const body = await request.json() as Record<string, unknown>;
