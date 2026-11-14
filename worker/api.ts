@@ -648,14 +648,26 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         const currency = String(row.currency || 'GBP').trim();
         currencies.set(currency, (currencies.get(currency) || 0) + 1);
       }
-      const currency = [...currencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'GBP';
+      const productCurrencyCounts = new Map();
+      for (const product of productsResult.data || []) {
+        const productCurrency = String(product.currency || 'GBP').trim();
+        productCurrencyCounts.set(productCurrency, (productCurrencyCounts.get(productCurrency) || 0) + 1);
+      }
+      const currency = [...currencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+        || [...productCurrencyCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+        || 'GBP';
       const revenueMinor = activeOrders.filter(row => String(row.currency || 'GBP').trim() === currency)
         .reduce((sum, row) => sum + Number(row.total_minor || 0), 0);
+      const productById = new Map((productsResult.data || []).map(product => [product.id, product]));
       const lowStockItems = (inventoryBalances || []).filter(balance =>
-        Number(balance.available || 0) <= Number((productsResult.data || []).find(product => product.id === balance.productId)?.low_stock_threshold || 0)
+        Number(balance.available || 0) <= Number(productById.get(balance.productId)?.low_stock_threshold || 0)
       ).length;
       const totalStockUnits = (inventoryBalances || []).reduce((sum, balance) => sum + Number(balance.onHand || 0), 0);
-      const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => sum + (Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0)), 0);
+      const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => {
+        const product = productById.get(balance.productId);
+        if (String(product?.currency || 'GBP').trim() !== currency) return sum;
+        return sum + Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0);
+      }, 0);
       const invoices = invoiceResult.data || [];
       const expenses = expenseResult.data || [];
       const outstandingForCurrency = (row: any) =>
@@ -673,7 +685,8 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         .filter(row => row.invoice_type === 'STORAGE'
           && String(row.currency || '').trim() === currency
           && !['DRAFT', 'VOID'].includes(String(row.status).toUpperCase())
-          && String(row.issue_date || '') >= start.toISOString().slice(0, 10))
+          && String(row.issue_date || '') >= start.toISOString().slice(0, 10)
+          && String(row.issue_date || '') <= now.toISOString().slice(0, 10))
         .reduce((sum, row) => sum + Number(row.total_minor || 0), 0);
       const outstandingPaymentsMinor = invoices
         .filter(row => String(row.status).toUpperCase() === 'OVERDUE')
