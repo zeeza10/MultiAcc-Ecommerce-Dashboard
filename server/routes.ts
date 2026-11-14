@@ -671,6 +671,52 @@ apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Purchase orders and receipts could not be loaded from the workspace database.' });
   }
 });
+apiRouter.post('/purchase-orders/:id/receive', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (!Array.isArray(body.items)) {
+      res.status(400).json({ error: 'Receipt items are required.' });
+      return;
+    }
+    if (typeof body.idempotencyKey !== 'string') {
+      res.status(400).json({ error: 'A receipt request ID is required. Reopen the receipt form and try again.' });
+      return;
+    }
+    const items = body.items.map((value) => {
+      const item = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+      return {
+        productId: typeof item.productId === 'string' ? item.productId : '',
+        receivedQty: typeof item.receivedQty === 'number' ? item.receivedQty : Number(item.receivedQty),
+        damagedQty: typeof item.damagedQty === 'number' ? item.damagedQty : Number(item.damagedQty ?? 0),
+        locationId: typeof item.locationId === 'string' ? item.locationId : undefined,
+      };
+    });
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    const result = await repository.receivePurchaseOrder(
+      req.params.id,
+      items,
+      typeof body.discrepancyNote === 'string' ? body.discrepancyNote : undefined,
+      body.idempotencyKey,
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('Transactional purchase receipt failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /authorized|authentication|membership|permission/i.test(message)
+      ? 403
+      : /not found/i.test(message)
+        ? 404
+        : /invalid|must |required|exceeds|cannot|only approved|exactly one|duplicate|request ID|location|configure|negative|at least one|already used/i.test(message)
+          ? 400
+          : 500;
+    res.status(status).json({
+      error: status === 500
+        ? 'The goods receipt could not be posted. No stock or accounting changes were committed.'
+        : message,
+    });
+  }
+});
+
 
 /**
  * Legacy demo-backed routes remain blocked outside explicit local demo mode.

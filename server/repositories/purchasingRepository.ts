@@ -189,4 +189,38 @@ export class SupabasePurchasingRepository {
       discrepancyNote: row.discrepancy_note || undefined,
     }));
   }
+  async receivePurchaseOrder(
+    purchaseOrderId: string,
+    items: Array<{ productId: string; receivedQty: number; damagedQty: number; locationId?: string }>,
+    discrepancyNote: string | undefined,
+    idempotencyKey: string,
+  ): Promise<{ success: boolean; receipt: GoodsReceipt; purchaseOrder: PurchaseOrder; duplicate: boolean }> {
+    const { data, error } = await this.context.supabase.rpc('receive_workspace_purchase_order', {
+      p_organization_id: this.context.organizationId,
+      p_purchase_order_id: purchaseOrderId,
+      p_items: items,
+      p_discrepancy_note: discrepancyNote ?? null,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') {
+      throw new Error('The database returned an invalid goods receipt response.');
+    }
+    const result = data as {
+      success?: boolean;
+      receipt?: GoodsReceipt;
+      purchaseOrder?: PurchaseOrder;
+      duplicate?: boolean;
+    };
+    if (!result.success || !result.receipt || !result.purchaseOrder) {
+      throw new Error('The database returned an incomplete goods receipt response.');
+    }
+    return {
+      success: true,
+      receipt: result.receipt,
+      purchaseOrder: result.purchaseOrder,
+      duplicate: Boolean(result.duplicate),
+    };
+  }
+
 }
