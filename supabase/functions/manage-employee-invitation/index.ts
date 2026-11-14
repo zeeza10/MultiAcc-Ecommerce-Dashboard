@@ -41,11 +41,11 @@ Deno.serve(async (request: Request) => {
 
   const { data: invite, error: inviteError } = await admin
     .from("user_invitations")
-    .select("id,email,role_id,expires_at,accepted_at,revoked_at,sent_at")
+    .select("id,email,role_id,expires_at,accepted_at,revoked_at,sent_at,created_at")
     .eq("id", body.invitationId)
     .eq("organization_id", body.organizationId)
     .maybeSingle();
-  if (inviteError || !invite || invite.email.toLowerCase() !== body.email.toLowerCase() || invite.accepted_at || invite.revoked_at || invite.sent_at || new Date(invite.expires_at).getTime() <= Date.now()) {
+  if (inviteError || !invite || invite.email.toLowerCase() !== body.email.toLowerCase() || invite.accepted_at || invite.revoked_at || invite.sent_at || new Date(invite.expires_at).getTime() <= Date.now() || new Date(invite.created_at).getTime() < Date.now() - 5 * 60 * 1000) {
     return Response.json({ error: "Invitation is invalid or expired" }, { status: 400, headers: cors });
   }
 
