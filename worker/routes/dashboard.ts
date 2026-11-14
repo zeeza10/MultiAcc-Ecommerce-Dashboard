@@ -13,6 +13,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     else if (period === 'YTD') start.setMonth(0, 1);
     else start.setDate(start.getDate() - 30);
 
+    const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
+
     let ordersQuery = auth.repositoryContext.supabase
       .from('orders')
       .select('id,status,total_minor,currency,created_at,marketplace_account_id')
@@ -23,11 +25,15 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
 
     const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult] = await Promise.all([
       ordersQuery,
-      auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId),
-      new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
-        client3plId: auth.user.clientId,
-        onlyClientProducts: auth.user.role === 'CLIENT_USER',
-      }),
+      canViewInventory
+        ? auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId)
+        : Promise.resolve({ data: [], error: null }),
+      canViewInventory
+        ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
+            client3plId: auth.user.clientId,
+            onlyClientProducts: auth.user.role === 'CLIENT_USER',
+          })
+        : Promise.resolve([]),
       auth.permissions.has('*') || auth.permissions.has('finance.view')
         ? auth.repositoryContext.supabase.from('invoices').select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date').eq('organization_id', auth.organizationId)
         : Promise.resolve({ data: [], error: null }),
@@ -111,15 +117,18 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
   if (path === '/dashboard/charts' && request.method === 'GET') {
     const since = new Date();
     since.setDate(since.getDate() - 6);
+    const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
     const [ordersResult, balances] = await Promise.all([
       auth.repositoryContext.supabase.from('orders')
         .select('id,status,total_minor,currency,created_at')
         .eq('organization_id', auth.organizationId)
         .gte('created_at', since.toISOString()),
-      new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
-        client3plId: auth.user.clientId,
-        onlyClientProducts: auth.user.role === 'CLIENT_USER',
-      }),
+      canViewInventory
+        ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
+            client3plId: auth.user.clientId,
+            onlyClientProducts: auth.user.role === 'CLIENT_USER',
+          })
+        : Promise.resolve([]),
     ]);
     if (ordersResult.error) throw new Error('Dashboard chart records could not be loaded.');
     const days = Array.from({ length: 7 }, (_, index) => {
@@ -150,7 +159,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       acc.quarantined = (acc.quarantined || 0) + Number(row.quarantined || 0);
       return acc;
     }, {});
-    return json({ trend, statusCounts, stockByState, topSkus: [] });
+    return json({ trend, statusCounts, stockByState, topSkus: [], inventoryAvailable: canViewInventory });
   }
 
 
