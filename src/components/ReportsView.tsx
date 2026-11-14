@@ -61,13 +61,19 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
-  const exportCurrentReport = () => {
+  const exportCurrentReport = async () => {
     if (!reportData) return;
-    const url = `/api/v1/reports/${selectedReportId}?format=csv`;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedReportId}_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    try {
+      const blob = await api.exportReport(selectedReportId);
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `${selectedReportId}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err: any) {
+      alert(err.message || 'Report export failed.');
+    }
   };
 
   return (
