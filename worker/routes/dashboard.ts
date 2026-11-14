@@ -51,6 +51,80 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error) {
       throw new Error('Dashboard source records could not be loaded.');
     }
+    let products = productsResult.data || [];
+    let balances: any[] = inventoryBalances || [];
+    let invoices = invoiceResult.data || [];
+    let expenses = expenseResult.data || [];
+
+    if (storeScoped) {
+      const { data: store, error: storeError } = await auth.repositoryContext.supabase
+        .from('marketplace_accounts').select('id').eq('organization_id', auth.organizationId).eq('id', accountId).maybeSingle();
+      if (storeError) throw storeError;
+      if (!store) return json({ error: 'Marketplace store was not found in this organization.' }, 404);
+
+      const [inventoryAllocationsResult, financeAllocationsResult] = await Promise.all([
+        canViewInventory
+          ? auth.repositoryContext.supabase.from('marketplace_inventory_allocations')
+              .select('product_id,allocated_quantity,reserved_quantity')
+              .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+          : Promise.resolve({ data: [], error: null }),
+        auth.permissions.has('*') || auth.permissions.has('finance.view')
+          ? auth.repositoryContext.supabase.from('marketplace_finance_allocations')
+              .select('source_type,source_id,amount_minor,currency')
+              .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (inventoryAllocationsResult.error || financeAllocationsResult.error) {
+        throw new Error('Store inventory or finance allocations could not be loaded.');
+      }
+
+      const allocatedRows = inventoryAllocationsResult.data || [];
+      const productIds = [...new Set(allocatedRows.map(row => row.product_id))];
+      const productResult = productIds.length
+        ? await auth.repositoryContext.supabase.from('products')
+            .select('id,currency,low_stock_threshold,cost_price_minor')
+            .eq('organization_id', auth.organizationId).in('id', productIds)
+        : { data: [], error: null };
+      if (productResult.error) throw productResult.error;
+      products = productResult.data || [];
+      const productByIdForAllocation = new Map(products.map(row => [row.id, row]));
+      balances = allocatedRows.map(row => ({
+        productId: row.product_id,
+        onHand: Number(row.allocated_quantity || 0),
+        reserved: Number(row.reserved_quantity || 0),
+        available: Math.max(0, Number(row.allocated_quantity || 0) - Number(row.reserved_quantity || 0)),
+        incoming: 0, damaged: 0, quarantined: 0, missing: 0, totalStock: Number(row.allocated_quantity || 0),
+        weightedAverageCostMinor: Number(productByIdForAllocation.get(row.product_id)?.cost_price_minor || 0),
+      }));
+
+      const financeAllocations = financeAllocationsResult.data || [];
+      const invoiceIds = [...new Set(financeAllocations.filter(row => row.source_type === 'INVOICE').map(row => row.source_id))];
+      const expenseIds = [...new Set(financeAllocations.filter(row => row.source_type === 'EXPENSE').map(row => row.source_id))];
+      const [storeInvoices, storeExpenses] = await Promise.all([
+        invoiceIds.length
+          ? auth.repositoryContext.supabase.from('invoices')
+              .select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date,id')
+              .eq('organization_id', auth.organizationId).in('id', invoiceIds)
+          : Promise.resolve({ data: [], error: null }),
+        expenseIds.length
+          ? auth.repositoryContext.supabase.from('expenses')
+              .select('amount_minor,currency,status,id')
+              .eq('organization_id', auth.organizationId).in('id', expenseIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (storeInvoices.error || storeExpenses.error) throw new Error('Store finance source records could not be loaded.');
+      const invoiceAllocations = new Map(financeAllocations.filter(row => row.source_type === 'INVOICE').map(row => [row.source_id, Number(row.amount_minor)]));
+      invoices = (storeInvoices.data || []).map(row => ({
+        ...row,
+        total_minor: Math.min(Number(row.total_minor || 0), invoiceAllocations.get(row.id) || 0),
+        paid_amount_minor: Math.min(Number(row.paid_amount_minor || 0), invoiceAllocations.get(row.id) || 0),
+      }));
+      const expenseAllocations = new Map(financeAllocations.filter(row => row.source_type === 'EXPENSE').map(row => [row.source_id, Number(row.amount_minor)]));
+      expenses = (storeExpenses.data || []).map(row => ({
+        ...row, amount_minor: Math.min(Number(row.amount_minor || 0), expenseAllocations.get(row.id) || 0),
+      }));
+    }
+
     const orders = ordersResult.data || [];
     const activeOrders = orders.filter(row => !['CANCELLED', 'VOID', 'REFUNDED'].includes(String(row.status).toUpperCase()));
     const pendingOrders = orders.filter(row => ['NEW', 'PENDING', 'CONFIRMED', 'ALLOCATED', 'PICKED', 'PACKED'].includes(String(row.status).toUpperCase()));
@@ -60,7 +134,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       currencies.set(currency, (currencies.get(currency) || 0) + 1);
     }
     const productCurrencyCounts = new Map();
-    for (const product of productsResult.data || []) {
+    for (const product of products) {
       const productCurrency = String(product.currency || 'GBP').trim();
       productCurrencyCounts.set(productCurrency, (productCurrencyCounts.get(productCurrency) || 0) + 1);
     }
@@ -69,18 +143,17 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       || 'GBP';
     const revenueMinor = activeOrders.filter(row => String(row.currency || 'GBP').trim() === currency)
       .reduce((sum, row) => sum + Number(row.total_minor || 0), 0);
-    const productById = new Map((productsResult.data || []).map(product => [product.id, product]));
-    const lowStockItems = (inventoryBalances || []).filter(balance =>
+    const productById = new Map(products.map(product => [product.id, product]));
+    const lowStockItems = balances.filter(balance =>
       Number(balance.available || 0) <= Number(productById.get(balance.productId)?.low_stock_threshold || 0)
     ).length;
-    const totalStockUnits = (inventoryBalances || []).reduce((sum, balance) => sum + Number(balance.onHand || 0), 0);
+    const totalStockUnits = balances.reduce((sum, balance) => sum + Number(balance.onHand || 0), 0);
     const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => {
       const product = productById.get(balance.productId);
       if (String(product?.currency || 'GBP').trim() !== currency) return sum;
       return sum + Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0);
     }, 0);
-    const invoices = invoiceResult.data || [];
-    const expenses = expenseResult.data || [];
+    
     const outstandingForCurrency = (row: any) =>
       String(row.currency || '').trim() === currency
       && !['PAID', 'VOID', 'DRAFT'].includes(String(row.status).toUpperCase())
