@@ -27,9 +27,11 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('GET', '/3pl/clients'), 'fulfilment.view');
   });
 
-  it('does not accidentally grant permission to unsupported routes or methods', () => {
-    assert.equal(permissionByRoute('POST', '/finance/invoices/invoice-id/void'), undefined);
-    assert.equal(permissionByRoute('GET', '/system/config'), undefined);
+  it('allows only explicitly supported routes and methods', () => {
+    assert.equal(permissionByRoute('POST', '/finance/invoices/invoice-id/void'), 'finance.manage');
+    assert.equal(permissionByRoute('POST', '/finance/payments'), 'finance.manage');
+    assert.equal(permissionByRoute('GET', '/system/config'), null);
+    assert.equal(permissionByRoute('POST', '/system/config'), 'settings.manage');
     assert.equal(permissionByRoute('DELETE', '/products'), undefined);
     assert.equal(permissionByRoute('GET', '/unknown'), undefined);
   });
