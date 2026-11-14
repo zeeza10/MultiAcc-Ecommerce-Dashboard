@@ -25,3 +25,5 @@ jobs:
         run: npm run lint
       - name: Production build
         run: npm run build
+
+# Lockfile is intentionally omitted until regenerated against the current dependency manifest.
