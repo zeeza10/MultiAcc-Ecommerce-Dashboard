@@ -18,12 +18,14 @@ import { Invoice, Payment, Expense, FinancialLedgerEntry, User, SystemConfig } f
 interface FinanceViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultTab?: 'INVOICES' | 'PAYMENTS' | 'EXPENSES' | 'LEDGER' | 'PROFIT';
 }
 
 export const FinanceView: React.FC<FinanceViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   defaultTab = 'INVOICES',
 }) => {
   const [activeTab, setActiveTab] = useState<'INVOICES' | 'PAYMENTS' | 'EXPENSES' | 'LEDGER' | 'PROFIT'>(defaultTab);
@@ -52,15 +54,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   useEffect(() => {
     loadFinanceData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadFinanceData = async () => {
     setLoading(true);
     try {
       const [invRes, payRes, expRes, ledRes, profRes] = await Promise.all([
-        api.getInvoices(), api.getPayments(),
-        isClientUser ? Promise.resolve({ expenses: [] }) : api.getExpenses(),
-        isClientUser ? Promise.resolve({ ledger: [] }) : api.getFinancialLedger(),
+        api.getInvoices(selectedStoreId), api.getPayments(selectedStoreId),
+        isClientUser ? Promise.resolve({ expenses: [] }) : api.getExpenses(selectedStoreId),
+        isClientUser ? Promise.resolve({ ledger: [] }) : api.getFinancialLedger(selectedStoreId),
         isClientUser ? Promise.resolve({ data: [] }) : api.getReport('R-13'),
       ]);
       setInvoices(invRes.invoices || []);
