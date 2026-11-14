@@ -48,6 +48,9 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [poRequestId, setPoRequestId] = useState('');
   const [savingPo, setSavingPo] = useState(false);
   const [approvingPoId, setApprovingPoId] = useState<string | null>(null);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -83,6 +86,30 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       console.error('Failed to load buying & returns data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateSupplier = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingSupplier(true);
+    try {
+      await api.createSupplier({
+        name: supplierForm.name,
+        code: supplierForm.code,
+        contactName: supplierForm.contactName || undefined,
+        email: supplierForm.email || undefined,
+        phone: supplierForm.phone || undefined,
+        paymentTermsDays: Number.parseInt(supplierForm.paymentTermsDays, 10) || 0,
+        currency: supplierForm.currency,
+        leadTimeDays: Number.parseInt(supplierForm.leadTimeDays, 10) || 0,
+      });
+      setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
+      setShowSupplierForm(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Supplier creation failed');
+    } finally {
+      setSavingSupplier(false);
     }
   };
 
