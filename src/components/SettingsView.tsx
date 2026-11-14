@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Layers,
   Cloud,
+  RotateCcw,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, SystemConfig } from '../types';
