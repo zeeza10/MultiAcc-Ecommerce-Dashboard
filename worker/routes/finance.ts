@@ -96,7 +96,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       id: row.id, invoiceNumber: row.invoice_number, type: row.invoice_type, recipientType: row.recipient_type,
       recipientId: row.recipient_id || '', recipientName: row.recipient_name, issueDate: row.issue_date, dueDate: row.due_date,
       subtotalMinor: Number(row.subtotal_minor), vatRatePercent: Number(row.vat_rate_percent), vatAmountMinor: Number(row.vat_amount_minor),
-      totalMinor: Number(row.total_minor), paidAmountMinor: Number(row.paid_amount_minor), status: row.status,
+      totalMinor: Number(row.total_minor), paidAmountMinor: Number(row.paid_amount_minor), currency: String(row.currency || 'GBP').trim(), status: row.status,
       lines: linesByInvoice.get(row.id) || [], voidReason: row.void_reason || undefined,
       isImmutable: Boolean(row.is_immutable), createdAt: row.created_at,
     })) });
@@ -182,7 +182,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     if (error) throw error;
     return json({ expenses: (data || []).map(row => ({
       id: row.id, expenseNumber: row.expense_number, category: row.category, supplierName: row.supplier_name || '',
-      date: row.expense_date, amountMinor: Number(row.amount_minor), vatMinor: Number(row.vat_minor),
+      date: row.expense_date, amountMinor: Number(row.amount_minor), vatMinor: Number(row.vat_minor), currency: String(row.currency || 'GBP').trim(),
       allocatedTo: row.allocated_to || undefined, status: row.status, approvedBy: row.approved_by || undefined, note: row.note || undefined,
     })) });
   }
