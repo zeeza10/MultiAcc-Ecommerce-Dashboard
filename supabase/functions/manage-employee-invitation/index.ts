@@ -64,6 +64,14 @@ Deno.serve(async (request: Request) => {
   }
 
   if (existing) {
+    const { data: currentMembership, error: currentMembershipError } = await admin
+      .from("organization_members")
+      .select("id,is_active")
+      .eq("organization_id", body.organizationId)
+      .eq("user_id", existing.id)
+      .maybeSingle();
+    if (currentMembershipError) return Response.json({ error: "Existing organization membership could not be checked" }, { status: 502, headers: cors });
+    if (currentMembership) return Response.json({ error: currentMembership.is_active ? "This employee is already a member of this organization." : "This employee is suspended. Reactivate the existing membership instead of sending another invitation." }, { status: 409, headers: cors });
     if (!existing.email_confirmed_at) return Response.json({ error: "An account with this email exists but is not verified. Ask the user to verify it before retrying." }, { status: 409, headers: cors });
     const { error: memberError } = await admin.from("organization_members").upsert({
       organization_id: body.organizationId,
