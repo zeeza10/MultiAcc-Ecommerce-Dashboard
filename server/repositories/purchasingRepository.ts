@@ -223,4 +223,32 @@ export class SupabasePurchasingRepository {
     };
   }
 
+  async createPurchaseOrder(
+    payload: Record<string, unknown>,
+    idempotencyKey: string,
+  ): Promise<PurchaseOrder> {
+    const { data, error } = await this.context.supabase.rpc('create_workspace_purchase_order', {
+      p_organization_id: this.context.organizationId,
+      p_order: payload,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid purchase order response.');
+    const result = data as { success?: boolean; purchaseOrder?: PurchaseOrder };
+    if (!result.success || !result.purchaseOrder) throw new Error('The database returned an incomplete purchase order response.');
+    return result.purchaseOrder;
+  }
+
+  async approvePurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrder> {
+    const { data, error } = await this.context.supabase.rpc('approve_workspace_purchase_order', {
+      p_organization_id: this.context.organizationId,
+      p_purchase_order_id: purchaseOrderId,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid purchase order approval response.');
+    const result = data as { success?: boolean; purchaseOrder?: PurchaseOrder };
+    if (!result.success || !result.purchaseOrder) throw new Error('The database returned an incomplete purchase order approval response.');
+    return result.purchaseOrder;
+  }
+
 }
