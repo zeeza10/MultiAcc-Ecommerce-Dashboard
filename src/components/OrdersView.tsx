@@ -725,6 +725,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           order={selectedOrder}
           products={products}
           currentUser={currentUser}
+          config={config}
           onClose={() => setShowEditModal(false)}
           onSuccess={(updated) => {
             setSelectedOrder(updated);
