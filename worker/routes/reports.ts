@@ -98,10 +98,22 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=[...invoices.map((x:any)=>({type:'Receivable',reference:x.invoice_number,party:x.recipient_name,balance:money(Math.max(0,Number(x.total_minor)-Number(x.paid_amount_minor||0))),dueDate:x.due_date||'—',status:x.status})),...pos.map((x:any)=>({type:'Purchase commitment',reference:x.po_number,party:x.supplier_id,balance:money(x.total_minor),dueDate:x.expected_date||'—',status:x.status}))];
   report=result(id,{receivables:invoices.length,payables:pos.length},['Type','Reference','Party','Balance','Due Date','Status'],data);
  }else if(id==='R-13'){
-  const [orders,items,products,expenses]=await Promise.all([rows(auth,'orders','id,order_number,total_minor,currency,shipping_cost_minor,created_at','created_at',url),rows(auth,'order_items','order_id,product_id,quantity'),rows(auth,'products','id,cost_price_minor,sku'),rows(auth,'expenses','category,amount_minor,expense_date','expense_date',url)]);
+  let [orders,items,products,expenses]=await Promise.all([rows(auth,'orders','id,order_number,total_minor,currency,shipping_cost_minor,created_at,marketplace_account_id','created_at',url),rows(auth,'order_items','order_id,product_id,quantity'),rows(auth,'products','id,cost_price_minor,sku'),rows(auth,'expenses','id,category,amount_minor,expense_date','expense_date',url)]);
+  let allocatedExpenseTotal=0;
+  if(accountId&&accountId!=='ALL'){
+   orders=orders.filter((o:any)=>o.marketplace_account_id===accountId);
+   const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_finance_allocations')
+    .select('source_id,amount_minor').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId).eq('source_type','EXPENSE');
+   if(error)throw new Error('Store expense allocations could not be loaded.');
+   const amountById=new Map((allocations||[]).map((a:any)=>[a.source_id,Number(a.amount_minor)]));
+   expenses=expenses.filter((e:any)=>amountById.has(e.id));
+   allocatedExpenseTotal=expenses.reduce((s:number,e:any)=>s+Math.min(Number(e.amount_minor||0),amountById.get(e.id)||0),0);
+  }else{
+   allocatedExpenseTotal=expenses.reduce((s:number,e:any)=>s+Number(e.amount_minor||0),0);
+  }
   const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=orders.map((o:any)=>{const lines=items.filter((x:any)=>x.order_id===o.id);const cogs=lines.reduce((s:number,l:any)=>s+Number(l.quantity||0)*Number(pmap.get(l.product_id)?.cost_price_minor||0),0);const shipping=Number(o.shipping_cost_minor||0);const fees=0;return {order:o.order_number,revenue:money(o.total_minor,o.currency||'GBP'),cogs:money(cogs,o.currency||'GBP'),fees:money(fees,o.currency||'GBP'),shipping:money(shipping,o.currency||'GBP'),grossProfit:money(Number(o.total_minor)-cogs-fees-shipping,o.currency||'GBP')};});
-  report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(expenses.reduce((s:number,x:any)=>s+Number(x.amount_minor||0),0))},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
+  report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(allocatedExpenseTotal)},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
  }else if(id==='R-14'){
   const [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at')]);
   const data=accounts.map((a:any)=>{const own=lines.filter((x:any)=>x.account_id===a.id);return {account:a.account_code+' '+a.account_name,debits:money(own.reduce((s:number,x:any)=>s+Number(x.debit_minor||0),0)),credits:money(own.reduce((s:number,x:any)=>s+Number(x.credit_minor||0),0))};});
