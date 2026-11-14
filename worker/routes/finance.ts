@@ -158,6 +158,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/expenses' && request.method === 'GET') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace expense records are not available to client users.' }, 403);
     const { data, error } = await auth.repositoryContext.supabase
       .from('expenses')
       .select('id,expense_number,category,supplier_name,expense_date,amount_minor,vat_minor,currency,allocated_to,status,approved_by,note')
@@ -172,6 +173,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/ledger' && request.method === 'GET') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace general ledger is not available to client users.' }, 403);
     const { data: entries, error } = await auth.repositoryContext.supabase
       .from('journal_entries')
       .select('id,source_type,source_id,description,created_at,status')
