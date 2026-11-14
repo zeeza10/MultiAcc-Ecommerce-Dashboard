@@ -6,9 +6,9 @@ drop policy if exists stock_adjustments_permission_update on public.stock_adjust
 drop policy if exists stock_adjustments_permission_delete on public.stock_adjustments;
 drop policy if exists stock_ledger_permission_delete on public.stock_ledger;
 
-revoke insert, update, delete on table public.stock_adjustments from authenticated;
-revoke insert, update, delete on table public.stock_ledger from authenticated;
-revoke insert, update, delete on table public.audit_logs from authenticated;
+revoke insert, update, delete on table public.stock_adjustments from public, anon, authenticated;
+revoke insert, update, delete on table public.stock_ledger from public, anon, authenticated;
+revoke insert, update, delete on table public.audit_logs from public, anon, authenticated;
 grant select on table public.stock_adjustments, public.stock_ledger, public.audit_logs to authenticated;
 
 create or replace function private.submit_stock_adjustment(
