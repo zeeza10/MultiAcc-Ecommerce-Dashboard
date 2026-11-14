@@ -38,7 +38,7 @@ const DEFAULT_CONFIG: SystemConfig = {
 };
 
 export default function App() {
-  const { user: authenticatedUser, signOut, organizationName } = useAuth();
+  const { user: authenticatedUser, signOut, organizationName, permissions } = useAuth();
   const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
