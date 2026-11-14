@@ -48,6 +48,7 @@ export async function handleAccessRoute(
         invitationId,
         email,
         fullName,
+        redirectTo: new URL('/', request.url).toString(),
       }),
     });
 
