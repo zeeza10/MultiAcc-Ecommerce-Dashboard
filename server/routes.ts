@@ -893,7 +893,7 @@ apiRouter.post('/returns/:id/disposition', async (req: Request, res: Response) =
   } catch (error) {
     console.error('Transactional return disposition failed:', error);
     const message = error instanceof Error ? error.message : '';
-    const status = /authorized|authentication|membership|permission/i.test(message)
+    const status = /authorized|authentication|membership|permission|does not belong/i.test(message)
       ? 403
       : /not found/i.test(message)
         ? 404
