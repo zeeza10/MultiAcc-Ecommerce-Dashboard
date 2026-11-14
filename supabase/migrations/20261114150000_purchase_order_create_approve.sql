@@ -29,7 +29,9 @@ declare
   v_product_id uuid;
   v_seen_products uuid[] := '{}'::uuid[];
   v_quantity integer;
+  v_quantity_numeric numeric;
   v_unit_cost bigint;
+  v_unit_cost_numeric numeric;
   v_line_total numeric;
   v_subtotal numeric := 0;
   v_tax numeric := 0;
@@ -89,7 +91,7 @@ begin
   if v_supplier.id is null then
     raise exception 'Select a supplier for this purchase order.' using errcode = '22023';
   end if;
-  if v_tax < 0 or v_tax > 9223372036854775807::numeric then
+  if v_tax < 0 or v_tax <> trunc(v_tax) or v_tax > 9223372036854775807::numeric then
     raise exception 'Purchase order tax must be a non-negative supported amount.' using errcode = '22023';
   end if;
 
@@ -147,14 +149,23 @@ begin
       end if;
       begin
         v_product_id := (v_line->>'productId')::uuid;
-        v_quantity := (v_line->>'orderedQty')::integer;
-        v_unit_cost := (v_line->>'unitCostMinor')::bigint;
+        v_quantity_numeric := (v_line->>'orderedQty')::numeric;
+        v_unit_cost_numeric := (v_line->>'unitCostMinor')::numeric;
       exception when invalid_text_representation or numeric_value_out_of_range then
         raise exception 'Purchase order line contains an invalid product, quantity, or unit cost.' using errcode = '22023';
       end;
       if v_product_id is null then
         raise exception 'Every purchase order line must identify a product.' using errcode = '22023';
       end if;
+      if v_quantity_numeric is null or v_unit_cost_numeric is null
+         or v_quantity_numeric <> trunc(v_quantity_numeric)
+         or v_unit_cost_numeric <> trunc(v_unit_cost_numeric)
+         or v_quantity_numeric > 2147483647
+         or v_unit_cost_numeric > 9223372036854775807::numeric then
+        raise exception 'Purchase order quantity and unit cost must be whole minor-unit amounts.' using errcode = '22023';
+      end if;
+      v_quantity := v_quantity_numeric::integer;
+      v_unit_cost := v_unit_cost_numeric::bigint;
       if v_product_id = any(v_seen_products) then
         raise exception 'A product may appear only once in a purchase order. Combine duplicate lines.' using errcode = '22023';
       end if;
