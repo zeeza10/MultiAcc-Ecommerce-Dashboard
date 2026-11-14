@@ -2,6 +2,80 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleSystemRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+  if (path === '/system/config' && request.method === 'GET') {
+    const { data, error } = await auth.repositoryContext.supabase.from('system_settings')
+      .select('base_currency,business_timezone,default_vat_rate_percent,adjustment_approval_threshold_value_minor,adjustment_approval_threshold_quantity,active_release_phase,allow_negative_stock,auto_sync_enabled')
+      .eq('organization_id', auth.organizationId).maybeSingle();
+    if (error) throw new Error('Workspace settings could not be loaded.');
+    if (!data) return json({ error: 'Workspace settings have not been provisioned.' }, 404);
+    return json({ config: {
+      baseCurrency: data.base_currency, businessTimezone: data.business_timezone,
+      defaultVatRatePercent: Number(data.default_vat_rate_percent),
+      adjustmentApprovalThresholdValueMinor: Number(data.adjustment_approval_threshold_value_minor),
+      adjustmentApprovalThresholdQuantity: Number(data.adjustment_approval_threshold_quantity),
+      activeReleasePhase: data.active_release_phase,
+      allowNegativeStock: data.allow_negative_stock, autoSyncEnabled: data.auto_sync_enabled,
+    } });
+  }
+
+  if (path === '/system/config' && request.method === 'POST') {
+    const body = await request.json() as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+    if (body.baseCurrency !== undefined) {
+      const value = String(body.baseCurrency).toUpperCase();
+      if (!['GBP','USD','EUR'].includes(value)) throw new Error('Choose GBP, USD or EUR as the base currency.');
+      updates.base_currency = value;
+    }
+    if (body.businessTimezone !== undefined) {
+      const value = String(body.businessTimezone).trim();
+      if (!value || value.length > 100) throw new Error('Enter a valid business timezone.');
+      updates.business_timezone = value;
+    }
+    if (body.defaultVatRatePercent !== undefined) {
+      const value = Number(body.defaultVatRatePercent);
+      if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('VAT rate must be between 0 and 100.');
+      updates.default_vat_rate_percent = value;
+    }
+    if (body.adjustmentApprovalThresholdValueMinor !== undefined) {
+      const value = Number(body.adjustmentApprovalThresholdValueMinor);
+      if (!Number.isSafeInteger(value) || value < 0) throw new Error('Adjustment approval value threshold must be a non-negative amount in minor units.');
+      updates.adjustment_approval_threshold_value_minor = value;
+    }
+    if (body.adjustmentApprovalThresholdQuantity !== undefined) {
+      const value = Number(body.adjustmentApprovalThresholdQuantity);
+      if (!Number.isSafeInteger(value) || value < 0) throw new Error('Adjustment approval quantity threshold must be a non-negative whole number.');
+      updates.adjustment_approval_threshold_quantity = value;
+    }
+    if (body.activeReleasePhase !== undefined) {
+      const value = String(body.activeReleasePhase);
+      if (!['P1','P2','P3','P4','P5','ALL'].includes(value)) throw new Error('Choose a valid release phase.');
+      updates.active_release_phase = value;
+    }
+    if (body.allowNegativeStock !== undefined) {
+      if (typeof body.allowNegativeStock !== 'boolean') throw new Error('Allow negative stock must be true or false.');
+      updates.allow_negative_stock = body.allowNegativeStock;
+    }
+    if (body.autoSyncEnabled !== undefined) {
+      if (typeof body.autoSyncEnabled !== 'boolean') throw new Error('Automatic synchronization must be true or false.');
+      updates.auto_sync_enabled = body.autoSyncEnabled;
+    }
+    if (Object.keys(updates).length === 0) throw new Error('No valid workspace settings were supplied.');
+    updates.updated_at = new Date().toISOString();
+    const { data, error } = await auth.repositoryContext.supabase.from('system_settings')
+      .update(updates).eq('organization_id', auth.organizationId)
+      .select('base_currency,business_timezone,default_vat_rate_percent,adjustment_approval_threshold_value_minor,adjustment_approval_threshold_quantity,active_release_phase,allow_negative_stock,auto_sync_enabled')
+      .single();
+    if (error) throw new Error('Workspace settings could not be saved.');
+    return json({ config: {
+      baseCurrency: data.base_currency, businessTimezone: data.business_timezone,
+      defaultVatRatePercent: Number(data.default_vat_rate_percent),
+      adjustmentApprovalThresholdValueMinor: Number(data.adjustment_approval_threshold_value_minor),
+      adjustmentApprovalThresholdQuantity: Number(data.adjustment_approval_threshold_quantity),
+      activeReleasePhase: data.active_release_phase,
+      allowNegativeStock: data.allow_negative_stock, autoSyncEnabled: data.auto_sync_enabled,
+    } });
+  }
+
   if (path === '/audit-logs' && request.method === 'GET') {
     const { data, error } = await auth.repositoryContext.supabase.from('audit_logs')
       .select('id,actor_id,action,entity,entity_id,before_snapshot,after_snapshot,notes,created_at')
