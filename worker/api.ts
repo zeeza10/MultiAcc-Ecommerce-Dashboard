@@ -126,6 +126,9 @@ const permissionByRoute = (method: string, path: string): string | null | undefi
   if (method === 'POST' && path === '/orders') return 'orders.create';
   if (method === 'POST' && /^\\/orders\\/[^/]+\\/transition$/.test(path)) return 'orders.edit';
   if (method === 'GET' && path === '/suppliers') return 'purchasing.view';
+  if (method === 'POST' && path === '/suppliers') return 'purchasing.manage';
+  if (method === 'POST' && path === '/purchase-orders') return 'purchasing.manage';
+  if (method === 'POST' && /^\\/purchase-orders\\/[^/]+\\/(approve|receive)$/.test(path)) return 'purchasing.manage';
   if (method === 'GET' && path === '/purchase-orders') return 'purchasing.view';
   if (method === 'GET' && path === '/returns') return 'returns.view';
   if (method === 'POST' && /^\\/returns\\/[^/]+\\/disposition$/.test(path)) return 'returns.manage';
@@ -210,6 +213,50 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     if (path === '/suppliers' && request.method === 'GET') {
       const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers();
       return json({ suppliers });
+    }
+
+    if (path === '/suppliers' && request.method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      const supplier = await new SupabasePurchasingRepository(auth.repositoryContext).createSupplier({
+        name: String(body.name || ''),
+        code: String(body.code || ''),
+        contactName: typeof body.contactName === 'string' ? body.contactName : undefined,
+        email: typeof body.email === 'string' ? body.email : undefined,
+        phone: typeof body.phone === 'string' ? body.phone : undefined,
+        paymentTermsDays: Number(body.paymentTermsDays),
+        currency: String(body.currency || ''),
+        leadTimeDays: Number(body.leadTimeDays),
+      });
+      return json({ supplier }, 201);
+    }
+
+    if (path === '/purchase-orders' && request.method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      if (typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
+        return json({ error: 'An idempotency key is required to create a purchase order.' }, 400);
+      }
+      const purchaseOrder = await new SupabasePurchasingRepository(auth.repositoryContext).createPurchaseOrder(body, body.idempotencyKey);
+      return json({ purchaseOrder }, 201);
+    }
+
+    const purchaseOrderActionMatch = path.match(/^\\/purchase-orders\\/([^/]+)\\/(approve|receive)$/);
+    if (purchaseOrderActionMatch && request.method === 'POST') {
+      const repository = new SupabasePurchasingRepository(auth.repositoryContext);
+      if (purchaseOrderActionMatch[2] === 'approve') {
+        const purchaseOrder = await repository.approvePurchaseOrder(purchaseOrderActionMatch[1]);
+        return json({ purchaseOrder });
+      }
+      const body = await request.json() as Record<string, unknown>;
+      if (!Array.isArray(body.items) || typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
+        return json({ error: 'Receipt items and an idempotency key are required.' }, 400);
+      }
+      const result = await repository.receivePurchaseOrder(
+        purchaseOrderActionMatch[1],
+        body.items as Array<{ productId: string; receivedQty: number; damagedQty: number; locationId?: string }>,
+        typeof body.discrepancyNote === 'string' ? body.discrepancyNote : undefined,
+        body.idempotencyKey,
+      );
+      return json(result, 201);
     }
 
     if (path === '/purchase-orders' && request.method === 'GET') {
