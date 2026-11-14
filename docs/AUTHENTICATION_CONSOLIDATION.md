@@ -44,7 +44,7 @@ The existing Express API already verified Supabase bearer tokens using `auth.get
 - API middleware continues to validate the bearer token with Supabase Auth.
 - Membership is selected against the requested `X-Organization-Id` header. If no header is provided and the account belongs to more than one active organization, the API returns HTTP 409 rather than silently choosing an organization.
 - Role permission codes are loaded by the provider for permission-aware navigation and independently by the API using the caller's JWT; permission lookup therefore remains subject to the existing RLS policies.
-- Sidebar modules are filtered by the active workspace permission codes. This is a usability layer only; the server-side permission matrix remains authoritative.
+- Sidebar modules and top-level quick actions are filtered by active workspace permission codes. App initialization and global search avoid calling endpoints the current role cannot access. This is a usability layer only; the server-side permission matrix remains authoritative.
 - A route permission matrix now covers all 56 currently registered API routes. Unknown/unmapped routes fail closed.
 - CSV report exports require `reports.export`, not merely `reports.view`.
 - Super Admin receives the existing system-role wildcard; all other roles are checked against the database permission assignments.
