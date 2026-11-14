@@ -13,6 +13,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     else if (period === 'YTD') start.setMonth(0, 1);
     else start.setDate(start.getDate() - 30);
 
+    const storeScoped = Boolean(accountId && accountId !== 'ALL');
     const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
 
     let ordersQuery = auth.repositoryContext.supabase
@@ -26,23 +27,23 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const settingsQuery = auth.repositoryContext.supabase.from('system_settings').select('active_release_phase').eq('organization_id', auth.organizationId).maybeSingle();
     const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult] = await Promise.all([
       ordersQuery,
-      canViewInventory
+      canViewInventory && !storeScoped
         ? (() => {
             let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId);
             if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) query = query.eq('client_3pl_id', auth.user.clientId).eq('owner_type', 'CLIENT');
             return query;
           })()
         : Promise.resolve({ data: [], error: null }),
-      canViewInventory
+      canViewInventory && !storeScoped
         ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
             client3plId: auth.user.clientId,
             onlyClientProducts: auth.user.role === 'CLIENT_USER',
           })
         : Promise.resolve([]),
-      auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
+      !storeScoped && auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
         ? auth.repositoryContext.supabase.from('invoices').select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date').eq('organization_id', auth.organizationId)
         : Promise.resolve({ data: [], error: null }),
-      auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
+      !storeScoped && auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
         ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId)
         : Promise.resolve({ data: [], error: null }),
       settingsQuery,
@@ -105,13 +106,14 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       totalOrders: activeOrders.length,
       pendingOrders: pendingOrders.length,
       revenueMinor,
-      lowStockItems,
-      totalStockUnits,
-      inventoryValueMinor,
-      supplierPayablesMinor,
-      clientReceivablesMinor,
-      storageRevenueMinor,
-      outstandingPaymentsMinor,
+      lowStockItems: storeScoped ? null : lowStockItems,
+      totalStockUnits: storeScoped ? null : totalStockUnits,
+      inventoryValueMinor: storeScoped ? null : inventoryValueMinor,
+      supplierPayablesMinor: storeScoped ? null : supplierPayablesMinor,
+      clientReceivablesMinor: storeScoped ? null : clientReceivablesMinor,
+      storageRevenueMinor: storeScoped ? null : storageRevenueMinor,
+      outstandingPaymentsMinor: storeScoped ? null : outstandingPaymentsMinor,
+      storeScoped,
       currency,
       activePhase: settingsResult.data?.active_release_phase || 'ALL',
     }, userRole: auth.user.role, dataCoverage: {
@@ -123,17 +125,20 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
   if (path === '/dashboard/charts' && request.method === 'GET') {
     const since = new Date();
     since.setDate(since.getDate() - 6);
+    const accountId = url.searchParams.get('accountId');
+    const storeScoped = Boolean(accountId && accountId !== 'ALL');
     const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
     let chartOrdersQuery = auth.repositoryContext.supabase.from('orders')
       .select('id,status,total_minor,currency,created_at')
       .eq('organization_id', auth.organizationId)
       .gte('created_at', since.toISOString());
+    if (accountId && accountId !== 'ALL') chartOrdersQuery = chartOrdersQuery.eq('marketplace_account_id', accountId);
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) {
       chartOrdersQuery = chartOrdersQuery.eq('client_3pl_id', auth.user.clientId);
     }
     const [ordersResult, balances] = await Promise.all([
       chartOrdersQuery,
-      canViewInventory
+      canViewInventory && !storeScoped
         ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
             client3plId: auth.user.clientId,
             onlyClientProducts: auth.user.role === 'CLIENT_USER',
@@ -191,7 +196,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       acc.quarantined = (acc.quarantined || 0) + Number(row.quarantined || 0);
       return acc;
     }, {});
-    return json({ trend, statusCounts, stockByState, topSkus, inventoryAvailable: canViewInventory });
+    return json({ trend, statusCounts, stockByState: storeScoped ? null : stockByState, topSkus, inventoryAvailable: canViewInventory && !storeScoped, storeScoped });
   }
 
 
