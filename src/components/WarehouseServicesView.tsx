@@ -21,6 +21,7 @@ import {
   WarehousePackagingJob,
   WarehouseShippingJob,
   Client3PL,
+  RateCard,
   User,
 } from '../types';
 import { api } from '../services/api';
@@ -79,7 +80,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         api.getWarehouseServicesSummary(), api.getPackagingJobs(), api.getShippingJobs(), api.get3PLClients(),
         api.getStorageSnapshots(), api.getProducts(), api.getBalances(), api.getStockLedger(), api.getInvoices(), api.getConfig(),
       ]);
-      setSummary(sumRes);
+      setSummary(sumRes.summary || sumRes);
       setPackagingJobs(pkgRes.packagingJobs || []);
       setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
@@ -106,10 +107,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const totalReserved = balances.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
   const totalDamaged = balances.reduce((sum, row) => sum + Number(row.damaged || 0), 0);
   const clientStorageRows = storageSnapshots.map(snapshot => {
-    const client = clients.find(item => item.id === snapshot.client3plId);
-    const clientBalances = balances.filter(item => item.ownerId === snapshot.client3plId);
-    const clientProducts = products.filter(item => item.ownerType === 'CLIENT' && item.ownerId === snapshot.client3plId);
-    const locations = [...new Set(stockLedger.filter(item => item.ownerId === snapshot.client3plId && item.locationCode).map(item => item.locationCode))];
+    const client = clients.find(item => item.id === snapshot.clientId);
+    const clientBalances = balances.filter(item => item.ownerId === snapshot.clientId);
+    const clientProducts = products.filter(item => item.ownerType === 'CLIENT' && item.ownerId === snapshot.clientId);
+    const locations = [...new Set(stockLedger.filter(item => item.ownerId === snapshot.clientId && item.locationCode).map(item => item.locationCode))];
     return {
       id: snapshot.id, clientName: client?.companyName || 'Unknown client', code: client?.code || '—',
       skuCount: clientProducts.length, skus: clientProducts.map(item => item.sku).join(', ') || '—',
@@ -122,7 +123,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     };
   });
   const clientBillingRows = clients.map(client => {
-    const storage = storageSnapshots.filter(item => item.client3plId === client.id).reduce((sum, item) => sum + Number(item.estimatedCostMinor || 0), 0);
+    const storage = storageSnapshots.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.estimatedCostMinor || 0), 0);
     const packaging = packagingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
     const shipping = shippingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
     const clientInvoices = invoices.filter(item => item.recipientId === client.id);
@@ -234,11 +235,11 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            {formatMoney(summary?.storage?.totalStorageChargesMinor ?? 0)}
+            {formatMoney(summary?.storageEstimatedCostMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>{summary?.storage?.activeClients ?? clients.filter(client => client.accountStatus === 'ACTIVE').length} Active 3PL Clients Stored</span>
+            <span>{clients.filter(client => client.accountStatus === 'ACTIVE').length} Active 3PL Clients Stored</span>
           </div>
         </div>
 
@@ -250,10 +251,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            {formatMoney(summary?.packaging?.totalPackagingChargesMinor ?? 0)}
+            {formatMoney(summary?.packagingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 mt-2">
-            <span>{summary?.packaging?.totalUnitsPacked ?? 0} units packaged & wrapped</span>
+            <span>{packagingJobs.reduce((sum, job) => sum + Number(job.quantity || 0), 0)} units packaged & wrapped</span>
           </div>
         </div>
 
@@ -265,7 +266,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            {formatMoney(summary?.shipping?.totalShippingChargesMinor ?? 0)}
+            {formatMoney(summary?.shippingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 mt-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -281,10 +282,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
-            {formatMoney(summary?.billing?.outstandingBalanceMinor ?? 0)}
+            {formatMoney(invoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.totalMinor || 0) - Number(invoice.paidAmountMinor || 0)), 0))}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
-            <span>Paid: {formatMoney(summary?.billing?.paidAmountMinor ?? 0)}</span>
+            <span>Paid: {formatMoney(invoices.reduce((sum, invoice) => sum + Number(invoice.paidAmountMinor || 0), 0))}</span>
           </div>
         </div>
       </div>
