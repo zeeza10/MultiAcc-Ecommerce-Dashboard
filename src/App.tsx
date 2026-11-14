@@ -21,7 +21,7 @@ import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
-import { useAuth } from './auth/AuthGate';
+import { useAuth } from './context/AuthContext';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
