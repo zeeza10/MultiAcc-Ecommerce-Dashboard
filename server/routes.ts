@@ -237,6 +237,184 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
  * These handlers run before the legacy demo-data safety gate below.
  */
 /**
+ * PRODUCTS — first organization-scoped PostgreSQL persistence slice.
+ * Registered before the legacy demo-data gate so only this migrated domain
+ * can use real tenant data while unported demo-backed routes remain disabled.
+ */
+apiRouter.get('/products', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const context = getRepositoryContext(req);
+    const repository = new SupabaseProductRepository(context);
+    const isClientUser = user.role === 'CLIENT_USER';
+    const products = await repository.listForOrganization({
+      client3plId: user.clientId,
+      onlyClientProducts: isClientUser,
+    });
+
+    const balances = new Map<string, { onHand: number; reserved: number; incoming: number; damaged: number }>();
+    if (context.permissions.has('inventory.view') && products.length > 0) {
+      const ledgerRows = await repository.listStockLedgerQuantities(
+        products.map(product => product.id),
+        isClientUser ? user.clientId : undefined,
+      );
+      for (const row of ledgerRows) {
+        const balance = balances.get(row.product_id) || { onHand: 0, reserved: 0, incoming: 0, damaged: 0 };
+        switch (row.stock_state) {
+          case 'ON_HAND': balance.onHand += Number(row.quantity_delta); break;
+          case 'RESERVED': balance.reserved += Number(row.quantity_delta); break;
+          case 'INCOMING': balance.incoming += Number(row.quantity_delta); break;
+          case 'DAMAGED': balance.damaged += Number(row.quantity_delta); break;
+        }
+        balances.set(row.product_id, balance);
+      }
+    }
+
+    const enhanced = products.map(product => {
+      const balance = balances.get(product.id) || { onHand: 0, reserved: 0, incoming: 0, damaged: 0 };
+      return {
+        ...product,
+        ...(user.role === 'WAREHOUSE_STAFF' ? { costPriceMinor: 0, sellingPriceMinor: 0 } : {}),
+        stockOnHand: balance.onHand,
+        stockReserved: balance.reserved,
+        stockAvailable: Math.max(0, balance.onHand - balance.reserved),
+        stockIncoming: balance.incoming,
+        stockDamaged: balance.damaged,
+      };
+    });
+
+    res.json({ products: enhanced });
+  } catch (error) {
+    console.error('PostgreSQL product listing failed:', error);
+    res.status(500).json({ error: 'Products could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.post('/products', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const context = getRepositoryContext(req);
+    if (user.role === 'WAREHOUSE_STAFF' || user.role === 'VIEWER') {
+      res.status(403).json({ error: 'Not authorized to create products.' });
+      return;
+    }
+
+    const body = req.body || {};
+    const sku = typeof body.sku === 'string' ? body.sku.trim().toUpperCase() : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!sku || !name) {
+      res.status(400).json({ error: 'SKU and Name are required.' });
+      return;
+    }
+    if (sku.length > 120 || name.length > 255) {
+      res.status(400).json({ error: 'SKU must be at most 120 characters and Name at most 255 characters.' });
+      return;
+    }
+
+    const parseNonNegativeInteger = (value: unknown, fallback: number): number | null => {
+      if (value === undefined || value === null || value === '') return fallback;
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+    };
+    const costPriceMinor = parseNonNegativeInteger(body.costPriceMinor, 0);
+    const sellingPriceMinor = parseNonNegativeInteger(body.sellingPriceMinor, 0);
+    const lowStockThreshold = parseNonNegativeInteger(body.lowStockThreshold, 10);
+    const reorderLevel = parseNonNegativeInteger(body.reorderLevel, 30);
+    if ([costPriceMinor, sellingPriceMinor, lowStockThreshold, reorderLevel].some(value => value === null)) {
+      res.status(400).json({ error: 'Prices and stock thresholds must be non-negative whole numbers.' });
+      return;
+    }
+
+    const ownerType = body.ownerType === undefined ? 'OPERATOR' : body.ownerType;
+    if (ownerType !== 'OPERATOR' && ownerType !== 'CLIENT') {
+      res.status(400).json({ error: 'Owner type must be OPERATOR or CLIENT.' });
+      return;
+    }
+    const ownerId = typeof body.ownerId === 'string' ? body.ownerId : undefined;
+
+    const parseDimension = (value: unknown): number | null => {
+      if (value === undefined || value === null || value === '') return 0;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+    };
+    const dimensions = body.dimensions && typeof body.dimensions === 'object'
+      ? {
+          lengthCm: parseDimension(body.dimensions.lengthCm),
+          widthCm: parseDimension(body.dimensions.widthCm),
+          heightCm: parseDimension(body.dimensions.heightCm),
+        }
+      : undefined;
+    if (dimensions && Object.values(dimensions).some(value => value === null)) {
+      res.status(400).json({ error: 'Product dimensions must be valid non-negative numbers.' });
+      return;
+    }
+
+    const weightKg = body.weightKg === undefined || body.weightKg === null || body.weightKg === ''
+      ? undefined
+      : Number(body.weightKg);
+    if (weightKg !== undefined && (!Number.isFinite(weightKg) || weightKg < 0)) {
+      res.status(400).json({ error: 'Product weight must be a valid non-negative number.' });
+      return;
+    }
+
+    const repository = new SupabaseProductRepository(context);
+    const product = await repository.createForOrganization({
+      sku,
+      name,
+      barcode: typeof body.barcode === 'string' ? body.barcode : undefined,
+      dimensions: dimensions ? {
+        lengthCm: dimensions.lengthCm!,
+        widthCm: dimensions.widthCm!,
+        heightCm: dimensions.heightCm!,
+      } : undefined,
+      weightKg,
+      costPriceMinor: costPriceMinor!,
+      sellingPriceMinor: sellingPriceMinor!,
+      lowStockThreshold: lowStockThreshold!,
+      reorderLevel: reorderLevel!,
+      category: typeof body.category === 'string' ? body.category : 'General',
+      ownerType,
+      ownerId,
+    });
+
+    res.status(201).json({
+      product: {
+        ...product,
+        stockOnHand: 0,
+        stockReserved: 0,
+        stockAvailable: 0,
+        stockIncoming: 0,
+        stockDamaged: 0,
+      },
+    });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+    if (code === '23505') {
+      res.status(409).json({ error: 'A product with this SKU already exists in this workspace.' });
+      return;
+    }
+    if (error instanceof Error && error.message.includes('3PL client')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('PostgreSQL product creation failed:', error);
+    res.status(500).json({ error: 'Product could not be saved to the workspace database.' });
+  }
+});
+
+/**
+ * Legacy demo-backed routes remain blocked outside explicit local demo mode.
+ * Migrated PostgreSQL routes above finish their response before this middleware.
+ */
+apiRouter.use((req: Request, res: Response, next: NextFunction) => {
+  if (process.env.NEXUS_DEMO_MODE !== 'true') {
+    res.status(503).json({ error: 'Business data storage is not yet connected to the organization-scoped database. Demo records are disabled in production.' });
+    return;
+  }
+  next();
+});
+
+/**
  * INVENTORY & STOCK LEDGER
  */
 apiRouter.get('/inventory/balances', (req: Request, res: Response) => {
