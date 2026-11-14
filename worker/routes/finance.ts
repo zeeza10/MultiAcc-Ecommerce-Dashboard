@@ -195,7 +195,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
 
   if (path === '/finance/expenses' && request.method === 'GET') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace expense records are not available to client users.' }, 403);
-    const { data, error } = await auth.repositoryContext.supabase
+    let query = auth.repositoryContext.supabase
       .from('expenses')
       .select('id,expense_number,category,supplier_name,expense_date,amount_minor,vat_minor,currency,allocated_to,status,approved_by,note')
       .eq('organization_id', auth.organizationId)
@@ -210,6 +210,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       if (ids.length) query = query.in('id', ids);
       else query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
     }
+    const { data, error } = await query;
     if (error) throw error;
     return json({ expenses: (data || []).map(row => ({
       id: row.id, expenseNumber: row.expense_number, category: row.category, supplierName: row.supplier_name || '',
@@ -220,7 +221,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
 
   if (path === '/finance/ledger' && request.method === 'GET') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace general ledger is not available to client users.' }, 403);
-    const { data: entries, error } = await auth.repositoryContext.supabase
+    let query = auth.repositoryContext.supabase
       .from('journal_entries')
       .select('id,source_type,source_id,description,created_at,status')
       .eq('organization_id', auth.organizationId)
@@ -236,6 +237,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       if (ids.length) query = query.in('id', ids);
       else query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
     }
+    const { data: entries, error } = await query;
     if (error) throw error;
     const entryIds = (entries || []).map(row => row.id);
     const { data: lines, error: lineError } = entryIds.length
