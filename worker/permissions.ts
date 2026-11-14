@@ -19,6 +19,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/orders') return 'orders.view';
   if (method === 'GET' && /^\/orders\/[^/]+$/.test(path)) return 'orders.view';
   if (method === 'POST' && path === '/orders') return 'orders.create';
+  if (method === 'PUT' && /^\\/orders\\/[^/]+$/.test(path)) return 'orders.edit';
   if (method === 'POST' && /^\/orders\/[^/]+\/transition$/.test(path)) return 'orders.edit';
   if (method === 'GET' && path === '/suppliers') return 'purchasing.view';
   if (method === 'POST' && path === '/suppliers') return 'purchasing.manage';
