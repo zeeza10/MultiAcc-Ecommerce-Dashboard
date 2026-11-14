@@ -26,7 +26,11 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult] = await Promise.all([
       ordersQuery,
       canViewInventory
-        ? auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId)
+        ? (() => {
+            let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId);
+            if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) query = query.eq('client_3pl_id', auth.user.clientId).eq('owner_type', 'CLIENT');
+            return query;
+          })()
         : Promise.resolve({ data: [], error: null }),
       canViewInventory
         ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
@@ -118,11 +122,15 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const since = new Date();
     since.setDate(since.getDate() - 6);
     const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
+    let chartOrdersQuery = auth.repositoryContext.supabase.from('orders')
+      .select('id,status,total_minor,currency,created_at')
+      .eq('organization_id', auth.organizationId)
+      .gte('created_at', since.toISOString());
+    if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) {
+      chartOrdersQuery = chartOrdersQuery.eq('client_3pl_id', auth.user.clientId);
+    }
     const [ordersResult, balances] = await Promise.all([
-      auth.repositoryContext.supabase.from('orders')
-        .select('id,status,total_minor,currency,created_at')
-        .eq('organization_id', auth.organizationId)
-        .gte('created_at', since.toISOString()),
+      chartOrdersQuery,
       canViewInventory
         ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
             client3plId: auth.user.clientId,
@@ -150,6 +158,28 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     });
     const statusCounts: Record<string, number> = {};
     for (const row of ordersResult.data || []) statusCounts[String(row.status)] = (statusCounts[String(row.status)] || 0) + 1;
+    const currencyOrderIds = (ordersResult.data || [])
+      .filter(row => String(row.currency || 'GBP').trim() === chartCurrency)
+      .map(row => row.id);
+    const itemResult = currencyOrderIds.length
+      ? await auth.repositoryContext.supabase.from('order_items')
+          .select('sku,product_name,quantity,total_price_minor')
+          .eq('organization_id', auth.organizationId)
+          .in('order_id', currencyOrderIds)
+      : { data: [], error: null };
+    if (itemResult.error) throw new Error('Dashboard top SKU records could not be loaded.');
+    const skuTotals = new Map<string, { sku: string; name: string; units: number; revenueMinor: number }>();
+    for (const item of itemResult.data || []) {
+      const sku = String(item.sku || '');
+      const current = skuTotals.get(sku) || { sku, name: String(item.product_name || sku), units: 0, revenueMinor: 0 };
+      current.units += Number(item.quantity || 0);
+      current.revenueMinor += Number(item.total_price_minor || 0);
+      skuTotals.set(sku, current);
+    }
+    const topSkus = [...skuTotals.values()]
+      .sort((a, b) => b.revenueMinor - a.revenueMinor)
+      .slice(0, 5)
+      .map(item => ({ sku: item.sku, name: item.name, units: item.units, revenue: item.revenueMinor / 100 }));
     const stockByState = (balances || []).reduce((acc: Record<string, number>, row: any) => {
       acc.available = (acc.available || 0) + Number(row.available || 0);
       acc.reserved = (acc.reserved || 0) + Number(row.reserved || 0);
@@ -159,7 +189,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       acc.quarantined = (acc.quarantined || 0) + Number(row.quarantined || 0);
       return acc;
     }, {});
-    return json({ trend, statusCounts, stockByState, topSkus: [], inventoryAvailable: canViewInventory });
+    return json({ trend, statusCounts, stockByState, topSkus, inventoryAvailable: canViewInventory });
   }
 
 
