@@ -145,6 +145,8 @@ begin
     'discrepancyNote', coalesce(p_discrepancy_note, '')
   )::text);
 
+  perform pg_advisory_xact_lock(hashtext(p_organization_id::text), hashtext(btrim(p_idempotency_key)));
+
   -- A retried request with the same key returns its original result and cannot
   -- post stock or accounting a second time.
   select * into v_receipt
@@ -153,6 +155,7 @@ begin
     and idempotency_key = btrim(p_idempotency_key)
   limit 1;
   if found then
+    v_existing_hash := v_receipt.request_hash;
     if v_receipt.request_hash is distinct from v_request_hash then
       raise exception 'This receipt request ID was already used with different contents.' using errcode = '22023';
     end if;
