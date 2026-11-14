@@ -66,7 +66,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
   const membership = memberships[0] as any;
   const relation = membership.roles;
   const roleCode = Array.isArray(relation) ? relation[0]?.code : relation?.code;
-  if (!validRoles.has(roleCode)) return json({ error: 'Your workspace role is not valid.' }, 403);
+  if (!validRoles.has(roleCode) && !roleCode.startsWith('CUSTOM_')) return json({ error: 'Your workspace role is not valid.' }, 403);
   if (roleCode === 'CLIENT_USER' && !membership.client_3pl_id) {
     return json({ error: 'Your client account is not linked to this workspace. Contact your workspace administrator.' }, 403);
   }
