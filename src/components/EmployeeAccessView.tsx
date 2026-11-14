@@ -100,7 +100,6 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const selectedMember = access.members.find(member => member.user_id === selectedMemberId) || null;
-  const selectedMemberRole = selectedMember ? access.roles.find(role => role.id === selectedMember.role_id) : null;
   const openMemberPermissions = (member: Member) => {
     const defaults = access.roles.find(role => role.id === member.role_id)?.permissions || [];
     const overrides = member.permission_overrides || [];
