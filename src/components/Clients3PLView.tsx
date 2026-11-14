@@ -36,7 +36,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [billingPreview, setBillingPreview] = useState<any>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string>('client_apex');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState('');
 
