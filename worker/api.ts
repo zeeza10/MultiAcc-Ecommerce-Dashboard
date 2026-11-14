@@ -4,14 +4,11 @@ import { handleMarketplaceRoute } from './routes/marketplace';
 import { handleSystemRoute } from './routes/system';
 import { handleFulfilmentRoute } from './routes/fulfilment';
 import { handleFinanceRoute } from './routes/finance';
+import { handleOrderPurchasingRoute } from './routes/orders-purchasing';
+import { handleReturnRoute } from './routes/returns';
+import { handleInventoryRoute } from './routes/inventory';
 import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
-import { SupabaseProductRepository } from '../server/repositories/productRepository';
-import { SupabaseInventoryRepository } from '../server/repositories/inventoryRepository';
-import { SupabaseOrderRepository } from '../server/repositories/orderRepository';
-import { SupabasePurchasingRepository } from '../server/repositories/purchasingRepository';
-import { SupabaseReturnRepository } from '../server/repositories/returnRepository';
-import { SupabaseWarehouseRepository } from '../server/repositories/warehouseRepository';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -169,255 +166,18 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   }
 
   try {
-    if (path === '/orders' && request.method === 'GET') {
-      const repository = new SupabaseOrderRepository(auth.repositoryContext);
-      const isClientUser = auth.user.role === 'CLIENT_USER';
-      const orders = await repository.listOrders({
-        status: url.searchParams.get('status') || undefined,
-        accountId: url.searchParams.get('accountId') || undefined,
-        search: url.searchParams.get('search') || undefined,
-        client3plId: auth.user.clientId,
-        onlyClientOrders: isClientUser,
-      });
-      return json({ orders });
-    }
-
-    const orderDetailMatch = path.match(/^\/orders\/([^/]+)$/);
-    if (orderDetailMatch && request.method === 'GET') {
-      const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderDetailMatch[1], {
-        client3plId: auth.user.clientId,
-        onlyClientOrders: auth.user.role === 'CLIENT_USER',
-      });
-      return result ? json(result) : json({ error: 'Order not found in this workspace.' }, 404);
-    }
-
-    if (path === '/orders' && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace orders.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      const order = await new SupabaseOrderRepository(auth.repositoryContext).createOrder(body);
-      return json({ order }, 201);
-    }
-
-    const orderTransitionMatch = path.match(/^\/orders\/([^/]+)\/transition$/);
-    if (orderTransitionMatch && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot transition workspace orders.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      if (typeof body.targetStatus !== 'string' || !body.targetStatus.trim()) {
-        return json({ error: 'A target order status is required.' }, 400);
-      }
-      const order = await new SupabaseOrderRepository(auth.repositoryContext).transitionOrder(
-        orderTransitionMatch[1],
-        body.targetStatus as any,
-        {
-          carrier: typeof body.carrier === 'string' ? body.carrier : undefined,
-          trackingNumber: typeof body.trackingNumber === 'string' ? body.trackingNumber : undefined,
-          note: typeof body.note === 'string' ? body.note : undefined,
-        },
-      );
-      return json({ order });
-    }
-
-    if (path === '/suppliers' && request.method === 'GET') {
-      const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers();
-      return json({ suppliers });
-    }
-
-    if (path === '/suppliers' && request.method === 'POST') {
-      const body = await request.json() as Record<string, unknown>;
-      const supplier = await new SupabasePurchasingRepository(auth.repositoryContext).createSupplier({
-        name: String(body.name || ''),
-        code: String(body.code || ''),
-        contactName: typeof body.contactName === 'string' ? body.contactName : undefined,
-        email: typeof body.email === 'string' ? body.email : undefined,
-        phone: typeof body.phone === 'string' ? body.phone : undefined,
-        paymentTermsDays: Number(body.paymentTermsDays),
-        currency: String(body.currency || ''),
-        leadTimeDays: Number(body.leadTimeDays),
-      });
-      return json({ supplier }, 201);
-    }
-
-    if (path === '/purchase-orders' && request.method === 'POST') {
-      const body = await request.json() as Record<string, unknown>;
-      if (typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
-        return json({ error: 'An idempotency key is required to create a purchase order.' }, 400);
-      }
-      const purchaseOrder = await new SupabasePurchasingRepository(auth.repositoryContext).createPurchaseOrder(body, body.idempotencyKey);
-      return json({ purchaseOrder }, 201);
-    }
-
-    const purchaseOrderActionMatch = path.match(/^\/purchase-orders\/([^/]+)\/(approve|receive)$/);
-    if (purchaseOrderActionMatch && request.method === 'POST') {
-      const repository = new SupabasePurchasingRepository(auth.repositoryContext);
-      if (purchaseOrderActionMatch[2] === 'approve') {
-        const purchaseOrder = await repository.approvePurchaseOrder(purchaseOrderActionMatch[1]);
-        return json({ purchaseOrder });
-      }
-      const body = await request.json() as Record<string, unknown>;
-      if (!Array.isArray(body.items) || typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
-        return json({ error: 'Receipt items and an idempotency key are required.' }, 400);
-      }
-      const result = await repository.receivePurchaseOrder(
-        purchaseOrderActionMatch[1],
-        body.items as Array<{ productId: string; receivedQty: number; damagedQty: number; locationId?: string }>,
-        typeof body.discrepancyNote === 'string' ? body.discrepancyNote : undefined,
-        body.idempotencyKey,
-      );
-      return json(result, 201);
-    }
-
-    if (path === '/purchase-orders' && request.method === 'GET') {
-      const repository = new SupabasePurchasingRepository(auth.repositoryContext);
-      const [purchaseOrders, receipts] = await Promise.all([
-        repository.listPurchaseOrders(),
-        repository.listGoodsReceipts(),
-      ]);
-      return json({ purchaseOrders, receipts });
-    }
-
-    if (path === '/returns' && request.method === 'GET') {
-      const returns = await new SupabaseReturnRepository(auth.repositoryContext).listReturns();
-      return json({ returns });
-    }
-
-    const returnDispositionMatch = path.match(/^\/returns\/([^/]+)\/disposition$/);
-    if (returnDispositionMatch && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot process workspace returns.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      if (!Array.isArray(body.dispositions) || typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
-        return json({ error: 'Return dispositions and an idempotency key are required.' }, 400);
-      }
-      const result = await new SupabaseReturnRepository(auth.repositoryContext).processDisposition(
-        returnDispositionMatch[1],
-        body.dispositions as Array<{ lineId: string; disposition: string; quantity: number }>,
-        Boolean(body.issueRefund),
-        body.idempotencyKey,
-      );
-      return json(result);
-    }
+    const orderPurchasingResponse = await handleOrderPurchasingRoute(path, request, url, auth);
+    if (orderPurchasingResponse) return orderPurchasingResponse;
+    const returnResponse = await handleReturnRoute(path, request, auth);
+    if (returnResponse) return returnResponse;
 
     const fulfilmentResponse = await handleFulfilmentRoute(path, request, auth);
     if (fulfilmentResponse) return fulfilmentResponse;
     const financeResponse = await handleFinanceRoute(path, request, url, auth);
     if (financeResponse) return financeResponse;
 
-    if (path === '/warehouses' && request.method === 'GET') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot view the workspace-wide warehouse layout.' }, 403);
-      const layout = await new SupabaseWarehouseRepository(auth.repositoryContext).getLayout();
-      return json(layout);
-    }
-
-    if (path === '/warehouses' && request.method === 'POST') {
-      const body = await request.json() as Record<string, unknown>;
-      const warehouse = await new SupabaseWarehouseRepository(auth.repositoryContext).createWarehouse({
-        name: String(body.name || ''),
-        code: String(body.code || ''),
-        address: typeof body.address === 'string' ? body.address : undefined,
-      });
-      return json({ warehouse }, 201);
-    }
-
-    const locationCreateMatch = path.match(/^\/warehouses\/([^/]+)\/locations$/);
-    if (locationCreateMatch && request.method === 'POST') {
-      const body = await request.json() as Record<string, unknown>;
-      const location = await new SupabaseWarehouseRepository(auth.repositoryContext).createLocation({
-        warehouseId: locationCreateMatch[1],
-        locationCode: String(body.locationCode || ''),
-        locationType: String(body.locationType || ''),
-        zone: typeof body.zone === 'string' ? body.zone : undefined,
-        aisle: typeof body.aisle === 'string' ? body.aisle : undefined,
-        shelf: typeof body.shelf === 'string' ? body.shelf : undefined,
-        bin: typeof body.bin === 'string' ? body.bin : undefined,
-        capacityUnits: body.capacityUnits == null ? undefined : Number(body.capacityUnits),
-      });
-      return json({ location }, 201);
-    }
-
-    if (path === '/products' && request.method === 'GET') {
-      const repository = new SupabaseProductRepository(auth.repositoryContext);
-      const isClientUser = auth.user.role === 'CLIENT_USER';
-      const products = await repository.listForOrganization({
-        client3plId: auth.user.clientId,
-        onlyClientProducts: isClientUser,
-      });
-      const balances = await new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
-        client3plId: auth.user.clientId,
-        onlyClientProducts: isClientUser,
-      });
-      const balanceByProduct = new Map(balances.map(balance => [balance.productId, balance]));
-      return json({ products: products.map(product => {
-        const balance = balanceByProduct.get(product.id);
-        return {
-          ...product,
-          stockOnHand: balance?.onHand || 0,
-          stockReserved: balance?.reserved || 0,
-          stockAvailable: balance?.available || 0,
-          stockIncoming: balance?.incoming || 0,
-          stockDamaged: balance?.damaged || 0,
-        };
-      }) });
-    }
-
-    if (path === '/products' && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace products.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      const repository = new SupabaseProductRepository(auth.repositoryContext);
-      const product = await repository.createForOrganization({
-        sku: String(body.sku || ''),
-        name: String(body.name || ''),
-        barcode: typeof body.barcode === 'string' ? body.barcode : undefined,
-        dimensions: body.dimensions as any,
-        weightKg: body.weightKg == null ? undefined : Number(body.weightKg),
-        costPriceMinor: Number(body.costPriceMinor || 0),
-        sellingPriceMinor: Number(body.sellingPriceMinor || 0),
-        lowStockThreshold: Number(body.lowStockThreshold || 0),
-        reorderLevel: Number(body.reorderLevel || 0),
-        category: String(body.category || 'General'),
-        ownerType: (body.ownerType === 'CLIENT' ? 'CLIENT' : 'OPERATOR') as any,
-        ownerId: typeof body.ownerId === 'string' ? body.ownerId : undefined,
-      });
-      return json({ product }, 201);
-    }
-
-    const inventory = new SupabaseInventoryRepository(auth.repositoryContext);
-    const isClientUser = auth.user.role === 'CLIENT_USER';
-    const options = { client3plId: auth.user.clientId, onlyClientProducts: isClientUser };
-
-    if (path === '/inventory/balances' && request.method === 'GET') {
-      return json({ balances: await inventory.listBalances(options) });
-    }
-    if (path === '/inventory/ledger' && request.method === 'GET') {
-      return json({ ledger: await inventory.listLedger(options) });
-    }
-    if (path === '/stock/adjustments' && request.method === 'GET') {
-      return json({ adjustments: await inventory.listAdjustments(options) });
-    }
-    if (path === '/stock/adjustments' && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot adjust workspace inventory.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      const adjustment = await inventory.createAdjustment({
-        productId: String(body.productId || ''),
-        locationId: typeof body.locationId === 'string' ? body.locationId : undefined,
-        quantityDelta: Number(body.quantityDelta),
-        targetState: String(body.targetState || 'ON_HAND') as any,
-        reasonCode: String(body.reasonCode || 'count_correction') as any,
-        note: String(body.note || ''),
-      });
-      return json({ adjustment }, 201);
-    }
-    const decisionMatch = path.match(/^\/stock\/adjustments\/([^/]+)\/decision$/);
-    if (decisionMatch && request.method === 'POST') {
-      if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot approve inventory adjustments.' }, 403);
-      const body = await request.json() as Record<string, unknown>;
-      const decision = body.decision;
-      if (decision !== 'APPROVE' && decision !== 'REJECT') return json({ error: 'A valid adjustment decision is required.' }, 400);
-      const adjustment = await inventory.decideAdjustment(
-        decisionMatch[1],
-        decision,
-        typeof body.approvalNote === 'string' ? body.approvalNote : '',
-      );
-      return json({ adjustment });
-    }
+    const inventoryResponse = await handleInventoryRoute(path, request, auth);
+    if (inventoryResponse) return inventoryResponse;
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const expected = /required|must |invalid|unsupported|between|too long|not found|inactive|authorized|amount|select|decision|stock|adjustment/i.test(message);
