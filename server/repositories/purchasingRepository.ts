@@ -29,7 +29,7 @@ type ReceiptItemRow = {
 
 const PAGE_SIZE = 500;
 
-async function readAll<T>(load: (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
+async function readAll<T>(load: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
   const rows: T[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await load(offset, offset + PAGE_SIZE - 1);
