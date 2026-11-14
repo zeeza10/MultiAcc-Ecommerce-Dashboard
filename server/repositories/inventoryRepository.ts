@@ -110,13 +110,13 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     const products = await this.products.listForOrganization(options);
     if (products.length === 0) return [];
 
-    const productById = new Map<string, Product>(products.map(product => [product.id, product]));
+    const productById = new Map<string, Product>(products.map(product => [product.id, product] as const));
     const productIds = products.map(product => product.id);
     const [ledgerRows, locationRows] = await Promise.all([
       this.readLedgerRows(productIds, options.onlyClientProducts ? options.client3plId : undefined),
       this.readLocations(),
     ]);
-    const locationById = new Map(locationRows.map(location => [location.id, location.location_code]));
+    const locationById = new Map(locationRows.map(location => [location.id, location.location_code] as const));
 
     return ledgerRows.map(row => {
       const product = productById.get(row.product_id);
@@ -149,20 +149,25 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     const rows: StockAdjustmentRow[] = [];
     const productIds = products.map(product => product.id);
 
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data, error } = await this.context.supabase
-        .from('stock_adjustments')
-        .select('id,adjustment_number,product_id,location_id,quantity_delta,target_state,reason_code,note,requested_by,requires_approval,status,approved_by,approval_note,evaluated_value_minor,created_at,updated_at')
-        .eq('organization_id', this.context.organizationId)
-        .in('product_id', productIds)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
-      if (error) throw error;
-      const page = (data || []) as unknown as StockAdjustmentRow[];
-      rows.push(...page);
-      if (page.length < PAGE_SIZE) break;
+    const productIdChunkSize = 100;
+    for (let start = 0; start < productIds.length; start += productIdChunkSize) {
+      const productIdChunk = productIds.slice(start, start + productIdChunkSize);
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const { data, error } = await this.context.supabase
+          .from('stock_adjustments')
+          .select('id,adjustment_number,product_id,location_id,quantity_delta,target_state,reason_code,note,requested_by,requires_approval,status,approved_by,approval_note,evaluated_value_minor,created_at,updated_at')
+          .eq('organization_id', this.context.organizationId)
+          .in('product_id', productIdChunk)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (error) throw error;
+        const page = (data || []) as unknown as StockAdjustmentRow[];
+        rows.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
     }
 
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
     return rows.map(row => ({
       id: row.id,
       adjustmentNumber: row.adjustment_number,
