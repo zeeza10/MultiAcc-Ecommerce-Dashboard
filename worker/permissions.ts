@@ -32,6 +32,8 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/warehouse-services/summary') return 'fulfilment.view';
   if (method === 'GET' && path === '/warehouse-services/packaging') return 'fulfilment.view';
   if (method === 'GET' && path === '/warehouse-services/shipping') return 'fulfilment.view';
+  if (method === 'POST' && path === '/finance/payments') return 'finance.manage';
+  if (method === 'POST' && path.startsWith('/finance/invoices/') && path.endsWith('/void')) return 'finance.manage';
   if (method === 'GET' && path === '/finance/invoices') return 'finance.view';
   if (method === 'GET' && path === '/finance/payments') return 'finance.view';
   if (method === 'GET' && path === '/finance/expenses') return 'finance.view';
