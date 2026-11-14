@@ -139,10 +139,10 @@ export const api = {
       body: JSON.stringify({ items, discrepancyNote, idempotencyKey }),
     }),
   getReturns: () => request<{ returns: ReturnOrder[] }>('/returns'),
-  processReturnDisposition: (id: string, dispositions: any[], issueRefund = false) =>
-    request<{ success: boolean; return: ReturnOrder }>(`/returns/${id}/disposition`, {
+  processReturnDisposition: (id: string, dispositions: any[], issueRefund: boolean, idempotencyKey: string) =>
+    request<{ success: boolean; return: ReturnOrder; duplicate: boolean }>(`/returns/${id}/disposition`, {
       method: 'POST',
-      body: JSON.stringify({ dispositions, issueRefund }),
+      body: JSON.stringify({ dispositions, issueRefund, idempotencyKey }),
     }),
 
   // Phase 3: 3PL

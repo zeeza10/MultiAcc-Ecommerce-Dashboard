@@ -53,6 +53,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
+  const [returnRequestId, setReturnRequestId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -210,6 +211,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     });
     setReturnDispositions(initialDisp);
     setIssueRefund(true);
+    setReturnRequestId(window.crypto.randomUUID());
   };
 
   const handleConfirmDisposition = async () => {
@@ -221,9 +223,12 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       quantity: l.quantity,
     }));
 
+    const requestId = returnRequestId || window.crypto.randomUUID();
+    setReturnRequestId(requestId);
     try {
-      await api.processReturnDisposition(selectedReturn.id, disps, issueRefund);
+      await api.processReturnDisposition(selectedReturn.id, disps, issueRefund, requestId);
       setSelectedReturn(null);
+      setReturnRequestId('');
       loadData();
     } catch (err: any) {
       alert(err.message || 'Disposition recording failed');
@@ -601,12 +606,14 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <button
-                            onClick={() => openReturnModal(ret)}
-                            className="px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md transition"
-                          >
-                            Inspect & Dispose
-                          </button>
+                          {['OPEN', 'RECEIVED'].includes(ret.status) ? (
+                            <button
+                              onClick={() => openReturnModal(ret)}
+                              className="px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md transition"
+                            >
+                              Inspect & Dispose
+                            </button>
+                          ) : <span className="text-xs text-gray-400">Processed</span>}
                         </td>
                       </tr>
                     );
@@ -911,12 +918,13 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                     <label className="block text-gray-600 font-medium mb-1">Target Disposition Outcome</label>
                     <select
                       value={returnDispositions[line.id] || 'RESTOCK'}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setReturnDispositions({
                           ...returnDispositions,
                           [line.id]: e.target.value,
-                        })
-                      }
+                        });
+                        setReturnRequestId(window.crypto.randomUUID());
+                      }}
                       className="w-full border border-gray-300 rounded p-1.5 bg-white font-medium"
                     >
                       <option value="RESTOCK">Restock (Re-enter sellable On-Hand)</option>
@@ -932,7 +940,10 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                 <input
                   type="checkbox"
                   checked={issueRefund}
-                  onChange={(e) => setIssueRefund(e.target.checked)}
+                  onChange={(e) => {
+                    setIssueRefund(e.target.checked);
+                    setReturnRequestId(window.crypto.randomUUID());
+                  }}
                   className="rounded text-indigo-600"
                 />
                 <span>
