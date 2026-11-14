@@ -66,11 +66,9 @@ Deno.serve(async (request: Request) => {
 
   const { data: role, error: roleError } = await admin.from("roles").select("code").eq("id", invite.role_id).maybeSingle();
   if (roleError || !role) return Response.json({ error: "Assigned role could not be verified" }, { status: 400, headers: cors });
-  if (role.code === "SUPER_ADMIN") {
-    const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (assuranceError || assurance?.currentLevel !== "aal2") {
-      return Response.json({ error: "Complete multi-factor authentication before inviting a Super Admin." }, { status: 403, headers: cors });
-    }
+  const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (assuranceError || assurance?.currentLevel !== "aal2") {
+    return Response.json({ error: "Complete authenticator MFA before inviting an employee." }, { status: 403, headers: cors });
   }
 
   let existing = null;
