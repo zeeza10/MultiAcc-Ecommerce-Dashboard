@@ -53,6 +53,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
+  const [returnRequestId, setReturnRequestId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -210,6 +211,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     });
     setReturnDispositions(initialDisp);
     setIssueRefund(true);
+    setReturnRequestId(window.crypto.randomUUID());
   };
 
   const handleConfirmDisposition = async () => {
@@ -221,9 +223,12 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       quantity: l.quantity,
     }));
 
+    const requestId = returnRequestId || window.crypto.randomUUID();
+    setReturnRequestId(requestId);
     try {
-      await api.processReturnDisposition(selectedReturn.id, disps, issueRefund);
+      await api.processReturnDisposition(selectedReturn.id, disps, issueRefund, requestId);
       setSelectedReturn(null);
+      setReturnRequestId('');
       loadData();
     } catch (err: any) {
       alert(err.message || 'Disposition recording failed');
@@ -915,7 +920,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         setReturnDispositions({
                           ...returnDispositions,
                           [line.id]: e.target.value,
-                        })
+                        });
+                        setReturnRequestId(window.crypto.randomUUID());
                       }
                       className="w-full border border-gray-300 rounded p-1.5 bg-white font-medium"
                     >
@@ -932,7 +938,10 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                 <input
                   type="checkbox"
                   checked={issueRefund}
-                  onChange={(e) => setIssueRefund(e.target.checked)}
+                  onChange={(e) => {
+                    setIssueRefund(e.target.checked);
+                    setReturnRequestId(window.crypto.randomUUID());
+                  }}
                   className="rounded text-indigo-600"
                 />
                 <span>
