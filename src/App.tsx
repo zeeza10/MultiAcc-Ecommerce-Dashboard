@@ -21,8 +21,7 @@ import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { AuthScreen, OrganizationSetup, PasswordRecoveryScreen } from './components/AuthScreen';
+import { useAuth } from './auth/AuthGate';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
 import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
@@ -38,19 +37,9 @@ const DEFAULT_CONFIG: SystemConfig = {
   autoSyncEnabled: true,
 };
 
-function DashboardApp() {
-  const auth = useAuth();
-  const currentUser: User | null = auth.user && auth.activeMembership ? {
-    id: auth.user.id,
-    email: auth.user.email || '',
-    name: String(auth.user.user_metadata?.full_name || auth.user.email || 'User'),
-    role: (auth.activeMembership.roles?.code || 'VIEWER') as User['role'],
-    clientId: auth.activeMembership.client_3pl_id || undefined,
-    isActive: auth.activeMembership.is_active,
-    twoFactorEnabled: false,
-    failedLoginAttempts: 0,
-    createdAt: auth.user.email_confirmed_at || new Date().toISOString(),
-  } : null;
+export default function App() {
+  const { user: authenticatedUser, signOut, organizationName } = useAuth();
+  const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
@@ -68,9 +57,11 @@ function DashboardApp() {
   const [loading, setLoading] = useState(false);
 
 
+  useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
+
   useEffect(() => {
-    if (auth.user && auth.activeMembership) void initApp();
-  }, [auth.user?.id, auth.activeMembership?.id]);
+    initApp();
+  }, []);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
@@ -108,7 +99,6 @@ function DashboardApp() {
         api.getNotifications(),
         api.getExceptions(),
       ]);
-
       setConfig(cfgRes.config);
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
@@ -158,22 +148,13 @@ function DashboardApp() {
 
 
 
-  if (!auth.configured) {
-    return <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6"><div className="max-w-xl rounded-xl bg-white border border-amber-200 p-6 shadow"><h1 className="text-xl font-bold text-slate-900">Supabase configuration required</h1><p className="mt-3 text-sm text-slate-600">{auth.configError}</p><p className="mt-2 text-sm text-slate-600">Copy .env.example to .env.local, add the project's publishable key, then restart the development server.</p></div></div>;
-  }
-  if (auth.loading) return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading secure session…</div>;
-  if (auth.passwordRecovery) return <PasswordRecoveryScreen />;
-  if (!auth.user) return <AuthScreen />;
-  if (!auth.activeMembership) return <OrganizationSetup />;
-  if (!currentUser) return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading organization workspace…</div>;
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navigation */}
       <Navbar
         currentUser={currentUser}
-        onSignOut={() => void auth.signOutUser()}
-        organizationName={auth.activeMembership.organizations?.name || 'Workspace'}
+        organizationName={organizationName}
+        onSignOut={signOut}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
@@ -474,9 +455,4 @@ function DashboardApp() {
       />
     </div>
   );
-}
-
-
-export default function App() {
-  return <AuthProvider><DashboardApp /></AuthProvider>;
 }

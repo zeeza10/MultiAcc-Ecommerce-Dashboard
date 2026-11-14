@@ -1,5 +1,5 @@
 {
-  "name": "multiacc-ecommerce-dashboard",
+  "name": "react-example",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -24,7 +24,8 @@
     "vite": "^8.3.0",
     "express": "^4.21.2",
     "dotenv": "^17.2.3",
-    "motion": "^12.23.24"
+    "motion": "^12.23.24",
+    "@supabase/supabase-js": "2.102.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.68.0",
@@ -33,7 +34,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.25.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",

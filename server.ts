@@ -17,19 +17,17 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Mount health check endpoints for root and versioned routes
-  app.get(['/api/health', '/api/v1/health', '/health'], (_req, res) => {
+  // Mount health check endpoint
+  app.get('/api/health', (_req, res) => {
     res.json({
       success: true,
       message: 'MultiAcc Backend Worker is running',
       platform: 'Cloudflare Workers',
-      environment: 'development',
-      timestamp: new Date().toISOString(),
     });
   });
 
-  // Mount internal API routes (/api/v1 and /api)
-  app.use(['/api/v1', '/api'], apiRouter);
+  // Mount internal API routes
+  app.use('/api/v1', apiRouter);
 
   // Check both dist/client and dist root for compiled assets
   const clientPath = fs.existsSync(path.resolve(distPath, 'client', 'index.html'))

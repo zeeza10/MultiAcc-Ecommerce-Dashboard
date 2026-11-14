@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { createClient } from '@supabase/supabase-js';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -20,104 +21,104 @@ import {
 
 export const apiRouter = Router();
 
+type AuthenticatedRequest = Request & { nexusUser?: User; organizationId?: string };
+
 const getActiveUser = (req: Request): User => {
-  const context = (req as any).authContext as VerifiedAuthContext | undefined;
-  if (!context) throw new Error('Authenticated request context is missing.');
-  return context.user;
+  const user = (req as AuthenticatedRequest).nexusUser;
+  if (!user) throw new Error('Authenticated user context is missing.');
+  return user;
 };
 
-interface VerifiedAuthContext {
-  user: User;
-  organizationId: string;
-  accessToken: string;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Supabase server auth is not configured. Protected API requests will fail closed.');
 }
 
-// These are public Supabase project settings. Server secrets must never be placed here.
-const supabaseUrl = (process.env.SUPABASE_URL || 'https://nmlwnezlsqystjrvszcd.supabase.co').replace(/\/$/, '');
-const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI';
-
-apiRouter.use(async (req: Request, res: Response, next) => {
-  const authorization = req.header('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) {
-    res.status(401).json({ error: 'Authentication required.' });
-    return;
-  }
-  if (!supabaseUrl || !supabaseKey) {
-    res.status(503).json({ error: 'Supabase server environment is not configured.' });
-    return;
-  }
-
+const requireSupabaseUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
-    });
-    if (!userResponse.ok) {
-      res.status(401).json({ error: 'Invalid or expired Supabase session.' });
-      return;
-    }
-    const authUser = await userResponse.json() as { id: string; email?: string; created_at?: string; user_metadata?: Record<string, unknown> };
-    const requestedOrganization = req.header('x-organization-id');
-    const membershipUrl = new URL(`${supabaseUrl}/rest/v1/organization_members`);
-    membershipUrl.searchParams.set('select', 'organization_id,client_3pl_id,is_active,roles(code)');
-    membershipUrl.searchParams.set('user_id', `eq.${authUser.id}`);
-    membershipUrl.searchParams.set('is_active', 'eq.true');
-    membershipUrl.searchParams.set('limit', '1');
-    if (requestedOrganization) membershipUrl.searchParams.set('organization_id', `eq.${requestedOrganization}`);
-
-    const membershipResponse = await fetch(membershipUrl, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
-    });
-    if (!membershipResponse.ok) {
-      res.status(403).json({ error: 'Unable to verify organization membership.' });
-      return;
-    }
-    const memberships = await membershipResponse.json() as Array<{
-      organization_id: string;
-      client_3pl_id: string | null;
-      roles?: { code?: string } | null;
-    }>;
-    const membership = memberships[0];
-    if (!membership) {
-      res.status(403).json({ error: 'No active membership found for this organization.' });
+    const authorization = req.header('authorization') || '';
+    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    if (!token || !supabaseUrl || !supabaseKey) {
+      res.status(401).json({ error: 'A valid Supabase bearer token is required.' });
       return;
     }
 
-    const allowedRoles: UserRole[] = ['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER'];
-    const role = allowedRoles.includes(membership.roles?.code as UserRole) ? membership.roles!.code as UserRole : 'VIEWER';
-    const user: User = {
-      id: authUser.id,
-      email: authUser.email || '',
-      name: String(authUser.user_metadata?.full_name || authUser.email || 'User'),
-      role,
+    const userClient = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser(token);
+    if (authError || !authData.user) {
+      res.status(401).json({ error: 'Your session is invalid or expired. Please sign in again.' });
+      return;
+    }
+
+    const { data: profile, error: profileError } = await userClient
+      .from('profiles').select('id,full_name,is_active,two_factor_enabled,created_at')
+      .eq('id', authData.user.id).maybeSingle();
+    if (profileError || !profile || !profile.is_active) {
+      res.status(403).json({ error: 'Your account is inactive or its profile is unavailable.' });
+      return;
+    }
+
+    const { data: membership, error: membershipError } = await userClient
+      .from('organization_members')
+      .select('organization_id,client_3pl_id,roles(code)')
+      .eq('user_id', authData.user.id).eq('is_active', true).limit(1).maybeSingle();
+    if (membershipError || !membership) {
+      res.status(403).json({ error: 'You are not an active member of a workspace.' });
+      return;
+    }
+
+    const roleRelation = (membership as any).roles;
+    const roleCode = Array.isArray(roleRelation) ? roleRelation[0]?.code : roleRelation?.code;
+    const validRoles: UserRole[] = ['SUPER_ADMIN','OPS_MANAGER','WAREHOUSE_STAFF','FINANCE_USER','CLIENT_USER','VIEWER'];
+    if (!validRoles.includes(roleCode)) {
+      res.status(403).json({ error: 'Your workspace role is not valid.' });
+      return;
+    }
+
+    const request = req as AuthenticatedRequest;
+    request.organizationId = membership.organization_id;
+    request.nexusUser = {
+      id: authData.user.id,
+      email: authData.user.email || '',
+      name: profile.full_name || authData.user.email || 'User',
+      role: roleCode,
       clientId: membership.client_3pl_id || undefined,
       isActive: true,
-      twoFactorEnabled: false,
+      twoFactorEnabled: profile.two_factor_enabled,
       failedLoginAttempts: 0,
-      createdAt: authUser.created_at || new Date().toISOString(),
+      createdAt: profile.created_at,
     };
-    (req as any).authContext = { user, organizationId: membership.organization_id, accessToken: token } satisfies VerifiedAuthContext;
-
-    if (req.path === '/auth/me') {
-      next();
-      return;
-    }
-
-    // Legacy handlers still read an unscoped JSON file. Fail closed until each module is migrated to tenant-scoped Supabase queries.
-    res.status(503).json({ error: 'Business module is temporarily unavailable while its data layer is being migrated to organization-scoped Supabase tables. No demo data was returned.' });
+    next();
   } catch (error) {
-    console.error('Supabase authentication verification failed:', error);
-    res.status(503).json({ error: 'Could not verify the Supabase session.' });
+    console.error('Supabase authentication middleware failed:', error);
+    res.status(401).json({ error: 'Authentication could not be verified.' });
   }
-});
+};
+
+/**
+ * AUTHENTICATION
+ * All business routes below require a verified Supabase user and active workspace membership.
+ */
+apiRouter.use(requireSupabaseUser);
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
-  const context = (req as any).authContext as VerifiedAuthContext | undefined;
-  if (!context) {
-    res.status(401).json({ error: 'Authentication required.' });
+  res.json({ user: getActiveUser(req), organizationId: (req as AuthenticatedRequest).organizationId });
+});
+
+/**
+ * Production safety gate: this API still uses the legacy in-memory demo repository.
+ * Never serve shared demo records as production tenant data.
+ */
+apiRouter.use((req: Request, res: Response, next: NextFunction) => {
+  if (process.env.NEXUS_DEMO_MODE !== 'true') {
+    res.status(503).json({ error: 'Business data storage is not yet connected to the organization-scoped database. Demo records are disabled in production.' });
     return;
   }
-  res.json({ user: context.user, organizationId: context.organizationId });
+  next();
 });
 
 /**
@@ -236,7 +237,7 @@ apiRouter.get('/orders', (req: Request, res: Response) => {
 apiRouter.get('/orders/:id', (req: Request, res: Response) => {
   const user = getActiveUser(req);
   const raw = db.getRawData();
-  const order = raw.orders.find((o) => o.id === req.params.id || o.orderNumber === req.params.id);
+  const order = raw.orders.find((o) => o.id === req.params.id);
 
   if (!order) {
     res.status(404).json({ error: 'Order not found' });
