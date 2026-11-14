@@ -11,9 +11,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: production
@@ -27,3 +24,6 @@ updates:
       time: "04:30"
       timezone: "Asia/Karachi"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
