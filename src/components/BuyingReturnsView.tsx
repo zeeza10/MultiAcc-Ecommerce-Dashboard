@@ -570,7 +570,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                               [line.productId]: { ...input, damaged: parseInt(e.target.value, 10) || 0 },
                             });
                             setReceiptRequestId(window.crypto.randomUUID());
-                          }
+                          }}
                           className="w-full border border-gray-300 rounded p-1.5 font-bold text-rose-700"
                         />
                       </div>
