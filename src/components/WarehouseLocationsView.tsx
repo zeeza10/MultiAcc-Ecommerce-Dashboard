@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Warehouse, MapPin, Layers, CheckCircle, Search, Plus, X, RefreshCw } from 'lucide-react';
+import { Warehouse, MapPin, CheckCircle, Search, Plus, X, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { User, SystemConfig } from '../types';
 
