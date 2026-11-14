@@ -127,7 +127,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
 
     const ledger = await this.products.listStockLedgerQuantities(
       products.map(product => product.id),
-      options.onlyClientProducts ? options.client3plId : undefined,
+      this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined),
     );
     const balances = new Map<string, StockBalance>();
 
@@ -177,7 +177,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     const productById = new Map<string, Product>(products.map(product => [product.id, product] as const));
     const productIds = products.map(product => product.id);
     const [ledgerRows, locationRows] = await Promise.all([
-      this.readLedgerRows(productIds, options.onlyClientProducts ? options.client3plId : undefined),
+      this.readLedgerRows(productIds, this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined)),
       this.readLocations(),
     ]);
     const locationById = new Map(locationRows.map(location => [location.id, location.location_code] as const));
