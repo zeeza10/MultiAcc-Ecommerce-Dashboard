@@ -4,6 +4,7 @@
  * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
 import { handleApiRequest } from './api';
+import type { RateLimitBinding } from './types';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
 
@@ -14,6 +15,9 @@ export interface Env {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   ALLOWED_ORIGIN?: string;
+  API_READ_RATE_LIMITER?: RateLimitBinding;
+  API_WRITE_RATE_LIMITER?: RateLimitBinding;
+  INVITATION_RATE_LIMITER?: RateLimitBinding;
 }
 
 export interface ExecutionContext {
