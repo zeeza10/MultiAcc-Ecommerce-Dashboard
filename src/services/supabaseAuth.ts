@@ -28,6 +28,7 @@ export interface OrganizationMembership {
 // The Supabase URL and publishable key are public client configuration, not secrets.
 // Keep the project defaults here so AI Studio previews and static deployments work
 // even when Vite environment variables have not been injected at build time.
+const PRODUCTION_AUTH_REDIRECT_URL = 'https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/';
 const DEFAULT_SUPABASE_URL = 'https://nmlwnezlsqystjrvszcd.supabase.co';
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI';
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
@@ -119,7 +120,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signUp(email: string, password: string, fullName: string) {
-  const result = await authRequest<{ user: SupabaseAuthUser; session?: SupabaseSession | null }>(`signup?redirect_to=${encodeURIComponent(window.location.origin)}`, {
+  const result = await authRequest<{ user: SupabaseAuthUser; session?: SupabaseSession | null }>(`signup?redirect_to=${encodeURIComponent(PRODUCTION_AUTH_REDIRECT_URL)}`, {
     email: email.trim(),
     password,
     data: { full_name: fullName.trim() },
