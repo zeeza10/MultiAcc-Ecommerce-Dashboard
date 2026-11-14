@@ -2,6 +2,52 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
+  if (path === '/finance/payments' && request.method === 'POST') {
+    const body = await request.json() as Record<string, unknown>;
+    const amountMinor = Number(body.amountMinor);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) throw new Error('Payment amount must be a positive whole number of minor currency units.');
+    const { data, error } = await auth.repositoryContext.supabase.rpc('record_finance_payment', {
+      p_organization_id: auth.organizationId,
+      p_invoice_id: String(body.invoiceId || ''),
+      p_amount_minor: amountMinor,
+      p_payment_method: String(body.paymentMethod || ''),
+      p_payment_date: String(body.paymentDate || new Date().toISOString().slice(0, 10)),
+      p_reference: body.reference == null ? null : String(body.reference),
+      p_payer_name: body.payerName == null ? null : String(body.payerName),
+    });
+    if (error) throw new Error(error.message || 'Payment could not be recorded.');
+    const row = data as Record<string, any>;
+    return json({ payment: {
+      id: row.id, paymentNumber: row.payment_number, amountMinor: Number(row.amount_minor),
+      currency: String(row.currency || 'GBP').trim(), paymentMethod: row.payment_method,
+      paymentDate: row.payment_date, reference: row.reference || undefined,
+      payerName: row.payer_name || undefined, unallocatedCreditMinor: Number(row.unallocated_credit_minor || 0),
+      recordedBy: row.recorded_by || '', createdAt: row.created_at,
+    } }, 201);
+  }
+
+  const voidInvoiceMatch = path.match(/^\/finance\/invoices\/([^/]+)\/void$/);
+  if (voidInvoiceMatch && request.method === 'POST') {
+    const body = await request.json() as { reason?: string };
+    const { data, error } = await auth.repositoryContext.supabase.rpc('void_finance_invoice', {
+      p_organization_id: auth.organizationId,
+      p_invoice_id: voidInvoiceMatch[1],
+      p_reason: String(body.reason || ''),
+    });
+    if (error) throw new Error(error.message || 'Invoice could not be voided.');
+    const row = data as Record<string, any>;
+    return json({ success: true, invoice: {
+      id: row.id, invoiceNumber: row.invoice_number, invoiceType: row.invoice_type,
+      recipientType: row.recipient_type, recipientId: row.recipient_id || undefined,
+      recipientName: row.recipient_name, issueDate: row.issue_date, dueDate: row.due_date,
+      subtotalMinor: Number(row.subtotal_minor), vatRatePercent: Number(row.vat_rate_percent),
+      vatAmountMinor: Number(row.vat_amount_minor), totalMinor: Number(row.total_minor),
+      paidAmountMinor: Number(row.paid_amount_minor), currency: String(row.currency || 'GBP').trim(),
+      status: row.status, voidReason: row.void_reason || undefined,
+      isImmutable: Boolean(row.is_immutable), createdBy: row.created_by || '', createdAt: row.created_at,
+    } });
+  }
+
   const confirmPayoutMatch = path.match(/^\/payouts\/([^/]+)\/confirm-deposit$/);
   if (confirmPayoutMatch && request.method === 'POST') {
     const body = await request.json() as { bankReference?: string };
