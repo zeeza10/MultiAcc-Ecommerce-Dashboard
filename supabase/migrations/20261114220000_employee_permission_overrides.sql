@@ -15,6 +15,9 @@ create index if not exists member_permission_overrides_lookup_idx
   on public.organization_member_permission_overrides (organization_id,user_id);
 
 alter table public.organization_member_permission_overrides enable row level security;
+-- Supabase tightened default Data API exposure for newly-created public tables.
+-- Grant read access only; all writes are performed by the checked RPC below.
+grant select on public.organization_member_permission_overrides to authenticated;
 drop policy if exists member_permission_overrides_admin_select on public.organization_member_permission_overrides;
 create policy member_permission_overrides_admin_select
   on public.organization_member_permission_overrides for select to authenticated
@@ -37,8 +40,8 @@ create or replace function public.set_org_member_permission_overrides(
 ) returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
-as $$
+set search_path = ''
+as $
 declare
   v_actor uuid := auth.uid();
   v_before jsonb;
