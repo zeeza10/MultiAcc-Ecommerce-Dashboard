@@ -145,19 +145,31 @@ export class SupabasePurchasingRepository {
       const ids = receiptIds.slice(start, start + 100);
       items.push(...await readAll<ReceiptItemRow>((from, to) => this.context.supabase
         .from('goods_receipt_items')
-        .select('id,goods_receipt_id,product_id,location_id,received_qty,shortage_qty,damaged_qty,product:products(sku)')
+        .select('id,goods_receipt_id,product_id,location_id,received_qty,shortage_qty,damaged_qty')
         .eq('organization_id', this.context.organizationId)
         .in('goods_receipt_id', ids)
         .order('id', { ascending: true })
         .range(from, to)));
     }
+    const poIds = [...new Set(receipts.map(receipt => receipt.purchase_order_id))];
+    const poItems: Array<Pick<PurchaseOrderItemRow, 'purchase_order_id' | 'product_id' | 'sku'>> = [];
+    for (let start = 0; start < poIds.length; start += 100) {
+      const ids = poIds.slice(start, start + 100);
+      poItems.push(...await readAll((from, to) => this.context.supabase
+        .from('purchase_order_items')
+        .select('purchase_order_id,product_id,sku')
+        .eq('organization_id', this.context.organizationId)
+        .in('purchase_order_id', ids)
+        .range(from, to)));
+    }
+    const skuByPoProduct = new Map(poItems.map(item => [item.purchase_order_id + ':' + item.product_id, item.sku] as const));
     const orderNumberById = new Map(orders.map(order => [order.id, order.po_number] as const));
     const linesByReceipt = new Map<string, GoodsReceipt['lines']>();
     for (const item of items) {
       const lines = linesByReceipt.get(item.goods_receipt_id) || [];
       lines.push({
         productId: item.product_id,
-        sku: item.product?.sku || '',
+        sku: skuByPoProduct.get(receipts.find(receipt => receipt.id === item.goods_receipt_id)?.purchase_order_id + ':' + item.product_id) || '',
         receivedQty: Number(item.received_qty),
         shortageQty: Number(item.shortage_qty),
         damagedQty: Number(item.damaged_qty),
