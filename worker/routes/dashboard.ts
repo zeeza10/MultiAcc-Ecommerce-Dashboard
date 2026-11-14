@@ -219,6 +219,21 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
         : Promise.resolve([]),
     ]);
     if (ordersResult.error) throw new Error('Dashboard chart records could not be loaded.');
+    let chartBalances: any[] = balances || [];
+    if (storeScoped && canViewInventory) {
+      const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+        .from('marketplace_inventory_allocations')
+        .select('allocated_quantity,reserved_quantity')
+        .eq('organization_id', auth.organizationId)
+        .eq('marketplace_account_id', accountId);
+      if (allocationError) throw allocationError;
+      chartBalances = (allocations || []).map(row => ({
+        onHand: Number(row.allocated_quantity || 0),
+        reserved: Number(row.reserved_quantity || 0),
+        available: Math.max(0, Number(row.allocated_quantity || 0) - Number(row.reserved_quantity || 0)),
+        incoming: 0, damaged: 0, quarantined: 0,
+      }));
+    }
     const days = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(since);
       date.setDate(since.getDate() + index);
@@ -260,7 +275,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       .sort((a, b) => b.revenueMinor - a.revenueMinor)
       .slice(0, 5)
       .map(item => ({ sku: item.sku, name: item.name, units: item.units, revenue: item.revenueMinor / 100 }));
-    const stockByState = (balances || []).reduce((acc: Record<string, number>, row: any) => {
+    const stockByState = chartBalances.reduce((acc: Record<string, number>, row: any) => {
       acc.available = (acc.available || 0) + Number(row.available || 0);
       acc.reserved = (acc.reserved || 0) + Number(row.reserved || 0);
       acc.onHand = (acc.onHand || 0) + Number(row.onHand || 0);
@@ -269,7 +284,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       acc.quarantined = (acc.quarantined || 0) + Number(row.quarantined || 0);
       return acc;
     }, {});
-    return json({ trend, statusCounts, stockByState: storeScoped ? null : stockByState, topSkus, inventoryAvailable: canViewInventory && !storeScoped, storeScoped });
+    return json({ trend, statusCounts, stockByState: canViewInventory ? stockByState : null, topSkus, inventoryAvailable: canViewInventory, storeScoped });
   }
 
 
