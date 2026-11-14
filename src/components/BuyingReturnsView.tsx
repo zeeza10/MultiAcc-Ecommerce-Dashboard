@@ -627,7 +627,55 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
       {/* Tab: Suppliers */}
       {subTab === 'SUPPLIERS' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-sm text-gray-900">Suppliers Directory</h2>
+              <p className="text-xs text-gray-500">Manage suppliers used to create purchase orders.</p>
+            </div>
+            <button onClick={() => setShowSupplierForm(value => !value)} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">
+              {showSupplierForm ? 'Close Form' : '+ Add Supplier'}
+            </button>
+          </div>
+
+          {showSupplierForm && (
+            <form onSubmit={handleCreateSupplier} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-bold text-sm text-gray-900">Create Supplier</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <label className="text-xs font-medium text-gray-600">Supplier Name
+                  <input required maxLength={160} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Supplier Code
+                  <input required maxLength={40} value={supplierForm.code} onChange={e => setSupplierForm({ ...supplierForm, code: e.target.value.toUpperCase() })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="SUP-001" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Contact Person
+                  <input maxLength={120} value={supplierForm.contactName} onChange={e => setSupplierForm({ ...supplierForm, contactName: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Email
+                  <input type="email" maxLength={254} value={supplierForm.email} onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Phone
+                  <input maxLength={40} value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Payment Terms (days)
+                  <input type="number" min="0" max="365" step="1" value={supplierForm.paymentTermsDays} onChange={e => setSupplierForm({ ...supplierForm, paymentTermsDays: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Currency
+                  <select value={supplierForm.currency} onChange={e => setSupplierForm({ ...supplierForm, currency: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                    {['GBP', 'USD', 'EUR', 'PKR', 'AED', 'SAR'].map(currency => <option key={currency} value={currency}>{currency}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600">Lead Time (days)
+                  <input type="number" min="0" max="365" step="1" value={supplierForm.leadTimeDays} onChange={e => setSupplierForm({ ...supplierForm, leadTimeDays: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" disabled={savingSupplier} className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold disabled:opacity-50">{savingSupplier ? 'Saving...' : 'Save Supplier'}</button>
+              </div>
+            </form>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {suppliers.map((s) => (
             <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-2 text-xs">
               <div className="flex justify-between items-start">
@@ -660,6 +708,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               No suppliers configured.
             </div>
           )}
+          </div>
         </div>
       )}
 
