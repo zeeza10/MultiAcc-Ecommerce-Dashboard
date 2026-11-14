@@ -28,6 +28,7 @@ interface NavbarProps {
   onTriggerSync: () => void;
   isSyncing: boolean;
   canSyncEbay: boolean;
+  marketplaceAccounts: any[];
   canAdjustStock: boolean;
   canCreateOrder: boolean;
   canManageSettings: boolean;
@@ -51,6 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTriggerSync,
   isSyncing,
   canSyncEbay,
+  marketplaceAccounts,
   canAdjustStock,
   canCreateOrder,
   canManageSettings,
@@ -94,6 +96,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-slate-400 hidden sm:inline">
             Signed in to {organizationName}. Your access is controlled by your workspace role.
           </span>
+          {marketplaceAccounts.length > 0 && marketplaceAccounts.every((account) => account.isDemo === true) && (
+            <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-amber-300">
+              DEMO DATA — DATABASE SEEDED
+            </span>
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
@@ -178,10 +185,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Global Store Context Filter"
               className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              <option value="ALL">🏪 All Stores Combined</option>
-              <option value="mkt_ebay_uk">🇬🇧 Nexus Tech Direct (UK)</option>
-              <option value="mkt_ebay_us">🇺🇸 Nexus Global Outlet (US)</option>
-              <option value="mkt_ebay_de">🇩🇪 Nexus Tech Europe (DE)</option>
+              <option value="ALL">All Connected Stores</option>
+              {marketplaceAccounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
+              ))}
             </select>
           </div>
         </div>

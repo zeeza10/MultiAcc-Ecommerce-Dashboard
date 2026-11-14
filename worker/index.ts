@@ -1,15 +1,17 @@
 /**
- * Cloudflare Worker Backend for MultiAcc E-Commerce Dashboard
- * Phase 1: Foundation, Health Check & Static Assets Routing
+ * Cloudflare Worker entry point for the MultiAcc E-Commerce Dashboard.
+ * Authenticated business API requests are handled at the edge and use the
+ * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
+import { handleApiRequest } from './api';
 
 export interface Env {
   ASSETS?: {
     fetch: (request: Request | string) => Promise<Response>;
   };
-  API_ORIGIN?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
   ALLOWED_ORIGIN?: string;
-  [key: string]: unknown;
 }
 
 export interface ExecutionContext {
@@ -20,86 +22,40 @@ export interface ExecutionContext {
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const requestOrigin = request.headers.get('Origin');
+    const configuredOrigin = env.ALLOWED_ORIGIN;
+    const sameOrigin = requestOrigin === url.origin;
+    const allowedOrigin = configuredOrigin && requestOrigin === configuredOrigin
+      ? configuredOrigin
+      : sameOrigin ? url.origin : null;
 
-    // Standard CORS headers
-    const requestOrigin = request.headers.get('Origin') || '';
-    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev';
-    const corsHeaders: Record<string, string> = {
-      'Access-Control-Allow-Origin': requestOrigin === allowedOrigin ? allowedOrigin : url.origin,
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Organization-Id',
-    };
+    const corsHeaders = new Headers({
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Organization-Id, Idempotency-Key',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
+    });
+    if (allowedOrigin) corsHeaders.set('Access-Control-Allow-Origin', allowedOrigin);
 
-    // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders,
-      });
-    }
-
-    // Proxy authenticated API traffic to the separately deployed Express service.
-    // API_ORIGIN is a deployment variable (for example https://api.example.com),
-    // never a browser-controlled request parameter.
-    if (url.pathname.startsWith('/api/') && url.pathname !== '/api/health') {
-      if (!env.API_ORIGIN) {
-        return new Response(JSON.stringify({
-          error: 'Business API origin is not configured for this deployment.',
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+      if (requestOrigin && !allowedOrigin) {
+        return new Response(null, { status: 403, headers: corsHeaders });
       }
-      const apiOrigin = new URL(env.API_ORIGIN);
-      if (apiOrigin.protocol !== 'https:' && apiOrigin.hostname !== 'localhost') {
-        return new Response(JSON.stringify({ error: 'API_ORIGIN must use HTTPS.' }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-      const target = new URL(url.pathname + url.search, apiOrigin);
-      const proxyHeaders = new Headers(request.headers);
-      proxyHeaders.delete('host');
-      proxyHeaders.delete('cf-connecting-ip');
-      const upstream = await fetch(target, {
-        method: request.method,
-        headers: proxyHeaders,
-        body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
-        redirect: 'manual',
-      });
-      const responseHeaders = new Headers(upstream.headers);
-      for (const [key, value] of Object.entries(corsHeaders)) responseHeaders.set(key, value);
-      responseHeaders.set('Vary', 'Origin');
-      return new Response(upstream.body, {
-        status: upstream.status,
-        statusText: upstream.statusText,
-        headers: responseHeaders,
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    if (url.pathname.startsWith('/api/')) {
+      const response = await handleApiRequest(request, env);
+      const headers = new Headers(response.headers);
+      for (const [key, value] of corsHeaders.entries()) headers.set(key, value);
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
       });
     }
 
-    // Health check endpoint (Phase 1 specification)
-    if (url.pathname === '/api/health') {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'MultiAcc Backend Worker is running',
-          platform: 'Cloudflare Workers',
-        }),
-        {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    // Route static frontend assets and SPA routes
-    if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
-    }
-
+    if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response('Not Found', { status: 404 });
   },
 };

@@ -137,6 +137,8 @@ export class SupabaseOrderRepository implements OrderRepository {
 
   private async readOrderRows(options: OrderListOptions = {}): Promise<OrderRow[]> {
     const rows: OrderRow[] = [];
+    const scopedClientId = this.context.client3plId || (options.onlyClientOrders ? options.client3plId : undefined);
+    if (options.onlyClientOrders && !scopedClientId) return [];
     for (let offset = 0; ; offset += PAGE_SIZE) {
       let query = this.context.supabase
         .from('orders')
@@ -147,10 +149,7 @@ export class SupabaseOrderRepository implements OrderRepository {
 
       if (options.status && options.status !== 'ALL') query = query.eq('status', options.status);
       if (options.accountId && options.accountId !== 'ALL') query = query.eq('marketplace_account_id', options.accountId);
-      if (options.onlyClientOrders) {
-        if (!options.client3plId) return [];
-        query = query.eq('client_3pl_id', options.client3plId);
-      }
+      if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -192,6 +191,7 @@ export class SupabaseOrderRepository implements OrderRepository {
   }
 
   async createOrder(payload: Record<string, unknown>): Promise<Order> {
+    if (this.context.client3plId) throw new Error('Client users cannot create workspace orders.');
     const { data, error } = await this.context.supabase.rpc('create_workspace_order', {
       p_organization_id: this.context.organizationId,
       p_order: payload,
@@ -208,6 +208,7 @@ export class SupabaseOrderRepository implements OrderRepository {
     targetStatus: OrderStatus,
     options: { carrier?: string; trackingNumber?: string; note?: string } = {},
   ): Promise<Order> {
+    if (this.context.client3plId) throw new Error('Client users cannot transition workspace orders.');
     const { data, error } = await this.context.supabase.rpc('transition_workspace_order', {
       p_organization_id: this.context.organizationId,
       p_order_id: orderId,
@@ -242,10 +243,9 @@ export class SupabaseOrderRepository implements OrderRepository {
       .select(ORDER_COLUMNS)
       .eq('organization_id', this.context.organizationId)
       .eq('id', orderId);
-    if (options.onlyClientOrders) {
-      if (!options.client3plId) return null;
-      query = query.eq('client_3pl_id', options.client3plId);
-    }
+    const scopedClientId = this.context.client3plId || (options.onlyClientOrders ? options.client3plId : undefined);
+    if (options.onlyClientOrders && !scopedClientId) return null;
+    if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId);
 
     const { data, error } = await query.maybeSingle();
     if (error) throw error;

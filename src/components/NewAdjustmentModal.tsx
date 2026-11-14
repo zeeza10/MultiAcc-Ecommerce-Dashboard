@@ -20,7 +20,7 @@ export const NewAdjustmentModal: React.FC<NewAdjustmentModalProps> = ({
 }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [delta, setDelta] = useState('5');
+  const [delta, setDelta] = useState('');
   const [isDeduction, setIsDeduction] = useState(false);
   const [targetState, setTargetState] = useState<StockState>('ON_HAND');
   const [reasonCode, setReasonCode] = useState<'damage' | 'loss' | 'found' | 'count_correction' | 'quarantine' | 'write_off'>('count_correction');
@@ -62,6 +62,11 @@ export const NewAdjustmentModal: React.FC<NewAdjustmentModalProps> = ({
 
     if (!selectedProductId) {
       setErrorMsg('Please select a product.');
+      setSubmitting(false);
+      return;
+    }
+    if (!Number.isSafeInteger(Number(delta)) || Number(delta) <= 0) {
+      setErrorMsg('Enter a positive whole-number quantity.');
       setSubmitting(false);
       return;
     }

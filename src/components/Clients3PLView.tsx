@@ -25,6 +25,8 @@ interface Clients3PLViewProps {
   defaultSubTab?: 'CLIENTS' | 'FULFILMENT' | 'SHIPPING' | 'STORAGE';
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   currentUser,
   config,
@@ -36,7 +38,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [billingPreview, setBillingPreview] = useState<any>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string>('client_apex');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState('');
 
@@ -117,7 +119,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
               3PL Logistics & Fulfilment Operations
             </h1>
             <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-              Phase 3 Active
+              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
             </span>
           </div>
           <p className="text-xs text-gray-500">
@@ -246,19 +248,19 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <div key={rc.id} className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pick Fee</div>
-                    <div className="font-bold text-gray-900 mt-1">£{(rc.pickFeeMinor / 100).toFixed(2)} / pick</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.pickFeeMinor, rc.currency || config.baseCurrency)} / pick</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pack Fee</div>
-                    <div className="font-bold text-gray-900 mt-1">£{(rc.packFeeMinor / 100).toFixed(2)} / pack</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.packFeeMinor, rc.currency || config.baseCurrency)} / pack</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pallet Storage</div>
-                    <div className="font-bold text-gray-900 mt-1">£{(rc.storagePalletPerMonthMinor / 100).toFixed(2)} / mo</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storagePalletPerMonthMinor, rc.currency || config.baseCurrency)} / mo</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Shelf Storage</div>
-                    <div className="font-bold text-gray-900 mt-1">£{(rc.storageShelfPerMonthMinor / 100).toFixed(2)} / mo</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storageShelfPerMonthMinor, rc.currency || config.baseCurrency)} / mo</div>
                   </div>
                 </div>
               ))}
@@ -338,7 +340,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
-                    {ord.status === 'Allocated' && (
+                    {currentUser.role !== 'CLIENT_USER' && ord.status === 'Allocated' && (
                       <button
                         onClick={() => handleQuickPick(ord.id)}
                         className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-md shadow-2xs transition"
@@ -346,7 +348,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                         Confirm Pick →
                       </button>
                     )}
-                    {ord.status === 'Picked' && (
+                    {currentUser.role !== 'CLIENT_USER' && ord.status === 'Picked' && (
                       <button
                         onClick={() => handleQuickPack(ord.id)}
                         className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-md shadow-2xs transition"
@@ -412,13 +414,13 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                         <div className="text-[11px] text-gray-500">{ord.shippingAddress?.city}, {ord.shippingAddress?.postalCode}</div>
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-800">
-                        {ord.carrier || 'Royal Mail 24'}
+                        {ord.carrier || 'Not assigned'}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-indigo-700 font-medium">
                         {ord.trackingNumber || 'GB-RM-99210284'}
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">
-                        £{ord.shippingCostMinor ? (ord.shippingCostMinor / 100).toFixed(2) : '4.50'}
+                        {formatMoney(ord.shippingCostMinor || 0, ord.currency || config.baseCurrency)}
                       </td>
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -453,7 +455,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <div className="text-right">
                   <div className="text-xs text-gray-500 font-medium">Estimated Statement Total</div>
                   <div className="text-2xl font-bold text-indigo-700">
-                    £{billingPreview.totalEstimatedChargesMinor ? (billingPreview.totalEstimatedChargesMinor / 100).toFixed(2) : '216.00'}
+                    {formatMoney(billingPreview.totalEstimatedChargesMinor || 0, billingPreview.currency || config.baseCurrency)}
                   </div>
                 </div>
               </div>
@@ -462,7 +464,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <div className="text-gray-500 font-medium">Estimated Pallet Storage</div>
                   <div className="text-lg font-bold text-gray-900 mt-1">
-                    £{billingPreview.estimatedStorageMinor ? (billingPreview.estimatedStorageMinor / 100).toFixed(2) : '180.00'}
+                    {formatMoney(billingPreview.estimatedStorageMinor || 0, billingPreview.currency || config.baseCurrency)}
                   </div>
                   <div className="text-[10px] text-gray-500">Based on active warehouse footprint</div>
                 </div>
@@ -470,15 +472,15 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <div className="text-gray-500 font-medium">Pick & Pack Service Fees</div>
                   <div className="text-lg font-bold text-gray-900 mt-1">
-                    £{billingPreview.estimatedHandlingMinor ? (billingPreview.estimatedHandlingMinor / 100).toFixed(2) : '36.00'}
+                    {formatMoney(billingPreview.estimatedHandlingMinor || 0, billingPreview.currency || config.baseCurrency)}
                   </div>
                   <div className="text-[10px] text-gray-500">Handling of client parcel orders</div>
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <div className="text-gray-500 font-medium">VAT (20%)</div>
+                  <div className="text-gray-500 font-medium">VAT ({billingPreview.vatRatePercent ?? config.defaultVatRatePercent}%)</div>
                   <div className="text-lg font-bold text-gray-900 mt-1">
-                    £{billingPreview.totalEstimatedChargesMinor ? (billingPreview.totalEstimatedChargesMinor * 0.20 / 100).toFixed(2) : '43.20'}
+                    {formatMoney(billingPreview.estimatedVatMinor || 0, billingPreview.currency || config.baseCurrency)}
                   </div>
                   <div className="text-[10px] text-gray-500">UK Standard Rate</div>
                 </div>

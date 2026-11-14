@@ -25,13 +25,17 @@ import { EditOrderModal } from './EditOrderModal';
 interface OrdersViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   initialFilter?: any;
   onOpenNewOrder: () => void;
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const OrdersView: React.FC<OrdersViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   initialFilter,
   onOpenNewOrder,
 }) => {
@@ -45,16 +49,16 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [carrierInput, setCarrierInput] = useState('Royal Mail');
+  const [carrierInput, setCarrierInput] = useState('');
   const [trackingInput, setTrackingInput] = useState('');
-  const [shippingCostInput, setShippingCostInput] = useState('4.50');
+  const [shippingCostInput, setShippingCostInput] = useState('');
   const [actionError, setActionError] = useState('');
   const [copiedRaw, setCopiedRaw] = useState(false);
 
   useEffect(() => {
     loadOrders();
     loadProducts();
-  }, [statusFilter, currentUser.id]);
+  }, [statusFilter, currentUser.id, selectedStoreId]);
 
   const loadProducts = async () => {
     try {
@@ -71,6 +75,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       const res = await api.getOrders({
         status: statusFilter === 'PENDING_GROUP' ? undefined : statusFilter,
         search,
+        accountId: selectedStoreId,
       });
 
 
@@ -139,7 +144,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   };
 
   const exportCsv = () => {
-    const headers = ['Order #', 'Marketplace ID', 'Date', 'Customer', 'Status', 'Payment', 'Total GBP', 'Carrier', 'Tracking'];
+    const headers = ['Order #', 'Marketplace ID', 'Date', 'Customer', 'Status', 'Payment', 'Total', 'Carrier', 'Tracking'];
     const rows = orders.map((o) => [
       `"${o.orderNumber}"`,
       `"${o.externalOrderId || ''}"`,
@@ -339,7 +344,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </td>
                       <td className="py-2.5 px-3">{getStatusBadge(order.status)}</td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
-                        £{(order.totalMinor / 100).toFixed(2)}
+                        {formatMoney(order.totalMinor, order.currency || config.baseCurrency)}
                       </td>
                       <td className="py-2.5 px-3 text-[11px]">
                         {order.trackingNumber ? (
@@ -559,10 +564,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                             <span className="ml-1 text-[10px] text-rose-600 font-semibold">(Backordered)</span>
                           )}
                         </td>
-                        <td className="py-2 px-3">£{(l.unitPriceMinor / 100).toFixed(2)}</td>
-                        <td className="py-2 px-3 text-gray-500">£{(l.taxAmountMinor / 100).toFixed(2)}</td>
+                        <td className="py-2 px-3">{formatMoney(l.unitPriceMinor, selectedOrder.currency || config.baseCurrency)}</td>
+                        <td className="py-2 px-3 text-gray-500">{formatMoney(l.taxAmountMinor, selectedOrder.currency || config.baseCurrency)}</td>
                         <td className="py-2 px-3 text-right font-bold text-gray-900">
-                          £{(l.totalPriceMinor / 100).toFixed(2)}
+                          {formatMoney(l.totalPriceMinor, selectedOrder.currency || config.baseCurrency)}
                         </td>
                       </tr>
                     ))}
@@ -573,7 +578,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         Total Order Amount:
                       </td>
                       <td className="py-2 px-3 text-right text-sm text-gray-900">
-                        £{(selectedOrder.totalMinor / 100).toFixed(2)}
+                        {formatMoney(selectedOrder.totalMinor, selectedOrder.currency || config.baseCurrency)}
                       </td>
                     </tr>
                   </tfoot>
@@ -723,6 +728,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           order={selectedOrder}
           products={products}
           currentUser={currentUser}
+          config={config}
           onClose={() => setShowEditModal(false)}
           onSuccess={(updated) => {
             setSelectedOrder(updated);

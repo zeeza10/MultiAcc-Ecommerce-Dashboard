@@ -41,6 +41,8 @@ export default function App() {
   const { user: authenticatedUser, signOut, organizationName, permissions } = useAuth();
   const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [initError, setInitError] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
@@ -54,7 +56,9 @@ export default function App() {
   const [showNewAdjustmentModal, setShowNewAdjustmentModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
-  const [loading, setLoading] = useState(false);
+  const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
+  const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
@@ -97,16 +101,21 @@ export default function App() {
     setLoading(true);
     try {
       const canViewMarketplace = permissions.includes('*') || permissions.includes('marketplace.view');
-      const [cfgRes, notifRes, excRes] = await Promise.all([
-        api.getConfig(),
-        api.getNotifications(),
+      const [cfgRes, notifRes, excRes, accountsRes] = await Promise.all([
+        api.getConfig(), api.getNotifications(),
         canViewMarketplace ? api.getExceptions() : Promise.resolve({ exceptions: [] }),
+        canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
       setConfig(cfgRes.config);
+      setConfigLoaded(true);
+      setInitError('');
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-    } catch (err) {
+      setMarketplaceAccounts(accountsRes.accounts || []);
+      setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
+    } catch (err: any) {
       console.error('Failed to initialize app:', err);
+      setInitError(err.message || 'Workspace data could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -117,9 +126,11 @@ export default function App() {
     setIsSyncing(true);
     try {
       const accRes = await api.getEbayAccounts();
-      if (accRes.accounts.length > 0) {
-        await api.syncEbayAccount(accRes.accounts[0].id);
+      if (!accRes.integrationReady) {
+        alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
+        return;
       }
+      if (accRes.accounts.length > 0) await api.syncEbayAccount(accRes.accounts[0].id);
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
         permissions.includes('*') || permissions.includes('marketplace.view')
@@ -142,17 +153,15 @@ export default function App() {
     setGlobalSearch('');
   };
 
-  const handleResetDemo = async () => {
-    try {
-      await api.resetDemo();
-      await initApp();
-      alert('Database restored to clean, verified baseline demo dataset.');
-    } catch (err: any) {
-      alert(`Reset failed: ${err.message}`);
-    }
-  };
-
-
+  if (loading && !configLoaded) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">Loading workspace data from Supabase…</div>;
+  }
+  if (!configLoaded) {
+    return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">
+      <p>{initError || 'Workspace configuration could not be loaded.'}</p>
+      <button onClick={initApp} className="px-4 py-2 rounded bg-indigo-600 text-white">Retry</button>
+    </div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
@@ -173,7 +182,8 @@ export default function App() {
         onOpenNewOrder={() => setShowNewOrderModal(true)}
         onTriggerSync={handleTriggerSync}
         isSyncing={isSyncing}
-        canSyncEbay={permissions.includes('*') || permissions.includes('marketplace.manage')}
+        canSyncEbay={(permissions.includes('*') || permissions.includes('marketplace.manage')) && marketplaceIntegrationReady}
+        marketplaceAccounts={marketplaceAccounts}
         canAdjustStock={permissions.includes('*') || permissions.includes('inventory.adjust')}
         canCreateOrder={permissions.includes('*') || permissions.includes('orders.create')}
         canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
@@ -283,6 +293,7 @@ export default function App() {
             <DashboardView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
               onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
               onOpenNewOrder={() => setShowNewOrderModal(true)}
@@ -293,6 +304,7 @@ export default function App() {
             <OrdersView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               initialFilter={tabFilterState}
               onOpenNewOrder={() => setShowNewOrderModal(true)}
             />
@@ -383,7 +395,7 @@ export default function App() {
           )}
 
           {/* Phase 4 Payouts & Finance Modules */}
-          {(activeTab === 'payouts' || activeTab === 'reconciliation') && (
+          {(activeTab === 'payouts' || activeTab === 'reconciliation') && (permissions.includes('*') || permissions.includes('finance.manage')) && (
             <EbayPayoutsView
               currentUser={currentUser}
               selectedStoreId={selectedStoreId}
@@ -434,8 +446,7 @@ export default function App() {
               currentUser={currentUser}
               config={config}
               onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
-              onResetDemo={handleResetDemo}
-            />
+                  />
           )}
         </main>
       </div>

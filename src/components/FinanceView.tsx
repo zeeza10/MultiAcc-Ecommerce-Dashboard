@@ -37,17 +37,18 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [voidError, setVoidError] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('144.00');
-  const [paymentRef, setPaymentRef] = useState('BACS-ONLINE-SETTLE');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentRef, setPaymentRef] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'BANK_TRANSFER' | 'CARD' | 'CASH' | 'OTHER'>('BANK_TRANSFER');
   const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState('');
   const [loading, setLoading] = useState(true);
+  const isClientUser = currentUser.role === 'CLIENT_USER';
+  const formatMoney = (minor: number, currency = config.baseCurrency) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
 
   useEffect(() => {
-    if (defaultTab) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab]);
+    if (currentUser.role === 'CLIENT_USER') setActiveTab(defaultTab === 'PAYMENTS' ? 'PAYMENTS' : 'INVOICES');
+    else if (defaultTab) setActiveTab(defaultTab);
+  }, [defaultTab, currentUser.role]);
 
   useEffect(() => {
     loadFinanceData();
@@ -57,17 +58,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     setLoading(true);
     try {
       const [invRes, payRes, expRes, ledRes, profRes] = await Promise.all([
-        api.getInvoices(),
-        api.getPayments(),
-        api.getExpenses(),
-        api.getFinancialLedger(),
-        api.getReport('R-13'),
+        api.getInvoices(), api.getPayments(),
+        isClientUser ? Promise.resolve({ expenses: [] }) : api.getExpenses(),
+        isClientUser ? Promise.resolve({ ledger: [] }) : api.getFinancialLedger(),
+        isClientUser ? Promise.resolve({ data: [] }) : api.getReport('R-13'),
       ]);
       setInvoices(invRes.invoices || []);
       setPayments(payRes.payments || []);
       setExpenses(expRes.expenses || []);
       setLedger(ledRes.ledger || []);
       setProfitRows(profRes.data || []);
+      if (isClientUser && !['INVOICES', 'PAYMENTS'].includes(activeTab)) setActiveTab('INVOICES');
       if (invRes.invoices && invRes.invoices.length > 0) {
         setSelectedInvoiceForPay(invRes.invoices[0].id);
       }
@@ -108,11 +109,19 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const inv = invoices.find((i) => i.id === selectedInvoiceForPay);
     if (!inv) return;
 
-    const amtMinor = Math.round(parseFloat(paymentAmount) * 100);
+    const amount = Number.parseFloat(paymentAmount);
+    const amtMinor = Math.round(amount * 100);
+    const outstanding = Math.max(0, inv.totalMinor - inv.paidAmountMinor);
+    if (!Number.isFinite(amount) || amtMinor <= 0 || amtMinor > outstanding) {
+      alert('Enter a positive payment amount that does not exceed the invoice balance.');
+      return;
+    }
 
     try {
       await api.recordPayment({
+        invoiceId: inv.id,
         amountMinor: amtMinor,
+        paymentDate: new Date().toISOString().slice(0, 10),
         paymentMethod,
         reference: paymentRef,
         payerName: inv.recipientName,
@@ -142,14 +151,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-              Finance, Invoicing & Financial Ledger
+              {isClientUser ? 'Client Invoices & Payments' : 'Finance, Invoicing & Financial Ledger'}
             </h1>
             <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-              Phase 4 Active
+              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Automated double-entry journals, VAT (20%) compliance, payment allocations, immutable document audit, and order-level unit profitability.
+            {isClientUser ? 'Invoices and payments allocated to your 3PL client account.' : `Double-entry journals, VAT (${config.defaultVatRatePercent}%) compliance, payment allocations, immutable document audit, and order-level unit profitability.`}
           </p>
         </div>
 
@@ -192,6 +201,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           <span>Payments & Allocations ({payments.length})</span>
         </button>
 
+        {!isClientUser && (
         <button
           onClick={() => setActiveTab('EXPENSES')}
           className={`flex items-center gap-2 px-4 py-2 font-semibold border-b-2 whitespace-nowrap transition ${
@@ -203,7 +213,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           <Receipt className="w-4 h-4" />
           <span>Operating Expenses ({expenses.length})</span>
         </button>
+        )}
 
+        {!isClientUser && (
         <button
           onClick={() => setActiveTab('LEDGER')}
           className={`flex items-center gap-2 px-4 py-2 font-semibold border-b-2 whitespace-nowrap transition ${
@@ -215,7 +227,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           <Scale className="w-4 h-4" />
           <span>Append-Only Ledger ({ledger.length})</span>
         </button>
+        )}
 
+        {!isClientUser && (
         <button
           onClick={() => setActiveTab('PROFIT')}
           className={`flex items-center gap-2 px-4 py-2 font-semibold border-b-2 whitespace-nowrap transition ${
@@ -227,6 +241,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           <TrendingUp className="w-4 h-4" />
           <span>Order Profitability</span>
         </button>
+        )}
       </div>
 
       {/* Tab: Invoices */}
@@ -242,10 +257,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <th className="py-2.5 px-3">Recipient</th>
                     <th className="py-2.5 px-3">Issue Date</th>
                     <th className="py-2.5 px-3">Due Date</th>
-                    <th className="py-2.5 px-3">Subtotal (£)</th>
-                    <th className="py-2.5 px-3">VAT (20%)</th>
-                    <th className="py-2.5 px-3">Total (£)</th>
-                    <th className="py-2.5 px-3">Paid (£)</th>
+                    <th className="py-2.5 px-3">Subtotal ({config.baseCurrency})</th>
+                    <th className="py-2.5 px-3">VAT ({config.defaultVatRatePercent}%)</th>
+                    <th className="py-2.5 px-3">Total ({config.baseCurrency})</th>
+                    <th className="py-2.5 px-3">Paid ({config.baseCurrency})</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
@@ -268,13 +283,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                         <td className="py-2.5 px-3 font-semibold text-gray-900">{inv.recipientName}</td>
                         <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{issueDateStr}</td>
                         <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{dueDateStr}</td>
-                        <td className="py-2.5 px-3">£{((inv.subtotalMinor || 0) / 100).toFixed(2)}</td>
-                        <td className="py-2.5 px-3 text-gray-500">£{((inv.vatAmountMinor || 0) / 100).toFixed(2)}</td>
+                        <td className="py-2.5 px-3">{formatMoney(inv.subtotalMinor, inv.currency)}</td>
+                        <td className="py-2.5 px-3 text-gray-500">{formatMoney(inv.vatAmountMinor, inv.currency)}</td>
                         <td className="py-2.5 px-3 font-bold text-gray-900">
-                          £{((inv.totalMinor || 0) / 100).toFixed(2)}
+                          {formatMoney(inv.totalMinor, inv.currency)}
                         </td>
                         <td className="py-2.5 px-3 text-emerald-700 font-semibold">
-                          £{((inv.paidAmountMinor || 0) / 100).toFixed(2)}
+                          {formatMoney(inv.paidAmountMinor, inv.currency)}
                         </td>
                         <td className="py-2.5 px-3">
                           <span
@@ -334,7 +349,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-2.5 px-3">Method</th>
                   <th className="py-2.5 px-3">Reference</th>
                   <th className="py-2.5 px-3">Payer</th>
-                  <th className="py-2.5 px-3">Amount (£)</th>
+                  <th className="py-2.5 px-3">Amount ({config.baseCurrency})</th>
                   <th className="py-2.5 px-3">Allocated Invoices</th>
                   <th className="py-2.5 px-3">Recorded By</th>
                 </tr>
@@ -347,7 +362,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     : p.createdAt
                     ? p.createdAt.split('T')[0]
                     : '—';
-                  const payer = p.payerName || (p as any).payer || 'Apex Logistics Ltd';
+                  const payer = p.payerName || (p as any).payer || '—';
                   const amt = p.amountMinor || 0;
                   const recorded = p.recordedBy || 'Elena Rostova (Finance)';
 
@@ -377,13 +392,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       <td className="py-2.5 px-3 font-mono">{p.reference || '—'}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">{payer}</td>
                       <td className="py-2.5 px-3 font-bold text-emerald-700">
-                        £{(amt / 100).toFixed(2)}
+                        {formatMoney(amt, p.currency)}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[11px]">
                         {allocations.length > 0 ? (
                           allocations.map((a, idx) => (
                             <span key={idx} className="mr-2 inline-block">
-                              {a.invoiceNumber || a.invoiceId}: £{(((a.amountMinor || amt) / 100)).toFixed(2)}
+                              {a.invoiceNumber || a.invoiceId}: {formatMoney(a.amountMinor || amt, p.currency)}
                             </span>
                           ))
                         ) : (
@@ -418,9 +433,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-2.5 px-3">Category</th>
                   <th className="py-2.5 px-3">Supplier / Description</th>
                   <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Net Amount (£)</th>
-                  <th className="py-2.5 px-3">VAT (£)</th>
-                  <th className="py-2.5 px-3">Total Amount (£)</th>
+                  <th className="py-2.5 px-3">Net Amount ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">VAT ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">Total Amount ({config.baseCurrency})</th>
                   <th className="py-2.5 px-3">Status</th>
                 </tr>
               </thead>
@@ -445,9 +460,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">{desc}</td>
                       <td className="py-2.5 px-3 font-mono text-gray-500">{dateStr}</td>
-                      <td className="py-2.5 px-3">£{(net / 100).toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-gray-500">£{(vat / 100).toFixed(2)}</td>
-                      <td className="py-2.5 px-3 font-bold text-gray-900">£{(total / 100).toFixed(2)}</td>
+                      <td className="py-2.5 px-3">{formatMoney(net, exp.currency)}</td>
+                      <td className="py-2.5 px-3 text-gray-500">{formatMoney(vat, exp.currency)}</td>
+                      <td className="py-2.5 px-3 font-bold text-gray-900">{formatMoney(total, exp.currency)}</td>
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                           {exp.status || 'PAID'}
@@ -478,7 +493,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <div>
                 <span className="font-bold text-gray-900">Trial Balance Verification:</span>{' '}
                 <span className="text-gray-600">
-                  Total Debits: £{(totalDebits / 100).toFixed(2)} | Total Credits: £{(totalCredits / 100).toFixed(2)}
+                  Total Debits: {formatMoney(totalDebits)} | Total Credits: {formatMoney(totalCredits)}
                 </span>
               </div>
             </div>
@@ -499,8 +514,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <th className="py-2.5 px-3">Date (UTC)</th>
                     <th className="py-2.5 px-3">Account Code</th>
                     <th className="py-2.5 px-3">General Ledger Account Name</th>
-                    <th className="py-2.5 px-3">Debit Amount (£)</th>
-                    <th className="py-2.5 px-3">Credit Amount (£)</th>
+                    <th className="py-2.5 px-3">Debit Amount ({config.baseCurrency})</th>
+                    <th className="py-2.5 px-3">Credit Amount ({config.baseCurrency})</th>
                     <th className="py-2.5 px-3">Source Type</th>
                     <th className="py-2.5 px-3">Source ID</th>
                     <th className="py-2.5 px-3">Posting Note</th>
@@ -519,7 +534,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       <td className="py-2 px-3">
                         {(entry.debitMinor || 0) > 0 ? (
                           <span className="font-bold text-gray-900">
-                            £{((entry.debitMinor || 0) / 100).toFixed(2)}
+                            {formatMoney(entry.debitMinor || 0)}
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>
@@ -528,7 +543,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       <td className="py-2 px-3">
                         {(entry.creditMinor || 0) > 0 ? (
                           <span className="font-bold text-gray-900">
-                            £{((entry.creditMinor || 0) / 100).toFixed(2)}
+                            {formatMoney(entry.creditMinor || 0)}
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>
@@ -570,11 +585,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-2.5 px-3">Order #</th>
                   <th className="py-2.5 px-3">Date</th>
                   <th className="py-2.5 px-3">Customer</th>
-                  <th className="py-2.5 px-3">Revenue (£)</th>
-                  <th className="py-2.5 px-3">COGS (£)</th>
-                  <th className="py-2.5 px-3">Marketplace Fee (£)</th>
-                  <th className="py-2.5 px-3">Postage Cost (£)</th>
-                  <th className="py-2.5 px-3">Gross Profit (£)</th>
+                  <th className="py-2.5 px-3">Revenue ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">COGS ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">Marketplace Fee ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">Postage Cost ({config.baseCurrency})</th>
+                  <th className="py-2.5 px-3">Gross Profit ({config.baseCurrency})</th>
                   <th className="py-2.5 px-3 text-right">Margin %</th>
                 </tr>
               </thead>
@@ -584,11 +599,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <td className="py-2 px-3 font-mono font-bold text-indigo-700">{r.orderNumber}</td>
                     <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{r.date}</td>
                     <td className="py-2 px-3 font-medium text-gray-900">{r.buyer}</td>
-                    <td className="py-2 px-3 font-bold text-gray-900">£{r.revenue}</td>
-                    <td className="py-2 px-3 text-gray-600">£{r.cogs}</td>
-                    <td className="py-2 px-3 text-gray-600">£{r.fees}</td>
-                    <td className="py-2 px-3 text-gray-600">£{r.shipping}</td>
-                    <td className="py-2 px-3 font-bold text-emerald-700">£{r.grossProfit}</td>
+                    <td className="py-2 px-3 font-bold text-gray-900">{r.revenue}</td>
+                    <td className="py-2 px-3 text-gray-600">{r.cogs}</td>
+                    <td className="py-2 px-3 text-gray-600">{r.fees}</td>
+                    <td className="py-2 px-3 text-gray-600">{r.shipping}</td>
+                    <td className="py-2 px-3 font-bold text-emerald-700">{r.grossProfit}</td>
                     <td className="py-2 px-3 text-right font-bold text-emerald-700">{r.marginPercent}</td>
                   </tr>
                 ))}
@@ -629,7 +644,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 >
                   {invoices.map((inv) => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} - {inv.recipientName} (£{(((inv.totalMinor || 0) - (inv.paidAmountMinor || 0)) / 100).toFixed(2)} due)
+                      {inv.invoiceNumber} - {inv.recipientName} ({formatMoney((inv.totalMinor || 0) - (inv.paidAmountMinor || 0), inv.currency)} due)
                     </option>
                   ))}
                 </select>

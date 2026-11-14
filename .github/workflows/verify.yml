@@ -2,7 +2,7 @@ name: Verify application
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase-3-worker-api-foundation]
   pull_request:
     branches: [main]
 
@@ -23,7 +23,11 @@ jobs:
         run: npm install --no-package-lock --no-audit --no-fund
       - name: TypeScript check
         run: npm run lint
+      - name: Worker boundary tests
+        run: npm test
       - name: Production build
         run: npm run build
+      - name: Cloudflare Worker dry run
+        run: npm run cf:dry-run
 
 # Lockfile is intentionally omitted until regenerated against the current dependency manifest.

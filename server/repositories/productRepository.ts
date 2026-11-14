@@ -96,7 +96,8 @@ export class SupabaseProductRepository implements ProductRepository {
   private get organizationId() { return this.context.organizationId; }
 
   async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<Product[]> {
-    if (options.onlyClientProducts && !options.client3plId) return [];
+    const scopedClientId = this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined);
+    if (options.onlyClientProducts && !scopedClientId) return [];
 
     const rows: ProductRow[] = [];
     for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -107,7 +108,7 @@ export class SupabaseProductRepository implements ProductRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
-      if (options.onlyClientProducts) query = query.eq('client_3pl_id', options.client3plId);
+      if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId).eq('owner_type', 'CLIENT');
 
       const { data, error } = await query;
       if (error) throw error;
@@ -134,7 +135,8 @@ export class SupabaseProductRepository implements ProductRepository {
           .in('product_id', productIdChunk)
           .range(offset, offset + PAGE_SIZE - 1);
 
-        if (client3plId) query = query.eq('client_3pl_id', client3plId);
+        const scopedClientId = this.context.client3plId || client3plId;
+        if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId);
 
         const { data, error } = await query;
         if (error) throw error;
@@ -148,6 +150,7 @@ export class SupabaseProductRepository implements ProductRepository {
   }
 
   async createForOrganization(input: ProductCreateInput): Promise<Product> {
+    if (this.context.client3plId) throw new Error('Client users cannot create workspace products.');
     let client3plId: string | null = null;
     if (input.ownerType === 'CLIENT') {
       if (!input.ownerId) throw new Error('Select a valid 3PL client for this product.');

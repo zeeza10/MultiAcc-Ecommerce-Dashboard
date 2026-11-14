@@ -26,6 +26,8 @@ interface EbayPayoutsViewProps {
   onStoreChange?: (storeId: string) => void;
 }
 
+const formatMoney = (minor: number, currency = 'GBP') => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   currentUser,
   selectedStoreId = 'ALL',
@@ -34,9 +36,13 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   const [activeTab, setActiveTab] = useState<'payouts' | 'reconciliation' | 'ledger'>('payouts');
   const [storeFilter, setStoreFilter] = useState<string>(selectedStoreId);
   const [payouts, setPayouts] = useState<EbayPayout[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [ledger, setLedger] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('GBP');
   const [balances, setBalances] = useState<any>(null);
   const [reconciliations, setReconciliations] = useState<FinancialReconciliation[]>([]);
   const [loading, setLoading] = useState(true);
+  const canManageFinance = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'FINANCE_USER';
 
   // Confirm Deposit Modal
   const [selectedPayoutForConfirm, setSelectedPayoutForConfirm] = useState<EbayPayout | null>(null);
@@ -54,13 +60,16 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [payoutRes, recRes] = await Promise.all([
-        api.getPayouts(storeFilter),
-        api.getReconciliations(storeFilter),
+      const [payoutRes, recRes, accountRes, ledgerRes, configRes] = await Promise.all([
+        api.getPayouts(storeFilter), api.getReconciliations(storeFilter),
+        api.getEbayAccounts(), api.getFinancialLedger(), api.getConfig(),
       ]);
       setPayouts(payoutRes.payouts || []);
       setBalances(payoutRes.balances || null);
       setReconciliations(recRes.reconciliations || []);
+      setAccounts(accountRes.accounts || []);
+      setLedger(ledgerRes.ledger || []);
+      setCurrency(String(configRes.config?.baseCurrency || payoutRes.payouts?.[0]?.currency || 'GBP').toUpperCase());
     } catch (err) {
       console.error('Failed to load eBay payouts data:', err);
     } finally {
@@ -117,6 +126,20 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
     }
   };
 
+  const ledgerByAccount = Object.values(ledger.reduce((groups: Record<string, any>, entry: any) => {
+    const key = String(entry.accountId);
+    const current = groups[key] || { accountId: key, accountName: entry.accountName, debitMinor: 0, creditMinor: 0, sources: [] as string[] };
+    current.debitMinor += Number(entry.debitMinor || 0);
+    current.creditMinor += Number(entry.creditMinor || 0);
+    if (entry.sourceType && !current.sources.includes(entry.sourceType)) current.sources.push(entry.sourceType);
+    groups[key] = current;
+    return groups;
+  }, {}));
+  const ledgerTotals = ledger.reduce((totals: { debitMinor: number; creditMinor: number }, entry: any) => ({
+    debitMinor: totals.debitMinor + Number(entry.debitMinor || 0),
+    creditMinor: totals.creditMinor + Number(entry.creditMinor || 0),
+  }), { debitMinor: 0, creditMinor: 0 });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -148,9 +171,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium shadow-xs"
           >
             <option value="ALL">All Stores Combined</option>
-            <option value="mkt_ebay_uk">Nexus Tech Direct (UK)</option>
-            <option value="mkt_ebay_us">Nexus Global Outlet (US)</option>
-            <option value="mkt_ebay_de">Nexus Tech Europe (DE)</option>
+            {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>)}
           </select>
         </div>
       </div>
@@ -165,7 +186,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((balances?.totalSalesMinor || 1911929) / 100).toFixed(2)}
+            {formatMoney(balances?.totalSalesMinor ?? 0, currency)}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
             Total sales processed across eBay channels
@@ -180,7 +201,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">
-            -£{((balances?.totalFeesMinor || 243375) / 100).toFixed(2)}
+            -{formatMoney(balances?.totalFeesMinor ?? 0, currency)}
           </div>
           <div className="text-xs text-rose-500/80 mt-2">
             Final value fees, promo listings, insertion
@@ -195,10 +216,10 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-            £{((balances?.confirmedMinor || 1125241) / 100).toFixed(2)}
+            {formatMoney(balances?.confirmedMinor ?? 0, currency)}
           </div>
           <div className="text-xs text-emerald-600/80 mt-2">
-            Reconciled 100% against bank statements
+            Confirmed deposits recorded in the workspace database
           </div>
         </div>
 
@@ -210,7 +231,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
-            £{((balances?.pendingDepositMinor || 523594) / 100).toFixed(2)}
+            {formatMoney(balances?.pendingDepositMinor ?? 0, currency)}
           </div>
           <div className="text-xs text-amber-500/80 mt-2">
             Awaiting bank clearing & SEPA/ACH settlement
@@ -299,13 +320,13 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                         {p.payoutDate.split('T')[0]}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-900 dark:text-slate-100 font-medium">
-                        £{(p.totalSalesMinor / 100).toFixed(2)}
+                        {formatMoney(p.totalSalesMinor, p.currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-rose-500">
-                        -£{(p.totalFeesMinor / 100).toFixed(2)}
+                        -{formatMoney(p.totalFeesMinor, p.currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        £{(p.netPayoutMinor / 100).toFixed(2)}
+                        {formatMoney(p.netPayoutMinor, p.currency)}
                       </td>
                       <td className="py-3 px-3">{getStatusBadge(p.status)}</td>
                       <td className="py-3 px-3">
@@ -321,7 +342,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                         )}
                       </td>
                       <td className="py-3 px-3 text-right">
-                        {p.status !== 'BANK_CONFIRMED' ? (
+                        {canManageFinance && p.status !== 'BANK_CONFIRMED' ? (
                           <button
                             onClick={() => {
                               setSelectedPayoutForConfirm(p);
@@ -375,16 +396,16 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                       <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{r.period}</td>
                       <td className="py-3 px-3 font-medium text-slate-900 dark:text-slate-100">{r.accountName}</td>
                       <td className="py-3 px-3 text-right font-mono font-medium">
-                        £{(r.expectedPayoutMinor / 100).toFixed(2)}
+                        {formatMoney(r.expectedPayoutMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-medium">
-                        £{(r.actualPayoutMinor / 100).toFixed(2)}
+                        {formatMoney(r.actualPayoutMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold">
                         {r.differenceMinor === 0 ? (
-                          <span className="text-emerald-500">£0.00</span>
+                          <span className="text-emerald-500">{formatMoney(0, currency)}</span>
                         ) : (
-                          <span className="text-amber-500">£{(r.differenceMinor / 100).toFixed(2)}</span>
+                          <span className="text-amber-500">{formatMoney(r.differenceMinor, currency)}</span>
                         )}
                       </td>
                       <td className="py-3 px-3 text-center font-bold">{r.unmatchedTransactionsCount}</td>
@@ -415,53 +436,28 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
       {activeTab === 'ledger' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              General Ledger Double-Entry Audit Trail
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Immutable debits and credits balancing across Cash (1000), Clearing (1200), Sales (4000), and Marketplace Fees (5100).
-            </p>
-
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">General Ledger Double-Entry Audit Trail</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Posted journal balances calculated from the workspace database.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Account Code</th>
-                    <th className="py-2.5 px-3">Account Description</th>
-                    <th className="py-2.5 px-3 text-right">Debit (£)</th>
-                    <th className="py-2.5 px-3 text-right">Credit (£)</th>
-                    <th className="py-2.5 px-3">Transaction Source</th>
-                  </tr>
+                  <tr><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3">Account Description</th><th className="py-2.5 px-3 text-right">Debit ({currency})</th><th className="py-2.5 px-3 text-right">Credit ({currency})</th><th className="py-2.5 px-3">Transaction Source</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">1000</td>
-                    <td className="py-3 px-3">Barclays Commercial Operating Account</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600">£11,252.41</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">EBAY-PAYOUT-DISBURSEMENT</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">5100</td>
-                    <td className="py-3 px-3">eBay Marketplace Selling & Promo Fees</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£2,433.75</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">EBAY-FEE-WITHHOLDING</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">1200</td>
-                    <td className="py-3 px-3">eBay Clearing & Settlement Receivable</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600">£13,686.16</td>
-                    <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">CLEARING-OFFSET</td>
-                  </tr>
+                  {ledgerByAccount.map((entry) => (
+                    <tr key={entry.accountId}>
+                      <td className="py-3 px-3 font-mono font-semibold">{entry.accountId}</td>
+                      <td className="py-3 px-3">{entry.accountName}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(entry.debitMinor, currency)}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(entry.creditMinor, currency)}</td>
+                      <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">{entry.sources.join(', ') || '—'}</td>
+                    </tr>
+                  ))}
                   <tr className="bg-slate-50 dark:bg-slate-800/40 font-bold">
-                    <td colSpan={2} className="py-3 px-3 text-right text-slate-900 dark:text-slate-100">
-                      Trial Balance Total:
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-900 dark:text-slate-100">£13,686.16</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-900 dark:text-slate-100">£13,686.16</td>
-                    <td className="py-3 px-3 text-emerald-600 text-[11px]">BALANCED (0.00 VAR)</td>
+                    <td colSpan={2} className="py-3 px-3 text-right">Trial Balance Total:</td>
+                    <td className="py-3 px-3 text-right font-mono">{formatMoney(ledgerTotals.debitMinor, currency)}</td>
+                    <td className="py-3 px-3 text-right font-mono">{formatMoney(ledgerTotals.creditMinor, currency)}</td>
+                    <td className={ledgerTotals.debitMinor === ledgerTotals.creditMinor ? "py-3 px-3 text-emerald-600" : "py-3 px-3 text-rose-600"}>{ledgerTotals.debitMinor === ledgerTotals.creditMinor ? 'BALANCED' : 'OUT OF BALANCE'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -469,7 +465,6 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
           </div>
         </div>
       )}
-
       {/* Confirm Deposit Modal */}
       {selectedPayoutForConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -487,7 +482,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                 <div className="flex justify-between">
                   <span className="text-slate-400">Net Payout Amount:</span>
                   <span className="font-mono font-bold text-emerald-400">
-                    £{(selectedPayoutForConfirm.netPayoutMinor / 100).toFixed(2)}
+                    {formatMoney(selectedPayoutForConfirm.netPayoutMinor, selectedPayoutForConfirm.currency)}
                   </span>
                 </div>
                 <div className="flex justify-between">

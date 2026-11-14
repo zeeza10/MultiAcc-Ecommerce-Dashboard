@@ -19,93 +19,44 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { MarketplaceAccount, SystemConfig, User } from '../types';
+import { SystemConfig, User } from '../types';
 
 interface DashboardViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onNavigate: (tab: any, filterState?: any) => void;
   onOpenNewAdjustment: () => void;
   onOpenNewOrder: () => void;
 }
 
-const INITIAL_KPIS = {
-  totalOrders: 10,
-  pendingOrders: 8,
-  revenueMinor: 64710,
-  lowStockItems: 1,
-  totalStockUnits: 359,
-  inventoryValueMinor: 690600,
-  supplierPayablesMinor: 144000,
-  clientReceivablesMinor: 36000,
-  storageRevenueMinor: 21600,
-  outstandingPaymentsMinor: 21600,
-  currency: 'GBP',
-  activePhase: 'ALL',
-};
-
-const INITIAL_CHARTS = {
-  trend: [
-    { date: '11-01', orders: 0, revenue: 0 },
-    { date: '11-02', orders: 0, revenue: 0 },
-    { date: '11-03', orders: 0, revenue: 0 },
-    { date: '11-04', orders: 0, revenue: 0 },
-    { date: '11-05', orders: 1, revenue: 74.99 },
-    { date: '11-06', orders: 2, revenue: 129.13 },
-    { date: '11-07', orders: 7, revenue: 442.98 },
-  ],
-  statusCounts: {
-    New: 3,
-    Confirmed: 3,
-    Allocated: 1,
-    Picked: 1,
-    Packed: 1,
-    Shipped: 1,
-    Delivered: 1,
-  },
-  stockByState: {
-    available: 357,
-    reserved: 12,
-    onHand: 359,
-    incoming: 50,
-    damaged: 2,
-    quarantined: 0,
-  },
-  topSkus: [
-    { sku: 'APX-SPK-100', name: 'Apex SoundPulse Rugged Waterproof Speaker', units: 4, revenue: 199.96 },
-    { sku: 'NX-CAM-002', name: 'Nexus 4K Ultra Wide StreamCam with Stereo Mic', units: 3, revenue: 179.97 },
-    { sku: 'EBAY-UNMAPPED-USB-CABLE', name: 'Braided Type-C Fast Charging Cable 2M', units: 2, revenue: 37.98 },
-    { sku: 'NX-AUD-001', name: 'Nexus Pro Active Noise-Cancelling Headphones', units: 2, revenue: 179.98 },
-    { sku: 'NX-HUB-005', name: 'Nexus 8-in-1 Aluminum USB-C Hub 100W PD', units: 2, revenue: 59.98 },
-  ],
-};
-
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   onNavigate,
   onOpenNewAdjustment,
   onOpenNewOrder,
 }) => {
   const [period, setPeriod] = useState('30D');
-  const [selectedAccount, setSelectedAccount] = useState('ALL');
-  const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
-  const [kpis, setKpis] = useState<any>(INITIAL_KPIS);
-  const [charts, setCharts] = useState<any>(INITIAL_CHARTS);
+  const [kpis, setKpis] = useState<any>(null);
+  const [charts, setCharts] = useState<any>(null);
   const [exceptions, setExceptions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
-  }, [period, selectedAccount, currentUser.id]);
+  }, [period, selectedStoreId, currentUser.id]);
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setKpis(null);
+    setCharts(null);
+    setExceptions([]);
     try {
       const results = await Promise.allSettled([
-        api.getKPIs(period, selectedAccount),
-        api.getCharts(),
-        api.getEbayAccounts(),
+        api.getKPIs(period, selectedStoreId),
+        api.getCharts(selectedStoreId),
         api.getExceptions(),
       ]);
 
@@ -115,11 +66,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (results[1].status === 'fulfilled' && results[1].value) {
         setCharts(results[1].value);
       }
-      if (results[2].status === 'fulfilled' && results[2].value?.accounts) {
-        setAccounts(results[2].value.accounts);
-      }
-      if (results[3].status === 'fulfilled' && results[3].value?.exceptions) {
-        setExceptions(results[3].value.exceptions.filter((e: any) => e.status === 'PENDING'));
+      if (results[2].status === 'fulfilled' && results[2].value?.exceptions) {
+        setExceptions(results[2].value.exceptions.filter((e: any) => e.status === 'PENDING'));
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -128,7 +76,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  const isFullPhases = true; // All 10 operational and financial KPIs fully visible
+  const formatMoney = (amountMinor: number | null) => amountMinor == null ? '—' : new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: kpis?.currency || config.baseCurrency || 'GBP',
+    }).format((Number(amountMinor) || 0) / 100);
 
   return (
     <div className="space-y-6">
@@ -138,30 +89,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Operations Dashboard</h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {currentUser.role === 'CLIENT_USER'
-              ? 'Apex Electronics Ltd - Client Inventory & Orders Visibility'
-              : 'Enterprise overview: eBay synchronizations, inventory ledger, and order pipeline.'}
+              ? 'Your client inventory and orders visibility.'
+              : 'Workspace overview from your connected operational records.'}
           </p>
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {currentUser.role !== 'CLIENT_USER' && (
-            <div className="flex items-center space-x-1.5 bg-white border border-gray-300 rounded-md px-2.5 py-1 text-xs shadow-2xs">
-              <span className="text-gray-400 font-medium">Channel:</span>
-              <select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="bg-transparent font-medium text-gray-800 focus:outline-none cursor-pointer"
-              >
-                <option value="ALL">All Marketplace Accounts</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.marketplace.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+    
 
           <div className="flex items-center space-x-1 bg-white border border-gray-300 rounded-md p-0.5 text-xs shadow-2xs">
             {['7D', '30D', '90D', 'YTD'].map((p) => (
@@ -258,7 +193,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <PoundSterling className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.revenueMinor / 100).toFixed(2) : '0.00'}
+              {kpis ? formatMoney(kpis.revenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Item totals excl. tax</span>
@@ -275,10 +210,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <AlertTriangle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? kpis.lowStockItems : '...'}
+              {kpis ? (kpis.lowStockItems == null ? '—' : kpis.lowStockItems) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700 font-medium">
-              <span>At or below reorder threshold</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'At or below reorder threshold'}</span>
             </div>
           </div>
 
@@ -292,10 +227,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Package className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? kpis.totalStockUnits : '...'}
+              {kpis ? (kpis.totalStockUnits == null ? '—' : kpis.totalStockUnits) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>On hand + damaged + quarantine</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'On hand + damaged + quarantine'}</span>
             </div>
           </div>
 
@@ -309,10 +244,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <CircleDollarSign className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.inventoryValueMinor / 100).toFixed(2) : '6,906.00'}
+              {kpis ? formatMoney(kpis.inventoryValueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Weighted avg cost valuation</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'Weighted avg cost valuation'}</span>
             </div>
           </div>
 
@@ -326,10 +261,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Receipt className="w-4 h-4 text-purple-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.supplierPayablesMinor / 100).toFixed(2) : '1,440.00'}
+              {kpis ? formatMoney(kpis.supplierPayablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Unpaid PO receipts / GRNI</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid PO receipts / GRNI'}</span>
             </div>
           </div>
 
@@ -343,10 +278,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Building className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.clientReceivablesMinor / 100).toFixed(2) : '360.00'}
+              {kpis ? formatMoney(kpis.clientReceivablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Unpaid issued 3PL invoices</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid issued 3PL invoices'}</span>
             </div>
           </div>
 
@@ -360,10 +295,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Archive className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.storageRevenueMinor / 100).toFixed(2) : '216.00'}
+              {kpis ? formatMoney(kpis.storageRevenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Storage charges billed</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Storage charges billed'}</span>
             </div>
           </div>
 
@@ -377,10 +312,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <AlertCircle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.outstandingPaymentsMinor / 100).toFixed(2) : '216.00'}
+              {kpis ? formatMoney(kpis.outstandingPaymentsMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700">
-              <span>Receivables past due date</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Receivables past due date'}</span>
             </div>
           </div>
         </div>
@@ -393,19 +328,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Daily Order Flow & Revenue</h3>
-              <p className="text-[11px] text-gray-500">7-day performance history from eBay & Direct channels</p>
+              <p className="text-[11px] text-gray-500">7-day order and revenue history{selectedStoreId !== 'ALL' ? ' for the selected store' : ' across all stores'}</p>
             </div>
             <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Live Ledger</span>
           </div>
 
-          {charts?.trend && (
+          {charts?.trend?.length > 0 && (
             <div className="h-48 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-gray-100">
               {charts.trend.map((point: any, idx: number) => {
                 const heightPercent = Math.min(100, Math.max(15, (point.revenue / 250) * 100));
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
                     <div className="text-[10px] font-bold text-indigo-700 opacity-0 group-hover:opacity-100 transition">
-                      £{point.revenue.toFixed(0)}
+                      {formatMoney(Math.round(point.revenue * 100))}
                     </div>
                     <div
                       style={{ height: `${heightPercent}%` }}
@@ -560,7 +495,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-gray-900">{skuItem.units} units</div>
-                    <div className="text-[11px] text-emerald-600 font-medium">£{skuItem.revenue.toFixed(2)}</div>
+                    <div className="text-[11px] text-emerald-600 font-medium">{formatMoney(Math.round(skuItem.revenue * 100))}</div>
                   </div>
                 </div>
               ))

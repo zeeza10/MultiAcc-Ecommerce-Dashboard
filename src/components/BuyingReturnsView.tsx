@@ -22,6 +22,8 @@ interface BuyingReturnsViewProps {
   defaultSubTab?: 'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS';
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   currentUser,
   config,
@@ -50,7 +52,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [approvingPoId, setApprovingPoId] = useState<string | null>(null);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [savingSupplier, setSavingSupplier] = useState(false);
-  const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
+  const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: config.baseCurrency, leadTimeDays: '7' });
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
   const [returnRequestId, setReturnRequestId] = useState('');
@@ -104,7 +106,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
         currency: supplierForm.currency,
         leadTimeDays: Number.parseInt(supplierForm.leadTimeDays, 10) || 0,
       });
-      setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
+      setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: config.baseCurrency, leadTimeDays: '7' });
       setShowSupplierForm(false);
       await loadData();
     } catch (err: any) {
@@ -282,7 +284,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       : true
   );
 
-  const poCurrency = suppliers.find(supplier => supplier.id === poSupplierId)?.currency || 'GBP';
+  const poCurrency = suppliers.find(supplier => supplier.id === poSupplierId)?.currency || config.baseCurrency;
   const poSubtotalMinor = poLines.reduce((sum, line) =>
     sum + (Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100), 0);
   const poTaxMinor = Math.round((Number.parseFloat(poTaxAmount) || 0) * 100);
@@ -301,7 +303,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               Purchasing, Receipts, Returns & Customers
             </h1>
             <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
-              Phase 2 Active
+              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
             </span>
           </div>
           <p className="text-xs text-gray-500">
@@ -517,7 +519,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         ))}
                       </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
-                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || 'GBP' }).format((po.totalMinor || 0) / 100)}
+                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || config.baseCurrency }).format((po.totalMinor || 0) / 100)}
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {po.status === 'DRAFT' ? (
@@ -602,7 +604,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3">
                           <span className="font-semibold text-emerald-700">
-                            {ret.refundStatus || 'Pending'} {refundAmount > 0 ? `(£${(refundAmount / 100).toFixed(2)})` : ''}
+                            {ret.refundStatus || 'Pending'} {refundAmount > 0 ? `(${formatMoney(refundAmount, config.baseCurrency)})` : ''}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
@@ -768,7 +770,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-gray-900">
-                        £{(c.totalSpendMinor / 100).toFixed(2)}
+                        {formatMoney(c.totalSpendMinor, config.baseCurrency)}
                       </td>
                       <td className="py-2.5 px-3 text-gray-500 font-mono text-[11px]">
                         {c.recentOrderDate.split('T')[0]} ({c.recentStatus})
@@ -947,7 +949,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                   className="rounded text-indigo-600"
                 />
                 <span>
-                  Issue & Record Refund in Financial Ledger (£{(((selectedReturn.refundAmountMinor ?? (selectedReturn as any).totalRefundMinor ?? 0)) / 100).toFixed(2)})
+                  Issue & Record Refund in Financial Ledger ({formatMoney((selectedReturn.refundAmountMinor ?? (selectedReturn as any).totalRefundMinor ?? 0), config.baseCurrency)})
                 </span>
               </label>
             </div>

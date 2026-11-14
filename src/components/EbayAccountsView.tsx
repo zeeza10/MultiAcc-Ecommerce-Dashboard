@@ -29,6 +29,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [activeTab, setActiveTab] = useState<'ACCOUNTS' | 'EXCEPTIONS'>('ACCOUNTS');
   const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
   const [recentSyncs, setRecentSyncs] = useState<any[]>([]);
+  const [integrationReady, setIntegrationReady] = useState(false);
+  const [integrationMessage, setIntegrationMessage] = useState('Live eBay OAuth and order synchronization are not enabled yet.');
   const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
@@ -51,6 +53,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         api.getProducts(),
       ]);
       setAccounts(accRes.accounts);
+      setIntegrationReady(accRes.integrationReady);
+      setIntegrationMessage(accRes.integrationMessage);
       setRecentSyncs(accRes.recentSyncs);
       setExceptions(excRes.exceptions);
       setProducts(prodRes.products);
@@ -112,16 +116,24 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">eBay Marketplace Integration</h1>
           <p className="text-xs text-gray-500">
-            Multi-account REST adapter managing OAuth identity, idempotent order polling, and unmapped SKU exception queue.
+            Account metadata and SKU exception management. Live OAuth and order synchronization are gated until secure credentials and token storage are configured.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
           <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 font-semibold">
-            API Environment: eBay Sandbox & Production Ready
+            Read-only mode — OAuth setup pending
           </span>
         </div>
       </div>
+
+      {!integrationReady && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs">
+          <div className="font-semibold mb-1">Live eBay integration is not enabled</div>
+          <p>{integrationMessage}</p>
+          <p className="mt-1">Existing account statuses are database records only; they do not confirm a live eBay OAuth connection.</p>
+        </div>
+      )}
 
       {syncFeedback && (
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-900 text-xs flex items-center justify-between">
@@ -190,14 +202,14 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      OAuth: {acc.authStatus}
+                      Stored account status: {acc.authStatus}
                     </span>
                   </div>
 
                   <div className="bg-slate-50 border border-slate-200 rounded-md p-2.5 text-xs space-y-1">
                     <div className="flex justify-between text-gray-600">
-                      <span>Token Validity:</span>
-                      <span className="font-semibold text-emerald-700">Valid (30 Days Remaining)</span>
+                      <span>Recorded token expiry:</span>
+                      <span className="font-semibold text-gray-700">{acc.tokenExpiresAt ? 'Stored expiry recorded (not live-verified)' : 'No token expiry recorded'}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Auto Polling Schedule:</span>
@@ -217,18 +229,20 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                   <div className="flex items-center justify-end space-x-2 pt-1">
                     <button
                       onClick={() => handleReconnect(acc.id)}
-                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition"
+                      disabled={!integrationReady}
+                      title={!integrationReady ? integrationMessage : undefined}
+                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Renew OAuth
                     </button>
 
                     <button
                       onClick={() => handleSync(acc.id)}
-                      disabled={isSyncing}
-                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50"
+                      disabled={!integrationReady || isSyncing}
+                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Polling...' : 'Sync Orders Now'}</span>
+                      <span>{isSyncing ? 'Polling...' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
                     </button>
                   </div>
                 </div>

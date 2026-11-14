@@ -150,12 +150,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Finance & Payouts',
       items: [
-        { id: 'payouts', label: 'eBay Payouts & Treasury', icon: CreditCard, phase: 'P4', permission: 'finance.view' },
-        { id: 'reconciliation', label: 'Reconciliation', icon: Receipt, phase: 'P4', permission: 'finance.view' },
+        { id: 'payouts', label: 'eBay Payouts & Treasury', icon: CreditCard, phase: 'P4', permission: 'finance.manage' },
+        { id: 'reconciliation', label: 'Reconciliation', icon: Receipt, phase: 'P4', permission: 'finance.manage' },
         { id: 'invoices', label: 'Invoices', icon: FileText, phase: 'P4', permission: 'finance.view' },
         { id: 'payments', label: 'Payments', icon: CreditCard, phase: 'P4', permission: 'finance.view' },
-        { id: 'expenses', label: 'Expenses', icon: Receipt, phase: 'P4', permission: 'finance.view' },
-        { id: 'profitability', label: 'Profitability', icon: TrendingUp, phase: 'P4', permission: 'finance.view' },
+        { id: 'expenses', label: 'Expenses', icon: Receipt, phase: 'P4', permission: 'finance.manage' },
+        { id: 'profitability', label: 'Profitability', icon: TrendingUp, phase: 'P4', permission: 'finance.manage' },
       ],
     },
     {

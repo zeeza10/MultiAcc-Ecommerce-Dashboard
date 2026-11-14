@@ -12,7 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { Product, User, SystemConfig } from '../types';
+import { Product, User, SystemConfig, Client3PL } from '../types';
 
 interface ProductsViewProps {
   currentUser: User;
@@ -20,12 +20,15 @@ interface ProductsViewProps {
   initialFilter?: any;
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const ProductsView: React.FC<ProductsViewProps> = ({
   currentUser,
   config,
   initialFilter,
 }) => {
   const [products, setProducts] = useState<any[]>([]);
+  const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterLowStockOnly, setFilterLowStockOnly] = useState(initialFilter?.filter === 'LOW_STOCK');
@@ -35,11 +38,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [newSku, setNewSku] = useState('');
   const [newName, setNewName] = useState('');
   const [newBarcode, setNewBarcode] = useState('');
-  const [newCategory, setNewCategory] = useState('Audio');
-  const [newCost, setNewCost] = useState('25.00');
-  const [newPrice, setNewPrice] = useState('59.99');
-  const [newThreshold, setNewThreshold] = useState('15');
-  const [newReorder, setNewReorder] = useState('50');
+  const [newCategory, setNewCategory] = useState('');
+  const [newCost, setNewCost] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newThreshold, setNewThreshold] = useState('');
+  const [newReorder, setNewReorder] = useState('');
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
@@ -49,8 +52,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const res = await api.getProducts();
-      setProducts(res.products);
+      const [res, clientRes] = await Promise.all([
+        api.getProducts(),
+        api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
+      ]);
+      setProducts(res.products || []);
+      setClients(clientRes.clients || []);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
@@ -62,8 +69,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     e.preventDefault();
     setFormError('');
 
-    if (!newSku.trim() || !newName.trim()) {
-      setFormError('SKU and Product Name are required.');
+    if (!newSku.trim() || !newName.trim() || !newCategory.trim()) {
+      setFormError('SKU, Product Name and Category are required.');
+      return;
+    }
+    const cost = Number.parseFloat(newCost);
+    const price = Number.parseFloat(newPrice);
+    const threshold = Number.parseInt(newThreshold, 10);
+    const reorder = Number.parseInt(newReorder, 10);
+    if (![cost, price].every(value => Number.isFinite(value) && value >= 0) ||
+        ![threshold, reorder].every(value => Number.isSafeInteger(value) && value >= 0)) {
+      setFormError('Enter valid non-negative cost, price and stock thresholds.');
       return;
     }
 
@@ -72,11 +88,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         sku: newSku.trim().toUpperCase(),
         name: newName.trim(),
         barcode: newBarcode.trim() || undefined,
-        category: newCategory,
-        costPriceMinor: Math.round(parseFloat(newCost || '0') * 100),
-        sellingPriceMinor: Math.round(parseFloat(newPrice || '0') * 100),
-        lowStockThreshold: parseInt(newThreshold, 10) || 10,
-        reorderLevel: parseInt(newReorder, 10) || 30,
+        category: newCategory.trim(),
+        costPriceMinor: Math.round(cost * 100),
+        sellingPriceMinor: Math.round(price * 100),
+        lowStockThreshold: threshold,
+        reorderLevel: reorder,
         ownerType: currentUser.role === 'CLIENT_USER' ? 'CLIENT' : 'OPERATOR',
         ownerId: currentUser.role === 'CLIENT_USER' ? currentUser.clientId : 'operator',
       });
@@ -86,6 +102,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
       setNewSku('');
       setNewName('');
       setNewBarcode('');
+      setNewCategory('');
+      setNewCost('');
+      setNewPrice('');
+      setNewThreshold('');
+      setNewReorder('');
       loadProducts();
     } catch (err: any) {
       setFormError(err.message || 'Failed to create product');
@@ -248,7 +269,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                               : 'bg-indigo-100 text-indigo-800'
                           }`}
                         >
-                          {p.ownerType === 'OPERATOR' ? 'Operator' : '3PL Apex'}
+                          {p.ownerType === 'OPERATOR' ? 'Operator' : (clients.find(client => client.id === p.ownerId)?.companyName || '3PL Client')}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-500 text-[11px]">
@@ -256,12 +277,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </td>
                       {!isWarehouseStaff && (
                         <td className="py-2.5 px-3 font-medium text-gray-700">
-                          £{(p.costPriceMinor / 100).toFixed(2)}
+                          {formatMoney(p.costPriceMinor, config.baseCurrency)}
                         </td>
                       )}
                       {!isWarehouseStaff && (
                         <td className="py-2.5 px-3 font-bold text-gray-900">
-                          £{(p.sellingPriceMinor / 100).toFixed(2)}
+                          {formatMoney(p.sellingPriceMinor, config.baseCurrency)}
                         </td>
                       )}
                       <td className="py-2.5 px-3">
@@ -325,17 +346,14 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">Category</label>
-                  <select
+                  <input
+                    type="text"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md p-2 bg-white"
-                  >
-                    <option value="Audio">Audio</option>
-                    <option value="Video">Video</option>
-                    <option value="Peripherals">Peripherals</option>
-                    <option value="Accessories">Accessories</option>
-                    <option value="Packaging">Packaging</option>
-                  </select>
+                    placeholder="Enter category from your catalog"
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    required
+                  />
                 </div>
               </div>
 

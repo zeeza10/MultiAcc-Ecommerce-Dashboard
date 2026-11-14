@@ -11,13 +11,14 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from 'lucide-react';
-import { Order, Product, User } from '../types';
+import { Order, Product, User, SystemConfig } from '../types';
 import { api } from '../services/api';
 
 interface EditOrderModalProps {
   order: Order;
   products: Product[];
   currentUser: User | null;
+  config: SystemConfig;
   onClose: () => void;
   onSuccess: (updatedOrder: Order) => void;
 }
@@ -33,11 +34,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   order,
   products,
   currentUser,
+  config,
   onClose,
   onSuccess,
 }) => {
   const isDispatched = ['Shipped', 'Delivered'].includes(order.status);
-  const [adminOverride, setAdminOverride] = useState<boolean>(true);
+  const [adminOverride] = useState<boolean>(false);
 
   // Form State
   const [customerName, setCustomerName] = useState(order.customerName || '');
@@ -48,7 +50,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [country, setCountry] = useState(order.shippingAddress?.country || 'GB');
   const [status, setStatus] = useState<string>(order.status);
   const [notes, setNotes] = useState(order.notes || '');
-  const [reason, setReason] = useState('Order details corrected by authorized administrator');
+  const [reason, setReason] = useState('');
   const [shippingFeeMinor, setShippingFeeMinor] = useState(order.shippingChargeMinor || 0);
 
   const [lines, setLines] = useState<EditableLine[]>(
@@ -65,11 +67,11 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Can line items, prices, and status be edited?
-  const canEditLines = !isDispatched || adminOverride;
+  const canEditLines = order.status === 'New';
 
   // Calculations
   const subtotalMinor = lines.reduce((acc, l) => acc + l.quantity * l.unitPriceMinor, 0);
-  const vatMinor = Math.round(subtotalMinor * 0.2);
+  const vatMinor = Math.round(subtotalMinor * config.defaultVatRatePercent / 100);
   const totalMinor = subtotalMinor + shippingFeeMinor;
 
   const handleAddLine = () => {
@@ -186,7 +188,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 Edit Order <span className="text-amber-400 font-mono text-base font-bold">{order.orderNumber}</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Audited modification • Actor: <span className="text-slate-200">{currentUser?.name || 'Sarah Jenkins (Super Admin)'}</span>
+                Audited modification • Actor: <span className="text-slate-200">{currentUser?.name || 'Workspace User'}</span>
               </p>
             </div>
           </div>
@@ -223,15 +225,15 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     Order is currently marked as {order.status}
                   </p>
                   <p className="text-amber-300/80 mt-0.5">
-                    Admin correction mode is enabled. Changes to lines, unit prices, shipping, or status will post as an audited correction entry in the compliance ledger.
+                    Only new, unallocated orders can be edited. Later order stages must use the dedicated status workflow.
                   </p>
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer text-amber-100 font-semibold select-none bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/30 self-start md:self-auto hover:bg-amber-500/30 transition-colors">
                 <input
                   type="checkbox"
-                  checked={adminOverride}
-                  onChange={(e) => setAdminOverride(e.target.checked)}
+                  checked={false}
+                  disabled
                   className="rounded text-amber-500 focus:ring-amber-400"
                 />
                 Admin Override Active
@@ -419,7 +421,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 <label className="block text-xs text-slate-400 mb-1">Order Status</label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value)}
+                  disabled
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="New">New</option>
@@ -466,19 +468,19 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between text-slate-400">
                     <span>Subtotal:</span>
-                    <span className="font-mono text-slate-200">£{(subtotalMinor / 100).toFixed(2)}</span>
+                    <span className="font-mono text-slate-200">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(subtotalMinor / 100)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
-                    <span>VAT (20%):</span>
-                    <span className="font-mono text-slate-200">£{(vatMinor / 100).toFixed(2)}</span>
+                    <span>VAT ({config.defaultVatRatePercent}%):</span>
+                    <span className="font-mono text-slate-200">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(vatMinor / 100)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Shipping Charged:</span>
-                    <span className="font-mono text-slate-200">£{(shippingFeeMinor / 100).toFixed(2)}</span>
+                    <span className="font-mono text-slate-200">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(shippingFeeMinor / 100)}</span>
                   </div>
                   <div className="border-t border-slate-800 pt-2 flex justify-between font-semibold text-sm">
                     <span className="text-slate-200">Total Order Amount:</span>
-                    <span className="font-mono text-emerald-400">£{(totalMinor / 100).toFixed(2)}</span>
+                    <span className="font-mono text-emerald-400">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(totalMinor / 100)}</span>
                   </div>
                 </div>
               </div>

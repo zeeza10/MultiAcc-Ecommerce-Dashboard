@@ -21,6 +21,7 @@ import {
   WarehousePackagingJob,
   WarehouseShippingJob,
   Client3PL,
+  RateCard,
   User,
 } from '../types';
 import { api } from '../services/api';
@@ -30,11 +31,19 @@ interface WarehouseServicesViewProps {
 }
 
 export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
+  const canManageFulfilment = currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER';
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
   const [summary, setSummary] = useState<any>(null);
   const [packagingJobs, setPackagingJobs] = useState<WarehousePackagingJob[]>([]);
   const [shippingJobs, setShippingJobs] = useState<WarehouseShippingJob[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
+  const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [storageSnapshots, setStorageSnapshots] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
+  const [stockLedger, setStockLedger] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('GBP');
   const [loading, setLoading] = useState(true);
 
   // New Job Modals
@@ -44,22 +53,21 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   // Form states for Packaging Job
   const [pkgClientId, setPkgClientId] = useState('');
   const [pkgType, setPkgType] = useState<'CUSTOM_BOX' | 'BUBBLE_MAILER' | 'PALLET_WRAP' | 'FRAGILE_PREP'>('CUSTOM_BOX');
-  const [pkgQty, setPkgQty] = useState(50);
-  const [pkgMaterialCost, setPkgMaterialCost] = useState('25.00');
-  const [pkgServiceCharge, setPkgServiceCharge] = useState('60.00');
+  const [pkgQty, setPkgQty] = useState(1);
+  const [pkgMaterialCost, setPkgMaterialCost] = useState('');
   const [pkgOrderNumber, setPkgOrderNumber] = useState('');
   const [pkgNotes, setPkgNotes] = useState('');
 
   // Form states for Shipping Job
   const [shpClientId, setShpClientId] = useState('');
-  const [shpCarrier, setShpCarrier] = useState('Royal Mail');
+  const [shpCarrier, setShpCarrier] = useState('');
   const [shpTracking, setShpTracking] = useState('');
-  const [shpServiceLevel, setShpServiceLevel] = useState('Tracked 24');
-  const [shpWeight, setShpWeight] = useState('1.2');
-  const [shpCarrierCost, setShpCarrierCost] = useState('4.20');
-  const [shpServiceCharge, setShpServiceCharge] = useState('7.50');
-  const [shpDestination, setShpDestination] = useState('Manchester, UK');
-  const [shpOrderNumber, setShpOrderNumber] = useState('NX-ORD-2026-001');
+  const [shpServiceLevel, setShpServiceLevel] = useState('');
+  const [shpWeight, setShpWeight] = useState('');
+  const [shpCarrierCost, setShpCarrierCost] = useState('');
+  const [shpServiceCharge, setShpServiceCharge] = useState('');
+  const [shpDestination, setShpDestination] = useState('');
+  const [shpOrderNumber, setShpOrderNumber] = useState('');
 
   useEffect(() => {
     loadData();
@@ -68,16 +76,23 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sumRes, pkgRes, shpRes, clientRes] = await Promise.all([
-        api.getWarehouseServicesSummary(),
-        api.getPackagingJobs(),
-        api.getShippingJobs(),
-        api.get3PLClients(),
+      const [sumRes, pkgRes, shpRes, clientRes, storageRes, productRes, balanceRes, ledgerRes, invoiceRes, configRes] = await Promise.all([
+        api.getWarehouseServicesSummary(), api.getPackagingJobs(), api.getShippingJobs(), api.get3PLClients(),
+        api.getStorageSnapshots(), api.getProducts(), api.getBalances(), api.getStockLedger(), api.getInvoices(), api.getConfig(),
       ]);
-      setSummary(sumRes);
-      setPackagingJobs(pkgRes.packagingJobs);
-      setShippingJobs(shpRes.shippingJobs);
+      setSummary(sumRes.summary || sumRes);
+      setPackagingJobs(pkgRes.packagingJobs || []);
+      setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
+      if (!pkgClientId && clientRes.clients?.length) setPkgClientId(clientRes.clients[0].id);
+      if (!shpClientId && clientRes.clients?.length) setShpClientId(clientRes.clients[0].id);
+      setRateCards(clientRes.rateCards || []);
+      setStorageSnapshots(storageRes.snapshots || []);
+      setProducts(productRes.products || []);
+      setBalances(balanceRes.balances || []);
+      setStockLedger(ledgerRes.ledger || []);
+      setInvoices(invoiceRes.invoices || []);
+      setCurrency(String(configRes.config?.baseCurrency || 'GBP').toUpperCase());
       if (clientRes.clients && clientRes.clients.length > 0) {
         setPkgClientId(clientRes.clients[0].id);
         setShpClientId(clientRes.clients[0].id);
@@ -89,20 +104,61 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     }
   };
 
+  const formatMoney = (minor: number, currencyCode = currency) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: currencyCode }).format((Number(minor) || 0) / 100);
+  const totalAvailable = balances.reduce((sum, row) => sum + Number(row.available || 0), 0);
+  const totalReserved = balances.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
+  const totalDamaged = balances.reduce((sum, row) => sum + Number(row.damaged || 0), 0);
+  const clientStorageRows = storageSnapshots.map(snapshot => {
+    const client = clients.find(item => item.id === snapshot.clientId);
+    const clientBalances = balances.filter(item => item.ownerId === snapshot.clientId);
+    const clientProducts = products.filter(item => item.ownerType === 'CLIENT' && item.ownerId === snapshot.clientId);
+    const locations = [...new Set(stockLedger.filter(item => item.ownerId === snapshot.clientId && item.locationCode).map(item => item.locationCode))];
+    return {
+      id: snapshot.id, clientName: client?.companyName || 'Unknown client', code: client?.code || '—',
+      skuCount: clientProducts.length, skus: clientProducts.map(item => item.sku).join(', ') || '—',
+      locations: locations.join(', ') || '—',
+      onHand: clientBalances.reduce((sum, item) => sum + Number(item.onHand || 0), 0),
+      available: clientBalances.reduce((sum, item) => sum + Number(item.available || 0), 0),
+      reserved: clientBalances.reduce((sum, item) => sum + Number(item.reserved || 0), 0),
+      damaged: clientBalances.reduce((sum, item) => sum + Number(item.damaged || 0), 0),
+      snapshotDate: snapshot.snapshotDate, estimatedCostMinor: Number(snapshot.estimatedCostMinor || 0),
+    };
+  });
+  const clientBillingRows = clients.map(client => {
+    const storage = storageSnapshots.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.estimatedCostMinor || 0), 0);
+    const packaging = packagingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
+    const shipping = shippingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
+    const clientInvoices = invoices.filter(item => item.recipientId === client.id);
+    const billed = clientInvoices.reduce((sum, item) => sum + Number(item.totalMinor || 0), 0);
+    const paid = clientInvoices.reduce((sum, item) => sum + Number(item.paidAmountMinor || 0), 0);
+    const balance = Math.max(0, billed - paid);
+    return { id: client.id, companyName: client.companyName, code: client.code, storage, packaging, shipping, billed, paid, balance,
+      status: billed === 0 ? 'NOT BILLED' : balance === 0 ? 'SETTLED' : paid > 0 ? 'PARTIAL' : 'DUE' };
+  });
+  const storageRates = rateCards.flatMap(card => [card.storagePalletPerMonthMinor, card.storageShelfPerMonthMinor, card.storageBinPerMonthMinor].map(Number).filter(value => Number.isFinite(value) && value > 0));
+  const minStorageRate = storageRates.length ? Math.min(...storageRates) : 0;
+  const maxStorageRate = storageRates.length ? Math.max(...storageRates) : 0;
+  const selectedPkgClient = clients.find(client => client.id === pkgClientId);
+  const selectedPkgRate = rateCards.find(card => card.id === selectedPkgClient?.rateCardId);
+  const estimatedPackagingServiceMinor = Number(selectedPkgRate?.packFeeMinor || 0) * pkgQty
+    + Number(selectedPkgRate?.extraItemFeeMinor || 0) * Math.max(0, pkgQty - 1);
+
   const handleCreatePackagingJob = async (e: React.FormEvent) => {
     e.preventDefault();
     const client = clients.find((c) => c.id === pkgClientId);
     try {
-      const matCostMinor = Math.round(parseFloat(pkgMaterialCost) * 100) || 0;
-      const srvChargeMinor = Math.round(parseFloat(pkgServiceCharge) * 100) || 0;
+      const materialCost = Number.parseFloat(pkgMaterialCost);
+      if (!pkgClientId || !Number.isSafeInteger(pkgQty) || pkgQty <= 0 || !Number.isFinite(materialCost) || materialCost < 0) {
+        alert('Select a client and enter a valid quantity and material cost.');
+        return;
+      }
+      const matCostMinor = Math.round(materialCost * 100);
       await api.createPackagingJob({
         clientId: pkgClientId,
         clientName: client?.companyName || '3PL Partner',
         packagingType: pkgType,
         quantity: pkgQty,
         materialCostMinor: matCostMinor,
-        serviceChargeMinor: srvChargeMinor,
-        totalChargeMinor: matCostMinor + srvChargeMinor,
         orderNumber: pkgOrderNumber || undefined,
         notes: pkgNotes,
         performedBy: currentUser.name,
@@ -118,15 +174,25 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     e.preventDefault();
     const client = clients.find((c) => c.id === shpClientId);
     try {
-      const carCostMinor = Math.round(parseFloat(shpCarrierCost) * 100) || 0;
-      const srvChargeMinor = Math.round(parseFloat(shpServiceCharge) * 100) || 0;
+      const weight = Number.parseFloat(shpWeight);
+      const carrierCost = Number.parseFloat(shpCarrierCost || '0');
+      const serviceCharge = Number.parseFloat(shpServiceCharge || '0');
+      if (!shpClientId || !shpCarrier || !shpServiceLevel || !shpDestination.trim() ||
+          !Number.isFinite(weight) || weight <= 0 ||
+          !Number.isFinite(carrierCost) || carrierCost < 0 ||
+          !Number.isFinite(serviceCharge) || serviceCharge < 0) {
+        alert('Select a client, carrier and service level; enter a valid weight, destination and non-negative charges.');
+        return;
+      }
+      const carCostMinor = Math.round(carrierCost * 100);
+      const srvChargeMinor = Math.round(serviceCharge * 100);
       await api.createShippingJob({
         clientId: shpClientId,
         clientName: client?.companyName || '3PL Partner',
         carrier: shpCarrier,
         trackingNumber: shpTracking || `GB-${Date.now().toString().slice(-8)}TRK`,
         serviceLevel: shpServiceLevel,
-        parcelWeightKg: parseFloat(shpWeight) || 1.0,
+        parcelWeightKg: weight,
         carrierCostMinor: carCostMinor,
         serviceChargeMinor: srvChargeMinor,
         totalChargeMinor: carCostMinor + srvChargeMinor,
@@ -147,7 +213,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Phase 3 • Warehouse Services
+              Warehouse Services
             </span>
             <span className="text-xs text-slate-400 font-medium">Dedicated Operational Workflow</span>
           </div>
@@ -160,20 +226,20 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          {canManageFulfilment && <button
             onClick={() => setShowPkgModal(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs"
           >
             <PackageCheck className="w-4 h-4 text-indigo-500" />
             <span>Record Packaging Job</span>
-          </button>
-          <button
+          </button>}
+          {canManageFulfilment && <button
             onClick={() => setShowShpModal(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition shadow-xs shadow-indigo-600/20"
           >
             <Truck className="w-4 h-4" />
             <span>Record Outbound Dispatch</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -187,11 +253,11 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.storage?.totalStorageChargesMinor || 21600) / 100).toFixed(2)}
+            {formatMoney(summary?.storageEstimatedCostMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>{summary?.storage?.activeClients || 5} Active 3PL Clients Stored</span>
+            <span>{clients.filter(client => client.accountStatus === 'ACTIVE').length} Active 3PL Clients Stored</span>
           </div>
         </div>
 
@@ -203,10 +269,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.packaging?.totalPackagingChargesMinor || 58000) / 100).toFixed(2)}
+            {formatMoney(summary?.packagingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 mt-2">
-            <span>{summary?.packaging?.totalUnitsPacked || 264} units packaged & wrapped</span>
+            <span>{packagingJobs.reduce((sum, job) => sum + Number(job.quantity || 0), 0)} units packaged & wrapped</span>
           </div>
         </div>
 
@@ -218,7 +284,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.shipping?.totalShippingChargesMinor || 6650) / 100).toFixed(2)}
+            {formatMoney(summary?.shippingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 mt-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -234,10 +300,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
-            £{((summary?.billing?.outstandingBalanceMinor || 21600) / 100).toFixed(2)}
+            {formatMoney(invoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.totalMinor || 0) - Number(invoice.paidAmountMinor || 0)), 0))}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
-            <span>Paid: £{((summary?.billing?.paidAmountMinor || 35600) / 100).toFixed(2)}</span>
+            <span>Paid: {formatMoney(invoices.reduce((sum, invoice) => sum + Number(invoice.paidAmountMinor || 0), 0))}</span>
           </div>
         </div>
       </div>
@@ -305,105 +371,40 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       {activeTab === 'storage' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              Multi-Client Segregated Storage Inventory
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Client inventory is quarantined and separated by client code with granular shelf, bin, and pallet location allocations.
-            </p>
-
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Multi-Client Storage & Inventory</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Client stock and storage snapshots loaded from Supabase.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Client SKUs</div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">5 Active SKUs</div>
-                <div className="text-[11px] text-slate-500 mt-1">Apex, Bolt, Luma, Nordic Eco</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Client SKUs</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{products.filter(item => item.ownerType === 'CLIENT').length}</div>
+                <div className="text-[11px] text-slate-500 mt-1">{clients.length} client accounts</div>
               </div>
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Physical Stock Status</div>
-                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">540 Avail / 35 Rsv</div>
-                <div className="text-[11px] text-slate-500 mt-1">5 Damaged in quarantine bin</div>
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{totalAvailable} Available / {totalReserved} Reserved</div>
+                <div className="text-[11px] text-slate-500 mt-1">{totalDamaged} damaged units</div>
               </div>
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Monthly Storage Rate</div>
-                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">£0.35 - £1.20</div>
-                <div className="text-[11px] text-slate-500 mt-1">Per cubic meter / pallet per day</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Monthly Storage Rates</div>
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatMoney(minStorageRate)} – {formatMoney(maxStorageRate)}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Lowest to highest configured unit rate</div>
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Client</th>
-                    <th className="py-2.5 px-3">SKU & Product</th>
-                    <th className="py-2.5 px-3">Location Bins</th>
-                    <th className="py-2.5 px-3 text-center">Available</th>
-                    <th className="py-2.5 px-3 text-center">Reserved</th>
-                    <th className="py-2.5 px-3 text-center">Damaged</th>
-                    <th className="py-2.5 px-3 text-right">Est. Storage Fee</th>
-                  </tr>
+                  <tr><th className="py-2.5 px-3">Client</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Location Bins</th><th className="py-2.5 px-3 text-center">On Hand</th><th className="py-2.5 px-3 text-center">Available</th><th className="py-2.5 px-3 text-center">Reserved</th><th className="py-2.5 px-3 text-center">Damaged</th><th className="py-2.5 px-3 text-right">Storage Estimate</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">APX-SPK-100</div>
-                      <div className="text-[11px] text-slate-500">Apex SoundPulse Rugged Waterproof Speaker</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">A-01-02, B-02-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">142</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">8</td>
-                    <td className="py-3 px-3 text-center text-rose-500">2</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£52.50 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">APX-EAR-200</div>
-                      <div className="text-[11px] text-slate-500">Apex PureBass Wireless Earbuds with ANC</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">A-02-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">88</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">12</td>
-                    <td className="py-3 px-3 text-center text-rose-500">0</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£35.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Bolt Gear Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">BLT-SND-10</div>
-                      <div className="text-[11px] text-slate-500">Bolt CinemaSound 120W Compact TV Soundbar</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">PALLET-P04</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">54</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">6</td>
-                    <td className="py-3 px-3 text-center text-rose-500">1</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£72.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Luma Smart Home</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">LUM-CAM-01</div>
-                      <div className="text-[11px] text-slate-500">Luma Smart 2K Pan & Tilt Indoor WiFi Camera</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">C-01-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">110</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">4</td>
-                    <td className="py-3 px-3 text-center text-rose-500">0</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£28.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Nordic Eco Living</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">NRD-WRM-01</div>
-                      <div className="text-[11px] text-slate-500">Nordic Eco Wool Heated Smart Throw Blanket</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">PALLET-P08</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">65</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">5</td>
-                    <td className="py-3 px-3 text-center text-rose-500">2</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£48.50 / mo</td>
-                  </tr>
+                  {clientStorageRows.map(row => (
+                    <tr key={row.id}>
+                      <td className="py-3 px-3"><div className="font-semibold text-slate-900 dark:text-slate-100">{row.clientName}</div><div className="text-[10px] text-slate-400">{row.code} · {row.snapshotDate}</div></td>
+                      <td className="py-3 px-3"><div className="font-medium">{row.skuCount} SKUs</div><div className="text-[10px] text-slate-400 max-w-[220px] truncate" title={row.skus}>{row.skus}</div></td>
+                      <td className="py-3 px-3 font-mono text-[11px]">{row.locations}</td>
+                      <td className="py-3 px-3 text-center">{row.onHand}</td><td className="py-3 px-3 text-center font-bold text-emerald-600">{row.available}</td><td className="py-3 px-3 text-center text-amber-600">{row.reserved}</td><td className="py-3 px-3 text-center text-rose-500">{row.damaged}</td><td className="py-3 px-3 text-right font-mono">{formatMoney(row.estimatedCostMinor)}</td>
+                    </tr>
+                  ))}
+                  {clientStorageRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-slate-500">No storage snapshots are recorded in the database yet.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -424,13 +425,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   Tracking packaging jobs, material consumption, staff labor, and client billable rates.
                 </p>
               </div>
-              <button
+              {canManageFulfilment && <button
                 onClick={() => setShowPkgModal(true)}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition shadow-xs flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Packaging Record</span>
-              </button>
+              </button>}
             </div>
 
             <div className="overflow-x-auto">
@@ -465,13 +466,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                       </td>
                       <td className="py-3 px-3 text-center font-bold">{j.quantity}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(j.materialCostMinor / 100).toFixed(2)}
+                        {formatMoney(j.materialCostMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(j.serviceChargeMinor / 100).toFixed(2)}
+                        {formatMoney(j.serviceChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                        £{(j.totalChargeMinor / 100).toFixed(2)}
+                        {formatMoney(j.totalChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -507,13 +508,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   Carrier dispatch records, tracking integrations, carrier postage costs, and client shipping billable rates.
                 </p>
               </div>
-              <button
+              {canManageFulfilment && <button
                 onClick={() => setShowShpModal(true)}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition shadow-xs flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Dispatch Job</span>
-              </button>
+              </button>}
             </div>
 
             <div className="overflow-x-auto">
@@ -549,13 +550,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                       </td>
                       <td className="py-3 px-3 text-slate-500">{s.destination}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-500">
-                        £{(s.carrierCostMinor / 100).toFixed(2)}
+                        {formatMoney(s.carrierCostMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-medium">
-                        £{(s.serviceChargeMinor / 100).toFixed(2)}
+                        {formatMoney(s.serviceChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                        £{(s.totalChargeMinor / 100).toFixed(2)}
+                        {formatMoney(s.totalChargeMinor, currency)}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -581,89 +582,28 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       {activeTab === 'billing' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              Client-Wise Billing & Settlement Matrix
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Comprehensive statement of services rendered (Storage, Packaging, Dispatch) with outstanding ledger balances.
-            </p>
-
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Client-Wise Billing & Settlement</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Service activity and invoice balances calculated from stored storage, packaging, shipping and invoice records.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Client Company</th>
-                    <th className="py-2.5 px-3">Account Code</th>
-                    <th className="py-2.5 px-3 text-right">Storage Charges</th>
-                    <th className="py-2.5 px-3 text-right">Packaging Charges</th>
-                    <th className="py-2.5 px-3 text-right">Shipping Charges</th>
-                    <th className="py-2.5 px-3 text-right">Total Charges</th>
-                    <th className="py-2.5 px-3 text-right">Paid Amount</th>
-                    <th className="py-2.5 px-3 text-right">Balance Due</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                  </tr>
+                  <tr><th className="py-2.5 px-3">Client Company</th><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3 text-right">Storage</th><th className="py-2.5 px-3 text-right">Packaging</th><th className="py-2.5 px-3 text-right">Shipping</th><th className="py-2.5 px-3 text-right">Invoiced Total</th><th className="py-2.5 px-3 text-right">Paid</th><th className="py-2.5 px-3 text-right">Balance Due</th><th className="py-2.5 px-3 text-center">Status</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-APEX-01</td>
-                    <td className="py-3 px-3 text-right font-mono">£87.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£216.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£10.30</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£313.80</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£313.80</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        SETTLED
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Bolt Gear Ltd</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-BOLT-02</td>
-                    <td className="py-3 px-3 text-right font-mono">£72.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£140.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£17.70</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£229.70</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£150.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-600 font-bold">£79.70</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-                        PARTIAL
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Zenith Retail Partners</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-ZEN-03</td>
-                    <td className="py-3 px-3 text-right font-mono">£60.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£93.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£38.50</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£192.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£100.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-600 font-bold">£92.00</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-                        PARTIAL
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">CloudLogix Direct</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-CLOUD-04</td>
-                    <td className="py-3 px-3 text-right font-mono">£45.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£130.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£0.00</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£175.50</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-rose-600 font-bold">£175.50</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
-                        DUE
-                      </span>
-                    </td>
-                  </tr>
+                  {clientBillingRows.map(row => (
+                    <tr key={row.id}>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{row.companyName}</td>
+                      <td className="py-3 px-3 font-mono text-slate-500">{row.code}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.storage)}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.packaging)}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.shipping)}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold">{formatMoney(row.billed)}</td>
+                      <td className="py-3 px-3 text-right font-mono text-emerald-600">{formatMoney(row.paid)}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold">{formatMoney(row.balance)}</td>
+                      <td className="py-3 px-3 text-center"><span className="px-2 py-0.5 rounded text-[10px] font-semibold">{row.status}</span></td>
+                    </tr>
+                  ))}
+                  {clientBillingRows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-slate-500">No 3PL billing records are available.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -737,15 +677,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Service Fee (£)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={pkgServiceCharge}
-                    onChange={(e) => setPkgServiceCharge(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100"
-                  />
+                <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                  <label className="block text-slate-400 mb-1">Rate-Card Service Fee</label>
+                  <div className="text-sm font-semibold text-indigo-300">{formatMoney(estimatedPackagingServiceMinor)}</div>
+                  <p className="text-[10px] text-slate-500 mt-1">Calculated from the selected client's saved rate card when the job is submitted.</p>
                 </div>
               </div>
 

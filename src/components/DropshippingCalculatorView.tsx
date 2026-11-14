@@ -31,17 +31,17 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
   const [loading, setLoading] = useState(true);
 
   // Form Inputs
-  const [productName, setProductName] = useState('Nexus Pro Active Noise-Cancelling Headphones');
-  const [skuInput, setSkuInput] = useState('NX-AUD-001');
-  const [supplierName, setSupplierName] = useState('Anker Innovations Technology Ltd');
-  const [purchaseCost, setPurchaseCost] = useState('38.00');
-  const [shippingCost, setShippingCost] = useState('4.50');
-  const [packagingCost, setPackagingCost] = useState('1.20');
-  const [additionalExpenses, setAdditionalExpenses] = useState('0.50');
-  const [sellingPrice, setSellingPrice] = useState('89.99');
+  const [productName, setProductName] = useState('');
+  const [skuInput, setSkuInput] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [purchaseCost, setPurchaseCost] = useState('0.00');
+  const [shippingCost, setShippingCost] = useState('0.00');
+  const [packagingCost, setPackagingCost] = useState('0.00');
+  const [additionalExpenses, setAdditionalExpenses] = useState('0.00');
+  const [sellingPrice, setSellingPrice] = useState('0.00');
   const [shippingChargedToCustomer, setShippingChargedToCustomer] = useState('0.00');
-  const [marketplaceFeePercent, setMarketplaceFeePercent] = useState('12.8');
-  const [otherCosts, setOtherCosts] = useState('0.30');
+  const [marketplaceFeePercent, setMarketplaceFeePercent] = useState('0.00');
+  const [otherCosts, setOtherCosts] = useState('0.00');
 
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
@@ -54,12 +54,15 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodRes, calcRes] = await Promise.all([
+      const [prodRes, calcRes, configRes] = await Promise.all([
         api.getProducts(),
         api.getDropshippingCalculations(),
+        api.getConfig(),
       ]);
       setProducts(prodRes.products || []);
       setSavedSimulations(calcRes.calculations || []);
+      const baseCurrency = String(configRes.config?.baseCurrency || 'GBP').toUpperCase();
+      if (baseCurrency === 'GBP' || baseCurrency === 'USD' || baseCurrency === 'EUR') setCurrency(baseCurrency);
     } catch (err) {
       console.error('Failed to load dropshipping calculator initial data:', err);
     } finally {
@@ -70,11 +73,11 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
   const handleProductSelect = (sku: string) => {
     setSelectedSku(sku);
     if (sku === 'CUSTOM') {
-      setProductName('Custom Dropshipped Product');
-      setSkuInput('DS-NEW-01');
-      setSupplierName('Global Supplier Direct');
-      setPurchaseCost('25.00');
-      setSellingPrice('59.99');
+      setProductName('');
+      setSkuInput('');
+      setSupplierName('');
+      setPurchaseCost('0.00');
+      setSellingPrice('0.00');
       return;
     }
     const found = products.find((p) => p.sku === sku);
