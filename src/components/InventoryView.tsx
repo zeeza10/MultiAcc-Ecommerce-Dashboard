@@ -11,7 +11,7 @@ import {
   Package,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { StockBalance, StockLedgerEntry, User, SystemConfig } from '../types';
+import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL } from '../types';
 
 interface InventoryViewProps {
   currentUser: User;
@@ -27,6 +27,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
   const [balances, setBalances] = useState<StockBalance[]>([]);
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
+  const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -37,12 +38,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadInventoryData = async () => {
     setLoading(true);
     try {
-      const [balRes, ledRes] = await Promise.all([
-        api.getBalances(),
-        api.getStockLedger(),
+      const [balRes, ledRes, clientRes] = await Promise.all([
+        api.getBalances(), api.getStockLedger(),
+        api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setBalances(balRes.balances);
       setLedger(ledRes.ledger);
+      setClients(clientRes.clients || []);
     } catch (err) {
       console.error('Failed to load inventory:', err);
     } finally {
@@ -230,7 +232,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               : 'bg-indigo-100 text-indigo-800'
                           }`}
                         >
-                          {b.ownerId === 'operator' ? 'Operator' : '3PL Apex'}
+                          {b.ownerId === 'operator' ? 'Operator' : (clients.find(client => client.id === b.ownerId)?.companyName || '3PL Client')}
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
