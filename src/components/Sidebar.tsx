@@ -42,7 +42,6 @@ interface NavMenuItem {
   badge?: string | number;
   allowedRoles?: string[];
   permission?: string;
-  permission?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -58,8 +57,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Filter items allowed for this user role per SRS Matrix S4
   const isAllowedForRole = (item: NavMenuItem) => {
-    if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
-    if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
     if (item.permission && !permissions.includes('*') && !permissions.includes(item.permission)) return false;
     if (item.allowedRoles && !item.allowedRoles.includes(currentUser.role)) return false;
     if (currentUser.role === 'SUPER_ADMIN') return true;
