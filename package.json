@@ -9,7 +9,7 @@
     "preview": "npm run build && vite preview --host 127.0.0.1",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "start": "wrangler dev --ip 127.0.0.1",
+    "start": "npm run build && wrangler dev --ip 127.0.0.1",
     "deploy": "npm run build && wrangler deploy",
     "cf:dev": "wrangler dev",
     "cf:dry-run": "wrangler deploy --dry-run",
