@@ -121,6 +121,17 @@ const permissionByRoute = (method: string, path: string): string | null | undefi
   if (method === 'GET' && path === '/stock/adjustments') return 'inventory.view';
   if (method === 'POST' && path === '/stock/adjustments') return 'inventory.adjust';
   if (method === 'POST' && /^\/stock\/adjustments\/[^/]+\/decision$/.test(path)) return 'inventory.adjust';
+  if (method === 'GET' && path === '/orders') return 'orders.view';
+  if (method === 'GET' && /^\\/orders\\/[^/]+$/.test(path)) return 'orders.view';
+  if (method === 'POST' && path === '/orders') return 'orders.create';
+  if (method === 'POST' && /^\\/orders\\/[^/]+\\/transition$/.test(path)) return 'orders.edit';
+  if (method === 'GET' && path === '/suppliers') return 'purchasing.view';
+  if (method === 'GET' && path === '/purchase-orders') return 'purchasing.view';
+  if (method === 'GET' && path === '/returns') return 'returns.view';
+  if (method === 'POST' && /^\\/returns\\/[^/]+\\/disposition$/.test(path)) return 'returns.manage';
+  if (method === 'GET' && path === '/warehouses') return 'inventory.view';
+  if (method === 'POST' && path === '/warehouses') return 'inventory.manage';
+  if (method === 'POST' && /^\\/warehouses\\/[^/]+\\/locations$/.test(path)) return 'inventory.manage';
   return undefined;
 };
 
