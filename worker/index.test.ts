@@ -25,6 +25,16 @@ describe('Cloudflare Worker request boundary', () => {
     assert.match(body.error || '', /bearer token/i);
   });
 
+  it('requires authentication before resolving marketplace SKU exceptions', async () => {
+    const request = new Request('https://dashboard.example.com/api/v1/ebay/exceptions/00000000-0000-0000-0000-000000000000/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetProductId: '00000000-0000-0000-0000-000000000001' }),
+    });
+    const response = await worker.fetch(request, {}, context);
+    assert.equal(response.status, 401);
+  });
+
   it('allows same-origin preflight requests', async () => {
     const request = new Request('https://dashboard.example.com/api/v1/products', {
       method: 'OPTIONS',
