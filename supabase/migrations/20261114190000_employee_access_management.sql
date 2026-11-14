@@ -158,7 +158,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_actor uuid := auth.uid();
-  v_role public.roles%rowtype;
+  v_role_code text;
   v_active boolean;
 begin
   if v_actor is null or not exists (
@@ -166,11 +166,11 @@ begin
     where m.organization_id=p_organization_id and m.user_id=v_actor and m.is_active and r.code='SUPER_ADMIN'
   ) then raise exception 'Only this organization Super Admin can suspend or reactivate employees' using errcode='42501'; end if;
 
-  select r,m.is_active into v_role,v_active from public.organization_members m join public.roles r on r.id=m.role_id
+  select r.code,m.is_active into v_role_code,v_active from public.organization_members m join public.roles r on r.id=m.role_id
   where m.organization_id=p_organization_id and m.user_id=p_user_id for update of m;
   if not found then raise exception 'Employee membership not found' using errcode='P0002'; end if;
 
-  if not p_is_active and v_active and v_role.code='SUPER_ADMIN' and
+  if not p_is_active and v_active and v_role_code='SUPER_ADMIN' and
     (select count(*) from public.organization_members m join public.roles r on r.id=m.role_id
      where m.organization_id=p_organization_id and m.is_active and r.code='SUPER_ADMIN') <= 1 then
     raise exception 'The organization must retain at least one active Super Admin' using errcode='23514';
