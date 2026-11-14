@@ -13,7 +13,11 @@ This document describes the current repository layout and the target boundaries 
   - `src/types.ts`: shared frontend-facing domain types.
 - `worker/`: Cloudflare Worker entry point and authenticated API dispatcher.
   - `worker/index.ts`: request routing, CORS and static asset serving.
-  - `worker/api.ts`: API authentication, permission checks and current route handlers.
+  - `worker/api.ts`: API authentication, active-workspace resolution, permission gates and domain dispatch.
+  - `worker/types.ts` and `worker/http.ts`: shared request context and JSON response helper.
+  - `worker/routes/dashboard.ts`: dashboard KPI and chart aggregates.
+  - `worker/routes/marketplace.ts`: account metadata, sync history, exception queue and SKU exception resolution.
+  - `worker/routes/system.ts`: audit-log and notification endpoints.
   - `worker/*.test.ts`: Worker boundary tests.
 - `server/`: legacy Express implementation and reusable domain repositories.
   - `server/repositories/`: Supabase-backed domain persistence adapters reused by the Worker.
@@ -27,8 +31,9 @@ This document describes the current repository layout and the target boundaries 
 As route coverage grows, split the current dispatcher into domain modules without changing public API paths:
 
 - `worker/auth/`: bearer-token validation, active profile/workspace resolution and permission helpers.
-- `worker/routes/dashboard.ts`: KPIs, chart aggregates and dashboard summaries.
-- `worker/routes/marketplace.ts`: account metadata, sync history and exception queue. Never return credential ciphertext or tokens.
+- `worker/routes/dashboard.ts` (implemented): KPIs, chart aggregates and dashboard summaries.
+- `worker/routes/marketplace.ts` (implemented): account metadata, sync history, exception queue and SKU exception resolution. Never return credential ciphertext or tokens.
+- `worker/routes/system.ts` (implemented): audit logs and notification reads/dismissal.
 - `worker/routes/inventory.ts`: products, balances, stock ledger and adjustments.
 - `worker/routes/orders.ts`: order reads, creation and state transitions.
 - `worker/routes/purchasing.ts`: suppliers, purchase orders and goods receipts.
@@ -36,8 +41,8 @@ As route coverage grows, split the current dispatcher into domain modules withou
 - `worker/routes/warehouse.ts`: warehouse layout and location management.
 - `worker/routes/fulfilment.ts`: 3PL clients, storage, packaging and shipping.
 - `worker/routes/finance.ts`: invoices, payments, expenses, ledger, payouts and reconciliation.
-- `worker/routes/system.ts`: notifications, audit log and safe configuration endpoints.
-- `worker/shared/`: response helpers, validation, pagination and typed request context.
+- `worker/routes/system.ts` currently handles audit and notifications; extend it with safe configuration endpoints.
+- `worker/shared/`: validation, pagination and shared domain helpers (response and request-context helpers currently live at `worker/http.ts` and `worker/types.ts`).
 
 ## Non-negotiable architecture rules
 
