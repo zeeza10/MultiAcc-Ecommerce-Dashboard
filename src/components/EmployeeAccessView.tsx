@@ -70,7 +70,7 @@ export const EmployeeAccessView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, inviteRole, templateId]);
 
   useEffect(() => { void load(); }, [load]);
 
