@@ -23,6 +23,8 @@ jobs:
         run: npm install --no-package-lock --no-audit --no-fund
       - name: TypeScript check
         run: npm run lint
+      - name: Worker boundary tests
+        run: npm test
       - name: Production build
         run: npm run build
 
