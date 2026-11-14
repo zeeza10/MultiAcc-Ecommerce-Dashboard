@@ -729,7 +729,7 @@ apiRouter.post('/purchase-orders', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Transactional purchase order creation failed:', error);
     const message = error instanceof Error ? error.message : '';
-    const status = /authorized|authentication|membership|permission/i.test(message)
+    const status = /authorized|authentication|membership|permission|does not belong/i.test(message)
       ? 403
       : /not found|not active/i.test(message)
         ? 404
@@ -897,7 +897,7 @@ apiRouter.post('/returns/:id/disposition', async (req: Request, res: Response) =
       ? 403
       : /not found/i.test(message)
         ? 404
-        : /invalid|must |required|exceeds|cannot|only open|unsupported|already been issued|request ID|already used|location|configure|whole-number|full returned quantity/i.test(message)
+        : /invalid|must |required|exceeds|cannot|only open|only be dispositioned|unsupported|already been issued|request ID|already used|location|configure|whole-number|full returned quantity/i.test(message)
           ? 400
           : 500;
     res.status(status).json({
