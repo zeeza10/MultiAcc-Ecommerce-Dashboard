@@ -22,6 +22,21 @@ describe('Cloudflare Worker request boundary', () => {
     assert.equal(response.headers.get('Strict-Transport-Security'), 'max-age=31536000');
   });
 
+  it('rate limits unauthenticated API traffic before Supabase authentication', async () => {
+    let seenKey = '';
+    const request = new Request('https://dashboard.example.com/api/v1/products', {
+      headers: { 'CF-Connecting-IP': '203.0.113.10' },
+    });
+    const response = await worker.fetch(request, {
+      API_IP_RATE_LIMITER: {
+        limit: async ({ key }) => { seenKey = key; return { success: false }; },
+      },
+    }, context);
+    assert.equal(response.status, 429);
+    assert.equal(seenKey, 'ip:203.0.113.10');
+    assert.equal(response.headers.get('Retry-After'), '60');
+  });
+
   it('rejects protected API requests without a Supabase bearer token', async () => {
     const request = new Request('https://dashboard.example.com/api/v1/products');
     const response = await worker.fetch(request, {}, context);
