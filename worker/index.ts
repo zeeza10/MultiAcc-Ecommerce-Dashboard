@@ -15,6 +15,7 @@ export interface Env {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   ALLOWED_ORIGIN?: string;
+  API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
   INVITATION_RATE_LIMITER?: RateLimitBinding;
