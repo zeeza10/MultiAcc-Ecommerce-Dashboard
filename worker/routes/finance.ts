@@ -76,6 +76,16 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     if (auth.user.role === 'CLIENT_USER') {
       if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
       invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId);
+    } else {
+      const accountId = url.searchParams.get('accountId');
+      if (accountId && accountId !== 'ALL') {
+        const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+          .from('marketplace_finance_allocations').select('source_id')
+          .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'INVOICE');
+        if (allocationError) throw allocationError;
+        const ids = [...new Set((allocations || []).map(row => row.source_id))];
+        invoicesQuery = ids.length ? invoicesQuery.in('id', ids) : invoicesQuery.in('id', ['00000000-0000-0000-0000-000000000000']);
+      }
     }
     const { data: invoices, error } = await invoicesQuery;
     if (error) throw error;
@@ -141,6 +151,17 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at')
       .eq('organization_id', auth.organizationId).order('payment_date', { ascending: false });
     if (clientPaymentIds) paymentsQuery = paymentsQuery.in('id', clientPaymentIds);
+    else {
+      const accountId = url.searchParams.get('accountId');
+      if (accountId && accountId !== 'ALL') {
+        const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+          .from('marketplace_finance_allocations').select('source_id')
+          .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'PAYMENT');
+        if (allocationError) throw allocationError;
+        const ids = [...new Set((allocations || []).map(row => row.source_id))];
+        paymentsQuery = ids.length ? paymentsQuery.in('id', ids) : paymentsQuery.in('id', ['00000000-0000-0000-0000-000000000000']);
+      }
+    }
     const { data: payments, error } = await paymentsQuery;
     if (error) throw error;
     const paymentIds = (payments || []).map(row => row.id);
@@ -179,6 +200,16 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       .select('id,expense_number,category,supplier_name,expense_date,amount_minor,vat_minor,currency,allocated_to,status,approved_by,note')
       .eq('organization_id', auth.organizationId)
       .order('expense_date', { ascending: false });
+    const accountId = url.searchParams.get('accountId');
+    if (accountId && accountId !== 'ALL') {
+      const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+        .from('marketplace_finance_allocations').select('source_id')
+        .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'EXPENSE');
+      if (allocationError) throw allocationError;
+      const ids = [...new Set((allocations || []).map(row => row.source_id))];
+      if (ids.length) query = query.in('id', ids);
+      else query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+    }
     if (error) throw error;
     return json({ expenses: (data || []).map(row => ({
       id: row.id, expenseNumber: row.expense_number, category: row.category, supplierName: row.supplier_name || '',
@@ -195,6 +226,16 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
       .eq('organization_id', auth.organizationId)
       .eq('status', 'POSTED')
       .order('created_at', { ascending: false });
+    const accountId = url.searchParams.get('accountId');
+    if (accountId && accountId !== 'ALL') {
+      const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+        .from('marketplace_finance_allocations').select('source_id')
+        .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId).eq('source_type', 'JOURNAL_ENTRY');
+      if (allocationError) throw allocationError;
+      const ids = [...new Set((allocations || []).map(row => row.source_id))];
+      if (ids.length) query = query.in('id', ids);
+      else query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+    }
     if (error) throw error;
     const entryIds = (entries || []).map(row => row.id);
     const { data: lines, error: lineError } = entryIds.length
