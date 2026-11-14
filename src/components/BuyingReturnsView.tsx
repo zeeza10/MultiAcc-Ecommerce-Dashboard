@@ -519,7 +519,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         ))}
                       </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
-                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || 'GBP' }).format((po.totalMinor || 0) / 100)}
+                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || config.baseCurrency }).format((po.totalMinor || 0) / 100)}
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {po.status === 'DRAFT' ? (
@@ -604,7 +604,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         </td>
                         <td className="py-2.5 px-3">
                           <span className="font-semibold text-emerald-700">
-                            {ret.refundStatus || 'Pending'} {refundAmount > 0 ? `(£${(refundAmount / 100).toFixed(2)})` : ''}
+                            {ret.refundStatus || 'Pending'} {refundAmount > 0 ? `(${formatMoney(refundAmount, config.baseCurrency)})` : ''}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
