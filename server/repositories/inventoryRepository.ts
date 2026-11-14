@@ -145,7 +145,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     const products = await this.products.listForOrganization(options);
     if (products.length === 0) return [];
 
-    const productById = new Map<string, Product>(products.map(product => [product.id, product]));
+    const productById = new Map<string, Product>(products.map(product => [product.id, product] as const));
     const rows: StockAdjustmentRow[] = [];
     const productIds = products.map(product => product.id);
 
