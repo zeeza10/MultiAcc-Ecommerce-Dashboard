@@ -54,7 +54,6 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const [pkgType, setPkgType] = useState<'CUSTOM_BOX' | 'BUBBLE_MAILER' | 'PALLET_WRAP' | 'FRAGILE_PREP'>('CUSTOM_BOX');
   const [pkgQty, setPkgQty] = useState(1);
   const [pkgMaterialCost, setPkgMaterialCost] = useState('');
-  const [pkgServiceCharge, setPkgServiceCharge] = useState('');
   const [pkgOrderNumber, setPkgOrderNumber] = useState('');
   const [pkgNotes, setPkgNotes] = useState('');
 
@@ -84,6 +83,8 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       setPackagingJobs(pkgRes.packagingJobs || []);
       setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
+      if (!pkgClientId && clientRes.clients?.length) setPkgClientId(clientRes.clients[0].id);
+      if (!shpClientId && clientRes.clients?.length) setShpClientId(clientRes.clients[0].id);
       setRateCards(clientRes.rateCards || []);
       setStorageSnapshots(storageRes.snapshots || []);
       setProducts(productRes.products || []);
@@ -136,21 +137,27 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const storageRates = rateCards.flatMap(card => [card.storagePalletPerMonthMinor, card.storageShelfPerMonthMinor, card.storageBinPerMonthMinor].map(Number).filter(value => Number.isFinite(value) && value > 0));
   const minStorageRate = storageRates.length ? Math.min(...storageRates) : 0;
   const maxStorageRate = storageRates.length ? Math.max(...storageRates) : 0;
+  const selectedPkgClient = clients.find(client => client.id === pkgClientId);
+  const selectedPkgRate = rateCards.find(card => card.id === selectedPkgClient?.rateCardId);
+  const estimatedPackagingServiceMinor = Number(selectedPkgRate?.packFeeMinor || 0) * pkgQty
+    + Number(selectedPkgRate?.extraItemFeeMinor || 0) * Math.max(0, pkgQty - 1);
 
   const handleCreatePackagingJob = async (e: React.FormEvent) => {
     e.preventDefault();
     const client = clients.find((c) => c.id === pkgClientId);
     try {
-      const matCostMinor = Math.round(parseFloat(pkgMaterialCost) * 100) || 0;
-      const srvChargeMinor = Math.round(parseFloat(pkgServiceCharge) * 100) || 0;
+      const materialCost = Number.parseFloat(pkgMaterialCost);
+      if (!pkgClientId || !Number.isSafeInteger(pkgQty) || pkgQty <= 0 || !Number.isFinite(materialCost) || materialCost < 0) {
+        alert('Select a client and enter a valid quantity and material cost.');
+        return;
+      }
+      const matCostMinor = Math.round(materialCost * 100);
       await api.createPackagingJob({
         clientId: pkgClientId,
         clientName: client?.companyName || '3PL Partner',
         packagingType: pkgType,
         quantity: pkgQty,
         materialCostMinor: matCostMinor,
-        serviceChargeMinor: srvChargeMinor,
-        totalChargeMinor: matCostMinor + srvChargeMinor,
         orderNumber: pkgOrderNumber || undefined,
         notes: pkgNotes,
         performedBy: currentUser.name,
@@ -166,15 +173,25 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     e.preventDefault();
     const client = clients.find((c) => c.id === shpClientId);
     try {
-      const carCostMinor = Math.round(parseFloat(shpCarrierCost) * 100) || 0;
-      const srvChargeMinor = Math.round(parseFloat(shpServiceCharge) * 100) || 0;
+      const weight = Number.parseFloat(shpWeight);
+      const carrierCost = Number.parseFloat(shpCarrierCost || '0');
+      const serviceCharge = Number.parseFloat(shpServiceCharge || '0');
+      if (!shpClientId || !shpCarrier || !shpServiceLevel || !shpDestination.trim() ||
+          !Number.isFinite(weight) || weight <= 0 ||
+          !Number.isFinite(carrierCost) || carrierCost < 0 ||
+          !Number.isFinite(serviceCharge) || serviceCharge < 0) {
+        alert('Select a client, carrier and service level; enter a valid weight, destination and non-negative charges.');
+        return;
+      }
+      const carCostMinor = Math.round(carrierCost * 100);
+      const srvChargeMinor = Math.round(serviceCharge * 100);
       await api.createShippingJob({
         clientId: shpClientId,
         clientName: client?.companyName || '3PL Partner',
         carrier: shpCarrier,
         trackingNumber: shpTracking || `GB-${Date.now().toString().slice(-8)}TRK`,
         serviceLevel: shpServiceLevel,
-        parcelWeightKg: parseFloat(shpWeight) || 1.0,
+        parcelWeightKg: weight,
         carrierCostMinor: carCostMinor,
         serviceChargeMinor: srvChargeMinor,
         totalChargeMinor: carCostMinor + srvChargeMinor,
@@ -659,15 +676,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Service Fee (£)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={pkgServiceCharge}
-                    onChange={(e) => setPkgServiceCharge(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100"
-                  />
+                <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                  <label className="block text-slate-400 mb-1">Rate-Card Service Fee</label>
+                  <div className="text-sm font-semibold text-indigo-300">{formatMoney(estimatedPackagingServiceMinor)}</div>
+                  <p className="text-[10px] text-slate-500 mt-1">Calculated from the selected client's saved rate card when the job is submitted.</p>
                 </div>
               </div>
 
