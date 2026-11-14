@@ -15,6 +15,7 @@ import { ReportsView } from './components/ReportsView';
 import { NotificationsView } from './components/NotificationsView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
+import { EmployeeAccessView } from './components/EmployeeAccessView';
 import { WarehouseServicesView } from './components/WarehouseServicesView';
 import { DropshippingCalculatorView } from './components/DropshippingCalculatorView';
 import { EbayPayoutsView } from './components/EbayPayoutsView';
@@ -443,6 +444,8 @@ export default function App() {
           {activeTab === 'audit-log' && (
             <AuditLogView currentUser={currentUser} config={config} />
           )}
+
+          {activeTab === 'employee-access' && <EmployeeAccessView />}
 
           {activeTab === 'settings' && (
             <SettingsView
