@@ -12,3 +12,20 @@ coverage/
 .dev.vars*
 worker-configuration.d.ts
 
+
+# Local credentials, private keys and certificate containers
+.npmrc
+.secrets/
+secrets/
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+.ssh/
