@@ -672,6 +672,35 @@ apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Purchase orders and receipts could not be loaded from the workspace database.' });
   }
 });
+apiRouter.post('/suppliers', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
+    const supplier = await repository.createSupplier({
+      name: typeof body.name === 'string' ? body.name : '',
+      code: typeof body.code === 'string' ? body.code : '',
+      contactName: typeof body.contactName === 'string' ? body.contactName : undefined,
+      email: typeof body.email === 'string' ? body.email : undefined,
+      phone: typeof body.phone === 'string' ? body.phone : undefined,
+      paymentTermsDays: typeof body.paymentTermsDays === 'number' ? body.paymentTermsDays : Number(body.paymentTermsDays ?? 0),
+      currency: typeof body.currency === 'string' ? body.currency : 'GBP',
+      leadTimeDays: typeof body.leadTimeDays === 'number' ? body.leadTimeDays : Number(body.leadTimeDays ?? 0),
+    });
+    res.status(201).json({ supplier });
+  } catch (error) {
+    console.error('PostgreSQL supplier creation failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /permission|authorized|row-level security|policy/i.test(message)
+      ? 403
+      : /required|must be|characters|days|length|currency|details/i.test(message)
+        ? 400
+        : /duplicate key|unique constraint/i.test(message)
+          ? 409
+          : 500;
+    res.status(status).json({ error: status === 500 ? 'Supplier could not be created.' : message });
+  }
+});
+
 apiRouter.post('/purchase-orders', async (req: Request, res: Response) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
