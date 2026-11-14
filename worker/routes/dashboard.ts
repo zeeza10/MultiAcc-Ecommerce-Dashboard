@@ -23,7 +23,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     if (accountId && accountId !== 'ALL') ordersQuery = ordersQuery.eq('marketplace_account_id', accountId);
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) ordersQuery = ordersQuery.eq('client_3pl_id', auth.user.clientId);
 
-    const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult] = await Promise.all([
+    const settingsQuery = auth.repositoryContext.supabase.from('system_settings').select('active_release_phase').eq('organization_id', auth.organizationId).maybeSingle();
+    const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult] = await Promise.all([
       ordersQuery,
       canViewInventory
         ? (() => {
@@ -44,8 +45,9 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
         ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId)
         : Promise.resolve({ data: [], error: null }),
+      settingsQuery,
     ]);
-    if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error) {
+    if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error) {
       throw new Error('Dashboard source records could not be loaded.');
     }
     const orders = ordersResult.data || [];
@@ -111,7 +113,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       storageRevenueMinor,
       outstandingPaymentsMinor,
       currency,
-      activePhase: 'ALL',
+      activePhase: settingsResult.data?.active_release_phase || 'ALL',
     }, userRole: auth.user.role, dataCoverage: {
       financeInvoices: invoices.length,
       expenseRecords: expenses.length,
