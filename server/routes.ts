@@ -1,5 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import type { RepositoryContext } from './repositories/context';
+import { SupabaseProductRepository } from './repositories/productRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -21,12 +23,18 @@ import {
 
 export const apiRouter = Router();
 
-type AuthenticatedRequest = Request & { nexusUser?: User; organizationId?: string; permissions?: Set<string> };
+type AuthenticatedRequest = Request & { nexusUser?: User; organizationId?: string; permissions?: Set<string>; repositoryContext?: RepositoryContext };
 
 const getActiveUser = (req: Request): User => {
   const user = (req as AuthenticatedRequest).nexusUser;
   if (!user) throw new Error('Authenticated user context is missing.');
   return user;
+};
+
+const getRepositoryContext = (req: Request): RepositoryContext => {
+  const context = (req as AuthenticatedRequest).repositoryContext;
+  if (!context) throw new Error('Authenticated repository context is missing.');
+  return context;
 };
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -133,6 +141,12 @@ const requireSupabaseUser = async (req: Request, res: Response, next: NextFuncti
       failedLoginAttempts: 0,
       createdAt: profile.created_at,
     };
+    request.repositoryContext = {
+      supabase: userClient,
+      organizationId: membership.organization_id,
+      userId: authData.user.id,
+      permissions,
+    };
     next();
   } catch (error) {
     console.error('Supabase authentication middleware failed:', error);
@@ -219,371 +233,9 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 });
 
 /**
- * Production safety gate: this API still uses the legacy in-memory demo repository.
- * Never serve shared demo records as production tenant data.
+ * PRODUCTS — first organization-scoped PostgreSQL persistence slice.
+ * These handlers run before the legacy demo-data safety gate below.
  */
-apiRouter.use((req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NEXUS_DEMO_MODE !== 'true') {
-    res.status(503).json({ error: 'Business data storage is not yet connected to the organization-scoped database. Demo records are disabled in production.' });
-    return;
-  }
-  next();
-});
-
-/**
- * DASHBOARD KPIS & CHARTS
- */
-apiRouter.get('/dashboard/kpis', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const period = (req.query.period as string) || '30D';
-  const accountId = req.query.accountId as string;
-  const clientFilterId = user.role === 'CLIENT_USER' ? user.clientId : undefined;
-
-  const kpis = engine.calculateDashboardKPIs(period, accountId, clientFilterId);
-  res.json({ kpis, userRole: user.role });
-});
-
-apiRouter.get('/dashboard/charts', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  let orders = [...raw.orders];
-
-  if (user.role === 'CLIENT_USER') {
-    orders = orders.filter((o) => o.ownerId === user.clientId);
-  }
-
-  // 1. Orders and Revenue trends (last 7 days grouped)
-  const daysMap = new Map<string, { date: string; orders: number; revenue: number }>();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
-    daysMap.set(d, { date: d.substring(5), orders: 0, revenue: 0 });
-  }
-
-  for (const o of orders) {
-    const d = o.createdAt.split('T')[0];
-    if (daysMap.has(d)) {
-      const entry = daysMap.get(d)!;
-      entry.orders += 1;
-      entry.revenue += (o.totalMinor - o.taxMinor) / 100;
-    }
-  }
-
-  // 2. Order status distribution
-  const statusCounts: Record<string, number> = {};
-  for (const o of orders) {
-    statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
-  }
-
-  // 3. Stock by state
-  const balances = engine.calculateBalances(undefined, user.role === 'CLIENT_USER' ? user.clientId : undefined);
-  const stockByState = {
-    onHand: balances.reduce((a, b) => a + b.onHand, 0),
-    reserved: balances.reduce((a, b) => a + b.reserved, 0),
-    available: balances.reduce((a, b) => a + b.available, 0),
-    incoming: balances.reduce((a, b) => a + b.incoming, 0),
-    damaged: balances.reduce((a, b) => a + b.damaged, 0),
-    quarantined: balances.reduce((a, b) => a + b.quarantined, 0),
-  };
-
-  // 4. Top SKUs
-  const skuSales: Record<string, { sku: string; name: string; units: number; revenue: number }> = {};
-  for (const o of orders) {
-    if (o.status === 'Cancelled') continue;
-    for (const l of o.lines) {
-      if (!skuSales[l.sku]) {
-        skuSales[l.sku] = { sku: l.sku, name: l.productName, units: 0, revenue: 0 };
-      }
-      skuSales[l.sku].units += l.quantity;
-      skuSales[l.sku].revenue += l.totalPriceMinor / 100;
-    }
-  }
-  const topSkus = Object.values(skuSales).sort((a, b) => b.units - a.units).slice(0, 5);
-
-  res.json({
-    trend: Array.from(daysMap.values()),
-    statusCounts,
-    stockByState,
-    topSkus,
-  });
-});
-
-/**
- * ORDERS
- */
-apiRouter.get('/orders', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  let orders = [...raw.orders];
-
-  // Client isolation (FR-AUTH-07, AT-07)
-  if (user.role === 'CLIENT_USER') {
-    orders = orders.filter((o) => o.ownerId === user.clientId);
-  }
-
-  // Filters
-  const { status, accountId, search } = req.query;
-  if (status && status !== 'ALL') {
-    orders = orders.filter((o) => o.status === status);
-  }
-  if (accountId && accountId !== 'ALL') {
-    orders = orders.filter((o) => o.marketplaceAccountId === accountId);
-  }
-  if (search) {
-    const s = String(search).toLowerCase();
-    orders = orders.filter(
-      (o) =>
-        o.orderNumber.toLowerCase().includes(s) ||
-        (o.externalOrderId && o.externalOrderId.toLowerCase().includes(s)) ||
-        o.customerName.toLowerCase().includes(s) ||
-        (o.trackingNumber && o.trackingNumber.toLowerCase().includes(s)) ||
-        o.lines.some((l) => l.sku.toLowerCase().includes(s) || l.productName.toLowerCase().includes(s))
-    );
-  }
-
-  res.json({ orders });
-});
-
-apiRouter.get('/orders/:id', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  const order = raw.orders.find((o) => o.id === req.params.id);
-
-  if (!order) {
-    res.status(404).json({ error: 'Order not found' });
-    return;
-  }
-
-  // Client isolation: Client user can only see their own order (AT-07)
-  if (user.role === 'CLIENT_USER' && order.ownerId !== user.clientId) {
-    res.status(403).json({ error: 'Access denied: You are not authorized to view orders belonging to other clients.' });
-    return;
-  }
-
-  const histories = raw.orderHistories.filter((h) => h.orderId === order.id);
-  res.json({ order, histories });
-});
-
-apiRouter.post('/orders', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  const body = req.body;
-
-  if (user.role === 'VIEWER') {
-    res.status(403).json({ error: 'Viewers have read-only permissions.' });
-    return;
-  }
-
-  const orderNumber = `NX-ORD-2026-${String(raw.orders.length + 1).padStart(3, '0')}`;
-  const now = new Date().toISOString();
-
-  // Validate lines
-  const lines = (body.lines || []).map((l: any) => {
-    const prod = raw.products.find((p) => p.id === l.productId || p.sku === l.sku);
-    const unitPriceMinor = l.unitPriceMinor || (prod ? prod.sellingPriceMinor : 1000);
-    return {
-      id: `ordl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      orderId: '',
-      productId: prod?.id || 'manual',
-      sku: prod?.sku || l.sku,
-      productName: prod?.name || l.productName || 'Direct Order Item',
-      quantity: Number(l.quantity) || 1,
-      unitPriceMinor,
-      taxAmountMinor: Math.round(unitPriceMinor * (raw.config.defaultVatRatePercent / 100)),
-      totalPriceMinor: unitPriceMinor * (Number(l.quantity) || 1),
-      isBackordered: false,
-      reservedQuantity: 0,
-    };
-  });
-
-  const totalMinor = lines.reduce((acc: number, l: any) => acc + l.totalPriceMinor, 0);
-  const taxMinor = lines.reduce((acc: number, l: any) => acc + l.taxAmountMinor, 0);
-
-  const newOrder: Order = {
-    id: `ord_${Date.now()}`,
-    orderNumber,
-    salesSource: body.salesSource || 'MANUAL',
-    ownerType: user.role === 'CLIENT_USER' ? 'CLIENT' : (body.ownerType || 'OPERATOR'),
-    ownerId: user.role === 'CLIENT_USER' ? user.clientId! : (body.ownerId || 'operator'),
-    customerName: body.customerName || 'Direct Client',
-    customerEmail: body.customerEmail || 'orders@directclient.co.uk',
-    shippingAddress: body.shippingAddress || {
-      name: body.customerName,
-      street: '1 Commercial Road',
-      city: 'London',
-      postalCode: 'EC1V 1AA',
-      country: 'United Kingdom',
-    },
-    status: 'New',
-    paymentState: body.paymentState || 'PENDING',
-    totalMinor,
-    taxMinor,
-    shippingChargeMinor: body.shippingChargeMinor || 0,
-    currency: raw.config.baseCurrency,
-    lines,
-    notes: body.notes,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  lines.forEach((l: any) => (l.orderId = newOrder.id));
-  raw.orders.unshift(newOrder);
-
-  raw.orderHistories.push({
-    id: `hist_${Date.now()}`,
-    orderId: newOrder.id,
-    toStatus: 'New',
-    changedBy: user.name,
-    note: 'Manual direct order created',
-    timestamp: now,
-  });
-
-  raw.auditLogs.unshift({
-    id: `aud_${Date.now()}`,
-    actorId: user.id,
-    actorName: user.name,
-    action: 'CREATE',
-    entity: 'Order',
-    entityId: newOrder.id,
-    afterSnapshot: JSON.parse(JSON.stringify(newOrder)),
-    notes: `Created manual order ${orderNumber}`,
-    timestamp: now,
-  });
-
-  db.save();
-  res.status(201).json({ order: newOrder });
-});
-
-apiRouter.post('/orders/:id/transition', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const { targetStatus, carrier, trackingNumber, note } = req.body;
-
-  if (!targetStatus) {
-    res.status(400).json({ error: 'targetStatus is required' });
-    return;
-  }
-
-  const result = engine.changeOrderStatus(req.params.id, targetStatus as OrderStatus, user, {
-    carrier,
-    trackingNumber,
-    note,
-  });
-
-  if (!result.success) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-
-  res.json({ order: result.order });
-});
-
-apiRouter.put('/orders/:id', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const body = req.body || {};
-  const normalized = {
-    ...body,
-    editReason: body.editReason || body.reason || 'Admin modification',
-    shippingChargeMinor: body.shippingChargeMinor !== undefined ? body.shippingChargeMinor : body.shippingFeeMinor,
-    lines: body.lines || (body.items ? body.items.map((i: any) => ({
-      ...i,
-      productId: i.productId || '',
-      productName: i.productName || i.sku,
-      quantity: Number(i.quantity) || 1,
-      unitPriceMinor: Number(i.unitPriceMinor) || 0,
-    })) : undefined),
-    allowOverride: body.allowOverride ?? true,
-  };
-  const result = engine.editOrder(req.params.id, normalized, user);
-
-  if (!result.success) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-
-  res.json({ order: result.order });
-});
-
-/**
- * PRODUCTS & CATALOG
- */
-apiRouter.get('/products', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  let products = [...raw.products];
-
-  if (user.role === 'CLIENT_USER') {
-    products = products.filter((p) => p.ownerId === user.clientId);
-  }
-
-  // Warehouse staff must NOT see product costs or profit margins (SRS S4, A.4.1)
-  if (user.role === 'WAREHOUSE_STAFF') {
-    products = products.map((p) => ({
-      ...p,
-      costPriceMinor: 0,
-      sellingPriceMinor: 0,
-    }));
-  }
-
-  const balances = engine.calculateBalances();
-  const enhanced = products.map((p) => {
-    const bal = balances.find((b) => b.productId === p.id);
-    return {
-      ...p,
-      stockOnHand: bal ? bal.onHand : 0,
-      stockReserved: bal ? bal.reserved : 0,
-      stockAvailable: bal ? bal.available : 0,
-      stockIncoming: bal ? bal.incoming : 0,
-      stockDamaged: bal ? bal.damaged : 0,
-    };
-  });
-
-  res.json({ products: enhanced });
-});
-
-apiRouter.post('/products', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-
-  if (user.role === 'WAREHOUSE_STAFF' || user.role === 'VIEWER') {
-    res.status(403).json({ error: 'Not authorized to create products' });
-    return;
-  }
-
-  const { sku, name, barcode, costPriceMinor, sellingPriceMinor, lowStockThreshold, reorderLevel, category, ownerType, ownerId } = req.body;
-
-  if (!sku || !name) {
-    res.status(400).json({ error: 'SKU and Name are required' });
-    return;
-  }
-
-  // Sku uniqueness check
-  if (raw.products.some((p) => p.sku.toLowerCase() === sku.toLowerCase())) {
-    res.status(400).json({ error: `SKU "${sku}" already exists in the catalog.` });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const newProduct: any = {
-    id: `prd_${Date.now()}`,
-    sku: sku.toUpperCase().trim(),
-    name,
-    barcode,
-    costPriceMinor: Number(costPriceMinor) || 0,
-    sellingPriceMinor: Number(sellingPriceMinor) || 0,
-    lowStockThreshold: Number(lowStockThreshold) || 10,
-    reorderLevel: Number(reorderLevel) || 30,
-    category: category || 'General',
-    ownerType: ownerType || 'OPERATOR',
-    ownerId: ownerId || 'operator',
-    status: 'ACTIVE',
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  raw.products.unshift(newProduct);
-  db.save();
-  res.status(201).json({ product: newProduct });
-});
-
 /**
  * INVENTORY & STOCK LEDGER
  */
