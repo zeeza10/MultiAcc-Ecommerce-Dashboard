@@ -45,7 +45,7 @@ export const AdminMfaSetup: React.FC = () => {
 
   return <section className="rounded-xl border border-slate-200 bg-white p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><div className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck className="h-4 w-4 text-indigo-600"/>Administrator MFA protection</div><p className="mt-1 text-xs text-slate-500">Multi-factor authentication is required before assigning or inviting another Super Admin.</p></div>
+      <div><div className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck className="h-4 w-4 text-indigo-600"/>Administrator MFA protection</div><p className="mt-1 text-xs text-slate-500">Multi-factor authentication is required before inviting employees, changing roles or permissions, or suspending employee access.</p></div>
       <span className={'rounded-full px-3 py-1 text-xs font-bold ' + (level === 'aal2' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>{level === 'aal2' ? 'MFA verified for this session' : 'MFA step-up not active'}</span>
     </div>
     {error && <p role="alert" className="mt-3 text-xs text-rose-700">{error}</p>}
