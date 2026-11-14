@@ -484,7 +484,7 @@ apiRouter.post('/stock/adjustments', async (req: Request, res: Response) => {
     const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
     const adjustment = await repository.createAdjustment({
       productId,
-      locationId: typeof body.locationId === 'string' ? body.locationId : undefined,
+      locationId: typeof body.locationId === 'string' && body.locationId.trim() ? body.locationId.trim() : undefined,
       quantityDelta,
       targetState,
       reasonCode,
