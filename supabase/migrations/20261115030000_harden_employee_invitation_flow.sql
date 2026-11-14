@@ -2,13 +2,6 @@
 ALTER TABLE public.user_invitations
   ADD COLUMN IF NOT EXISTS sent_at timestamptz;
 
--- Existing active invitations were created by the previous send flow; mark them as already sent.
-UPDATE public.user_invitations
-SET sent_at = created_at
-WHERE sent_at IS NULL
-  AND accepted_at IS NULL
-  AND revoked_at IS NULL;
-
 CREATE INDEX IF NOT EXISTS idx_user_invitations_org_inviter_created_at
   ON public.user_invitations (organization_id, invited_by, created_at DESC);
 
