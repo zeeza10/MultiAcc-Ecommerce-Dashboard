@@ -170,6 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
         },
         { id: 'audit-log', label: 'Audit Log', icon: History, phase: 'P1', permission: 'audit.view' },
+        { id: 'employee-access', label: 'Employees & Permissions', icon: Users, phase: 'P1', permission: 'users.manage' },
         { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1', permission: 'settings.manage' },
       ],
     },
