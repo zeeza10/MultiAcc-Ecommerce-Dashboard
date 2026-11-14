@@ -73,8 +73,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  const formatMoney = (amountMinor: number) =>
-    new Intl.NumberFormat('en-GB', {
+  const formatMoney = (amountMinor: number | null) => amountMinor == null ? '—' : new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: kpis?.currency || config.baseCurrency || 'GBP',
     }).format((Number(amountMinor) || 0) / 100);
@@ -208,10 +207,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <AlertTriangle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? kpis.lowStockItems : '...'}
+              {kpis ? (kpis.lowStockItems == null ? '—' : kpis.lowStockItems) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700 font-medium">
-              <span>At or below reorder threshold</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'At or below reorder threshold'}</span>
             </div>
           </div>
 
@@ -225,10 +224,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Package className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              {kpis ? kpis.totalStockUnits : '...'}
+              {kpis ? (kpis.totalStockUnits == null ? '—' : kpis.totalStockUnits) : '...'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>On hand + damaged + quarantine</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'On hand + damaged + quarantine'}</span>
             </div>
           </div>
 
@@ -245,7 +244,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.inventoryValueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Weighted avg cost valuation</span>
+              <span>{kpis?.storeScoped ? 'Inventory is not assigned to individual stores yet' : 'Weighted avg cost valuation'}</span>
             </div>
           </div>
 
@@ -262,7 +261,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.supplierPayablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Unpaid PO receipts / GRNI</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid PO receipts / GRNI'}</span>
             </div>
           </div>
 
@@ -279,7 +278,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.clientReceivablesMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Unpaid issued 3PL invoices</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Unpaid issued 3PL invoices'}</span>
             </div>
           </div>
 
@@ -296,7 +295,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.storageRevenueMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
-              <span>Storage charges billed</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Storage charges billed'}</span>
             </div>
           </div>
 
@@ -313,7 +312,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {kpis ? formatMoney(kpis.outstandingPaymentsMinor) : '—'}
             </div>
             <div className="mt-1 text-[11px] text-rose-700">
-              <span>Receivables past due date</span>
+              <span>{kpis?.storeScoped ? 'Not allocated by marketplace store' : 'Receivables past due date'}</span>
             </div>
           </div>
         </div>
@@ -326,7 +325,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Daily Order Flow & Revenue</h3>
-              <p className="text-[11px] text-gray-500">7-day performance history from eBay & Direct channels</p>
+              <p className="text-[11px] text-gray-500">7-day order and revenue history{selectedStoreId !== 'ALL' ? ' for the selected store' : ' across all stores'}</p>
             </div>
             <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Live Ledger</span>
           </div>
