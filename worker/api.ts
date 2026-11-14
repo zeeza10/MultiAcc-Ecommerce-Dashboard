@@ -13,6 +13,7 @@ import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
 import { handleAccessRoute } from './routes/access';
+import { resolveEffectivePermissions } from './permission-overrides';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -77,13 +78,34 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     .eq('role_id', membership.role_id);
   if (permissionError) return json({ error: 'Workspace permissions could not be verified.' }, 403);
 
-  const permissions = new Set<string>(
-    roleCode === 'SUPER_ADMIN'
-      ? ['*']
-      : (permissionRows || []).map((row: any) => {
-          const permission = row.permissions;
-          return Array.isArray(permission) ? permission[0]?.code : permission?.code;
-        }).filter((code: unknown): code is string => typeof code === 'string'),
+  const rolePermissionCodes = (permissionRows || []).map((row: any) => {
+    const permission = row.permissions;
+    return Array.isArray(permission) ? permission[0]?.code : permission?.code;
+  }).filter((code: unknown): code is string => typeof code === 'string');
+
+  const { data: overrideRows, error: overrideError } = await client
+    .from('organization_member_permission_overrides')
+    .select('effect,permissions(code)')
+    .eq('organization_id', membership.organization_id)
+    .eq('user_id', authData.user.id);
+  if (overrideError) return json({ error: 'Individual workspace permissions could not be verified.' }, 403);
+
+  const granted = (overrideRows || []).filter((row: any) => row.effect === 'GRANT').map((row: any) => {
+    const relation = row.permissions;
+    return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+  }).filter((code: unknown): code is string => typeof code === 'string');
+  const denied = new Set<string>((overrideRows || []).filter((row: any) => row.effect === 'DENY').map((row: any) => {
+    const relation = row.permissions;
+    return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+  }).filter((code: unknown): code is string => typeof code === 'string'));
+
+  const permissions = resolveEffectivePermissions(
+    roleCode,
+    rolePermissionCodes,
+    [
+      ...granted.map(code => ({ effect: 'GRANT' as const, code })),
+      ...[...denied].map(code => ({ effect: 'DENY' as const, code })),
+    ],
   );
 
   return {

@@ -103,12 +103,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('role_id', member.role_id);
     if (permissionError) throw permissionError;
 
+    const rolePermissionCodes = (permissionRows || []).map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string');
+
+    const { data: overrideRows, error: overrideError } = await supabase
+      .from('organization_member_permission_overrides')
+      .select('effect,permissions(code)')
+      .eq('organization_id', member.organization_id)
+      .eq('user_id', authUser.id);
+    if (overrideError) throw overrideError;
+
+    const granted = (overrideRows || []).filter((row: any) => row.effect === 'GRANT').map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string');
+    const denied = new Set<string>((overrideRows || []).filter((row: any) => row.effect === 'DENY').map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string'));
+
     const activePermissions = role === 'SUPER_ADMIN'
       ? ['*']
-      : (permissionRows || []).map((row: any) => {
-          const relation = row.permissions;
-          return Array.isArray(relation) ? relation[0]?.code : relation?.code;
-        }).filter((code: unknown): code is string => typeof code === 'string');
+      : [...new Set([...rolePermissionCodes, ...granted])].filter(code => !denied.has(code));
 
     window.localStorage.setItem('nexusops_active_organization_id', member.organization_id);
     setPermissions(activePermissions);

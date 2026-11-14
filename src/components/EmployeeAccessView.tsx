@@ -13,6 +13,7 @@ type Permission = { id: string; code: string; description: string };
 type Member = {
   user_id: string; email: string | null; full_name: string; is_active: boolean;
   joined_at: string; role_id: string; role_code: string; role_name: string;
+  permission_overrides?: { code: string; effect: 'GRANT' | 'DENY' }[];
 };
 type Invitation = {
   id: string; email: string; role_id: string; expires_at: string;
@@ -46,6 +47,8 @@ export const EmployeeAccessView: React.FC = () => {
   const [roleDescription, setRoleDescription] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [selectedMemberPermissions, setSelectedMemberPermissions] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +95,46 @@ export const EmployeeAccessView: React.FC = () => {
 
   const togglePermission = (code: string) => {
     setRolePermissions(current => current.includes(code)
+      ? current.filter(item => item !== code)
+      : [...current, code]);
+  };
+
+  const selectedMember = access.members.find(member => member.user_id === selectedMemberId) || null;
+  const openMemberPermissions = (member: Member) => {
+    const defaults = access.roles.find(role => role.id === member.role_id)?.permissions || [];
+    const overrides = member.permission_overrides || [];
+    const effective = new Set(defaults);
+    overrides.forEach(item => item.effect === 'GRANT' ? effective.add(item.code) : effective.delete(item.code));
+    setSelectedMemberId(member.user_id);
+    setSelectedMemberPermissions([...effective]);
+  };
+
+  const saveMemberPermissions = async () => {
+    if (!selectedMember) return;
+    const defaults = access.roles.find(role => role.id === selectedMember.role_id)?.permissions || [];
+    const selected = new Set(selectedMemberPermissions);
+    const baseline = new Set(defaults);
+    const grantCodes = [...selected].filter(code => !baseline.has(code));
+    const denyCodes = [...baseline].filter(code => !selected.has(code));
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const { error: saveError } = await supabase.rpc('set_org_member_permission_overrides', {
+        p_organization_id: organizationId,
+        p_user_id: selectedMember.user_id,
+        p_grant_codes: grantCodes,
+        p_deny_codes: denyCodes,
+      });
+      if (saveError) throw saveError;
+      setNotice('Individual permissions saved. These changes affect only this employee and override their role defaults.');
+      setSelectedMemberId('');
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Individual permissions could not be saved.');
+    } finally { setSaving(false); }
+  };
+
+  const toggleMemberPermission = (code: string) => {
+    setSelectedMemberPermissions(current => current.includes(code)
       ? current.filter(item => item !== code)
       : [...current, code]);
   };
@@ -251,13 +294,36 @@ export const EmployeeAccessView: React.FC = () => {
                     <td className="px-4 py-3"><select disabled={saving || !member.is_active || member.user_id===user.id} value={member.role_id} onChange={e=>void changeRole(member,e.target.value)} className="max-w-[220px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(member.joined_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${member.is_active?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{member.is_active?<CheckCircle2 className="h-3 w-3"/>:<XCircle className="h-3 w-3"/>}{member.is_active?'Active':'Suspended'}</span></td>
-                    <td className="px-4 py-3"><button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,!member.is_active)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.is_active?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.is_active?<><UserMinus className="h-3.5 w-3.5"/>Suspend & revoke</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id || member.role_code==='SUPER_ADMIN'} title={member.role_code==='SUPER_ADMIN'?'Super Admin has protected organization-wide access':''} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button><button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,!member.is_active)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.is_active?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.is_active?<><UserMinus className="h-3.5 w-3.5"/>Suspend & revoke</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button></div></td>
                   </tr>)}
                   {!access.members.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No employee memberships found.</td></tr>}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {selectedMember && (
+            <section className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><h2 className="font-semibold text-slate-900">Individual access: {selectedMember.full_name || selectedMember.email}</h2>
+                  <p className="mt-1 text-xs text-slate-500">Role: {selectedMember.role_name}. Checked permissions are effective access; role defaults start checked. Changes here apply only to this employee.</p>
+                </div>
+                <button type="button" onClick={()=>setSelectedMemberId('')} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">Close</button>
+              </div>
+              <div className="mt-4 space-y-4">
+                {permissionGroups.map(([group,items])=><div key={group} className="rounded-lg border border-slate-200 p-3">
+                  <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{labelFor(group)}</h3><span className="text-[11px] text-slate-400">{items.filter(item=>selectedMemberPermissions.includes(item.code)).length}/{items.length} enabled</span></div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {items.map(permission=><label key={permission.id} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+                      <input type="checkbox" checked={selectedMemberPermissions.includes(permission.code)} onChange={()=>toggleMemberPermission(permission.code)} className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"/>
+                      <span><span className="font-semibold">{labelFor(permission.code)}</span><span className="block text-[11px] text-slate-400">{permission.description}</span></span>
+                    </label>)}
+                  </div>
+                </div>)}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" disabled={saving} onClick={()=>void saveMemberPermissions()} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving?'Saving…':'Save individual permissions'}</button><button type="button" onClick={()=>setSelectedMemberPermissions(access.roles.find(role=>role.id===selectedMember.role_id)?.permissions||[])} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Reset to role defaults</button><span className="text-xs text-slate-500">Only Super Admin can change these settings.</span></div>
+            </section>
+          )}
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-4 py-3"><h2 className="font-semibold text-slate-900">Pending invitations</h2></div>
