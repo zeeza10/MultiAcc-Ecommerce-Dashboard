@@ -293,6 +293,7 @@ export default function App() {
             <DashboardView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
               onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
               onOpenNewOrder={() => setShowNewOrderModal(true)}
