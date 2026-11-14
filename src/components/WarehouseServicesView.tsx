@@ -35,6 +35,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const [packagingJobs, setPackagingJobs] = useState<WarehousePackagingJob[]>([]);
   const [shippingJobs, setShippingJobs] = useState<WarehouseShippingJob[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
+  const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [storageSnapshots, setStorageSnapshots] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
+  const [stockLedger, setStockLedger] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('GBP');
   const [loading, setLoading] = useState(true);
 
   // New Job Modals
@@ -68,16 +75,21 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sumRes, pkgRes, shpRes, clientRes] = await Promise.all([
-        api.getWarehouseServicesSummary(),
-        api.getPackagingJobs(),
-        api.getShippingJobs(),
-        api.get3PLClients(),
+      const [sumRes, pkgRes, shpRes, clientRes, storageRes, productRes, balanceRes, ledgerRes, invoiceRes, configRes] = await Promise.all([
+        api.getWarehouseServicesSummary(), api.getPackagingJobs(), api.getShippingJobs(), api.get3PLClients(),
+        api.getStorageSnapshots(), api.getProducts(), api.getBalances(), api.getStockLedger(), api.getInvoices(), api.getConfig(),
       ]);
       setSummary(sumRes);
-      setPackagingJobs(pkgRes.packagingJobs);
-      setShippingJobs(shpRes.shippingJobs);
+      setPackagingJobs(pkgRes.packagingJobs || []);
+      setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
+      setRateCards(clientRes.rateCards || []);
+      setStorageSnapshots(storageRes.snapshots || []);
+      setProducts(productRes.products || []);
+      setBalances(balanceRes.balances || []);
+      setStockLedger(ledgerRes.ledger || []);
+      setInvoices(invoiceRes.invoices || []);
+      setCurrency(String(configRes.config?.baseCurrency || 'GBP').toUpperCase());
       if (clientRes.clients && clientRes.clients.length > 0) {
         setPkgClientId(clientRes.clients[0].id);
         setShpClientId(clientRes.clients[0].id);
@@ -88,6 +100,41 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       setLoading(false);
     }
   };
+
+  const formatMoney = (minor: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+  const totalAvailable = balances.reduce((sum, row) => sum + Number(row.available || 0), 0);
+  const totalReserved = balances.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
+  const totalDamaged = balances.reduce((sum, row) => sum + Number(row.damaged || 0), 0);
+  const clientStorageRows = storageSnapshots.map(snapshot => {
+    const client = clients.find(item => item.id === snapshot.client3plId);
+    const clientBalances = balances.filter(item => item.ownerId === snapshot.client3plId);
+    const clientProducts = products.filter(item => item.ownerType === 'CLIENT' && item.ownerId === snapshot.client3plId);
+    const locations = [...new Set(stockLedger.filter(item => item.ownerId === snapshot.client3plId && item.locationCode).map(item => item.locationCode))];
+    return {
+      id: snapshot.id, clientName: client?.companyName || 'Unknown client', code: client?.code || '—',
+      skuCount: clientProducts.length, skus: clientProducts.map(item => item.sku).join(', ') || '—',
+      locations: locations.join(', ') || '—',
+      onHand: clientBalances.reduce((sum, item) => sum + Number(item.onHand || 0), 0),
+      available: clientBalances.reduce((sum, item) => sum + Number(item.available || 0), 0),
+      reserved: clientBalances.reduce((sum, item) => sum + Number(item.reserved || 0), 0),
+      damaged: clientBalances.reduce((sum, item) => sum + Number(item.damaged || 0), 0),
+      snapshotDate: snapshot.snapshotDate, estimatedCostMinor: Number(snapshot.estimatedCostMinor || 0),
+    };
+  });
+  const clientBillingRows = clients.map(client => {
+    const storage = storageSnapshots.filter(item => item.client3plId === client.id).reduce((sum, item) => sum + Number(item.estimatedCostMinor || 0), 0);
+    const packaging = packagingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
+    const shipping = shippingJobs.filter(item => item.clientId === client.id).reduce((sum, item) => sum + Number(item.totalChargeMinor || 0), 0);
+    const clientInvoices = invoices.filter(item => item.recipientId === client.id);
+    const billed = clientInvoices.reduce((sum, item) => sum + Number(item.totalMinor || 0), 0);
+    const paid = clientInvoices.reduce((sum, item) => sum + Number(item.paidAmountMinor || 0), 0);
+    const balance = Math.max(0, billed - paid);
+    return { id: client.id, companyName: client.companyName, code: client.code, storage, packaging, shipping, billed, paid, balance,
+      status: billed === 0 ? 'NOT BILLED' : balance === 0 ? 'SETTLED' : paid > 0 ? 'PARTIAL' : 'DUE' };
+  });
+  const storageRates = rateCards.flatMap(card => [card.storagePalletPerMonthMinor, card.storageShelfPerMonthMinor, card.storageBinPerMonthMinor].map(Number).filter(value => Number.isFinite(value) && value > 0));
+  const minStorageRate = storageRates.length ? Math.min(...storageRates) : 0;
+  const maxStorageRate = storageRates.length ? Math.max(...storageRates) : 0;
 
   const handleCreatePackagingJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,11 +234,11 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.storage?.totalStorageChargesMinor || 21600) / 100).toFixed(2)}
+            {formatMoney(summary?.storage?.totalStorageChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>{summary?.storage?.activeClients || 5} Active 3PL Clients Stored</span>
+            <span>{summary?.storage?.activeClients ?? clients.filter(client => client.accountStatus === 'ACTIVE').length} Active 3PL Clients Stored</span>
           </div>
         </div>
 
@@ -203,10 +250,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.packaging?.totalPackagingChargesMinor || 58000) / 100).toFixed(2)}
+            {formatMoney(summary?.packaging?.totalPackagingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 mt-2">
-            <span>{summary?.packaging?.totalUnitsPacked || 264} units packaged & wrapped</span>
+            <span>{summary?.packaging?.totalUnitsPacked ?? 0} units packaged & wrapped</span>
           </div>
         </div>
 
@@ -218,7 +265,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-            £{((summary?.shipping?.totalShippingChargesMinor || 6650) / 100).toFixed(2)}
+            {formatMoney(summary?.shipping?.totalShippingChargesMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 mt-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -234,10 +281,10 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
-            £{((summary?.billing?.outstandingBalanceMinor || 21600) / 100).toFixed(2)}
+            {formatMoney(summary?.billing?.outstandingBalanceMinor ?? 0)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
-            <span>Paid: £{((summary?.billing?.paidAmountMinor || 35600) / 100).toFixed(2)}</span>
+            <span>Paid: {formatMoney(summary?.billing?.paidAmountMinor ?? 0)}</span>
           </div>
         </div>
       </div>
@@ -305,105 +352,40 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       {activeTab === 'storage' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              Multi-Client Segregated Storage Inventory
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Client inventory is quarantined and separated by client code with granular shelf, bin, and pallet location allocations.
-            </p>
-
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Multi-Client Storage & Inventory</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Client stock and storage snapshots loaded from Supabase.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Client SKUs</div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">5 Active SKUs</div>
-                <div className="text-[11px] text-slate-500 mt-1">Apex, Bolt, Luma, Nordic Eco</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Client SKUs</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{products.filter(item => item.ownerType === 'CLIENT').length}</div>
+                <div className="text-[11px] text-slate-500 mt-1">{clients.length} client accounts</div>
               </div>
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Physical Stock Status</div>
-                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">540 Avail / 35 Rsv</div>
-                <div className="text-[11px] text-slate-500 mt-1">5 Damaged in quarantine bin</div>
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{totalAvailable} Available / {totalReserved} Reserved</div>
+                <div className="text-[11px] text-slate-500 mt-1">{totalDamaged} damaged units</div>
               </div>
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Monthly Storage Rate</div>
-                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">£0.35 - £1.20</div>
-                <div className="text-[11px] text-slate-500 mt-1">Per cubic meter / pallet per day</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Monthly Storage Rates</div>
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatMoney(minStorageRate)} – {formatMoney(maxStorageRate)}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Lowest to highest configured unit rate</div>
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Client</th>
-                    <th className="py-2.5 px-3">SKU & Product</th>
-                    <th className="py-2.5 px-3">Location Bins</th>
-                    <th className="py-2.5 px-3 text-center">Available</th>
-                    <th className="py-2.5 px-3 text-center">Reserved</th>
-                    <th className="py-2.5 px-3 text-center">Damaged</th>
-                    <th className="py-2.5 px-3 text-right">Est. Storage Fee</th>
-                  </tr>
+                  <tr><th className="py-2.5 px-3">Client</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Location Bins</th><th className="py-2.5 px-3 text-center">On Hand</th><th className="py-2.5 px-3 text-center">Available</th><th className="py-2.5 px-3 text-center">Reserved</th><th className="py-2.5 px-3 text-center">Damaged</th><th className="py-2.5 px-3 text-right">Storage Estimate</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">APX-SPK-100</div>
-                      <div className="text-[11px] text-slate-500">Apex SoundPulse Rugged Waterproof Speaker</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">A-01-02, B-02-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">142</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">8</td>
-                    <td className="py-3 px-3 text-center text-rose-500">2</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£52.50 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">APX-EAR-200</div>
-                      <div className="text-[11px] text-slate-500">Apex PureBass Wireless Earbuds with ANC</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">A-02-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">88</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">12</td>
-                    <td className="py-3 px-3 text-center text-rose-500">0</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£35.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Bolt Gear Ltd</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">BLT-SND-10</div>
-                      <div className="text-[11px] text-slate-500">Bolt CinemaSound 120W Compact TV Soundbar</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">PALLET-P04</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">54</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">6</td>
-                    <td className="py-3 px-3 text-center text-rose-500">1</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£72.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Luma Smart Home</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">LUM-CAM-01</div>
-                      <div className="text-[11px] text-slate-500">Luma Smart 2K Pan & Tilt Indoor WiFi Camera</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">C-01-01</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">110</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">4</td>
-                    <td className="py-3 px-3 text-center text-rose-500">0</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£28.00 / mo</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Nordic Eco Living</td>
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">NRD-WRM-01</div>
-                      <div className="text-[11px] text-slate-500">Nordic Eco Wool Heated Smart Throw Blanket</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">PALLET-P08</td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600">65</td>
-                    <td className="py-3 px-3 text-center text-amber-600 font-medium">5</td>
-                    <td className="py-3 px-3 text-center text-rose-500">2</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium">£48.50 / mo</td>
-                  </tr>
+                  {clientStorageRows.map(row => (
+                    <tr key={row.id}>
+                      <td className="py-3 px-3"><div className="font-semibold text-slate-900 dark:text-slate-100">{row.clientName}</div><div className="text-[10px] text-slate-400">{row.code} · {row.snapshotDate}</div></td>
+                      <td className="py-3 px-3"><div className="font-medium">{row.skuCount} SKUs</div><div className="text-[10px] text-slate-400 max-w-[220px] truncate" title={row.skus}>{row.skus}</div></td>
+                      <td className="py-3 px-3 font-mono text-[11px]">{row.locations}</td>
+                      <td className="py-3 px-3 text-center">{row.onHand}</td><td className="py-3 px-3 text-center font-bold text-emerald-600">{row.available}</td><td className="py-3 px-3 text-center text-amber-600">{row.reserved}</td><td className="py-3 px-3 text-center text-rose-500">{row.damaged}</td><td className="py-3 px-3 text-right font-mono">{formatMoney(row.estimatedCostMinor)}</td>
+                    </tr>
+                  ))}
+                  {clientStorageRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-slate-500">No storage snapshots are recorded in the database yet.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -581,89 +563,28 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       {activeTab === 'billing' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              Client-Wise Billing & Settlement Matrix
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Comprehensive statement of services rendered (Storage, Packaging, Dispatch) with outstanding ledger balances.
-            </p>
-
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Client-Wise Billing & Settlement</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Service activity and invoice balances calculated from stored storage, packaging, shipping and invoice records.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Client Company</th>
-                    <th className="py-2.5 px-3">Account Code</th>
-                    <th className="py-2.5 px-3 text-right">Storage Charges</th>
-                    <th className="py-2.5 px-3 text-right">Packaging Charges</th>
-                    <th className="py-2.5 px-3 text-right">Shipping Charges</th>
-                    <th className="py-2.5 px-3 text-right">Total Charges</th>
-                    <th className="py-2.5 px-3 text-right">Paid Amount</th>
-                    <th className="py-2.5 px-3 text-right">Balance Due</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                  </tr>
+                  <tr><th className="py-2.5 px-3">Client Company</th><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3 text-right">Storage</th><th className="py-2.5 px-3 text-right">Packaging</th><th className="py-2.5 px-3 text-right">Shipping</th><th className="py-2.5 px-3 text-right">Invoiced Total</th><th className="py-2.5 px-3 text-right">Paid</th><th className="py-2.5 px-3 text-right">Balance Due</th><th className="py-2.5 px-3 text-center">Status</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Apex Electronics Ltd</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-APEX-01</td>
-                    <td className="py-3 px-3 text-right font-mono">£87.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£216.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£10.30</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£313.80</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£313.80</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        SETTLED
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Bolt Gear Ltd</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-BOLT-02</td>
-                    <td className="py-3 px-3 text-right font-mono">£72.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£140.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£17.70</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£229.70</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£150.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-600 font-bold">£79.70</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-                        PARTIAL
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">Zenith Retail Partners</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-ZEN-03</td>
-                    <td className="py-3 px-3 text-right font-mono">£60.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£93.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£38.50</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£192.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">£100.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-600 font-bold">£92.00</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-                        PARTIAL
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">CloudLogix Direct</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">CLI-CLOUD-04</td>
-                    <td className="py-3 px-3 text-right font-mono">£45.00</td>
-                    <td className="py-3 px-3 text-right font-mono">£130.50</td>
-                    <td className="py-3 px-3 text-right font-mono">£0.00</td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">£175.50</td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-400">£0.00</td>
-                    <td className="py-3 px-3 text-right font-mono text-rose-600 font-bold">£175.50</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
-                        DUE
-                      </span>
-                    </td>
-                  </tr>
+                  {clientBillingRows.map(row => (
+                    <tr key={row.id}>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{row.companyName}</td>
+                      <td className="py-3 px-3 font-mono text-slate-500">{row.code}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.storage)}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.packaging)}</td>
+                      <td className="py-3 px-3 text-right font-mono">{formatMoney(row.shipping)}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold">{formatMoney(row.billed)}</td>
+                      <td className="py-3 px-3 text-right font-mono text-emerald-600">{formatMoney(row.paid)}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold">{formatMoney(row.balance)}</td>
+                      <td className="py-3 px-3 text-center"><span className="px-2 py-0.5 rounded text-[10px] font-semibold">{row.status}</span></td>
+                    </tr>
+                  ))}
+                  {clientBillingRows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-slate-500">No 3PL billing records are available.</td></tr>}
                 </tbody>
               </table>
             </div>
