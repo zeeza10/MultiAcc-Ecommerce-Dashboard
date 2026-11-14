@@ -22,7 +22,7 @@ Deno.serve(async (request: Request) => {
   const { data: callerData, error: callerError } = await caller.auth.getUser(token);
   if (callerError || !callerData.user) return Response.json({ error: "Invalid session" }, { status: 401, headers: cors });
 
-  const body = await request.json().catch(() => null) as { organizationId?: string; invitationId?: string; email?: string; fullName?: string } | null;
+  const body = await request.json().catch(() => null) as { organizationId?: string; invitationId?: string; email?: string; fullName?: string; redirectTo?: string } | null;
   if (!body?.organizationId || !body.invitationId || !body.email) return Response.json({ error: "Missing invitation details" }, { status: 400, headers: cors });
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -84,7 +84,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const { data: invited, error: inviteUserError } = await admin.auth.admin.inviteUserByEmail(body.email, {
-    redirectTo: new URL("/", request.url).toString(),
+    redirectTo: body.redirectTo || url,
     data: body.fullName ? { full_name: body.fullName } : {},
   });
   if (inviteUserError || !invited.user) {
