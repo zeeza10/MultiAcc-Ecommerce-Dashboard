@@ -36,7 +36,7 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('POST', '/finance/invoices/invoice-id/void'), 'finance.manage');
     assert.equal(permissionByRoute('POST', '/finance/payments'), 'finance.manage');
     assert.equal(permissionByRoute('POST', '/finance/allocations'), 'finance.manage');
-    assert.equal(permissionByRoute('GET', '/system/config'), null);
+    assert.equal(permissionByRoute('GET', '/system/config'), 'dashboard.view');
     assert.equal(permissionByRoute('POST', '/system/config'), 'settings.manage');
     assert.equal(permissionByRoute('DELETE', '/products'), undefined);
     assert.equal(permissionByRoute('GET', '/unknown'), undefined);
