@@ -117,6 +117,7 @@ const permissionByRoute = (method: string, path: string): string | null | undefi
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/exceptions') return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/exceptions\/[^/]+\/resolve$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/audit-logs') return 'audit.view';
   if (method === 'GET' && path === '/notifications') return 'dashboard.view';
   if (method === 'POST' && /^\/notifications\/[^/]+\/dismiss$/.test(path)) return 'dashboard.view';
@@ -752,6 +753,51 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         source: row.source, referenceId: row.reference_id, details: row.details, status: row.status,
         createdAt: row.created_at, resolvedAt: row.resolved_at || '', resolutionNote: row.resolution_note || '',
       })) });
+    }
+
+    const resolveExceptionMatch = path.match(/^\/ebay\/exceptions\/([^/]+)\/resolve$/);
+    if (resolveExceptionMatch && request.method === 'POST') {
+      const body = await request.json() as Record<string, unknown>;
+      const targetProductId = typeof body.targetProductId === 'string' ? body.targetProductId.trim() : '';
+      const resolutionNote = typeof body.resolutionNote === 'string' ? body.resolutionNote.trim() : '';
+      if (!targetProductId) return json({ error: 'Select a valid internal product before resolving this exception.' }, 400);
+      if (resolutionNote.length > 500) return json({ error: 'Resolution notes must be 500 characters or fewer.' }, 400);
+
+      const { data: exception, error: exceptionError } = await auth.repositoryContext.supabase
+        .from('marketplace_exceptions')
+        .select('id,marketplace_account_id,exception_type,source,reference_id,details,raw_payload_snippet,status,created_at')
+        .eq('id', resolveExceptionMatch[1])
+        .eq('organization_id', auth.organizationId)
+        .maybeSingle();
+      if (exceptionError) throw new Error('Marketplace exception could not be loaded.');
+      if (!exception) return json({ error: 'Marketplace exception was not found in this workspace.' }, 404);
+      if (exception.exception_type !== 'UNMAPPED_SKU' || !exception.marketplace_account_id) {
+        return json({ error: 'Only unmapped SKU exceptions linked to a marketplace account can be resolved here.' }, 400);
+      }
+
+      let externalSku = '';
+      try {
+        const rawLine = JSON.parse(exception.raw_payload_snippet || '{}') as Record<string, unknown>;
+        externalSku = typeof rawLine.sku === 'string' ? rawLine.sku.trim() : '';
+      } catch {
+        return json({ error: 'The exception does not contain a valid marketplace SKU payload.' }, 422);
+      }
+      if (!externalSku || externalSku.length > 128) {
+        return json({ error: 'The exception does not contain a valid marketplace SKU.' }, 422);
+      }
+
+      const { data: resolution, error: resolutionError } = await auth.repositoryContext.supabase.rpc(
+        'resolve_marketplace_exception',
+        {
+          p_organization_id: auth.organizationId,
+          p_exception_id: exception.id,
+          p_product_id: targetProductId,
+          p_external_sku: externalSku,
+          p_resolution_note: resolutionNote || null,
+        },
+      );
+      if (resolutionError) throw resolutionError;
+      return json({ success: true, exception: resolution });
     }
 
     if (path === '/audit-logs' && request.method === 'GET') {
