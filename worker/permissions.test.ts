@@ -13,6 +13,8 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('POST', '/products'), 'products.create');
     assert.equal(permissionByRoute('GET', '/orders'), 'orders.view');
     assert.equal(permissionByRoute('POST', '/orders'), 'orders.create');
+    assert.equal(permissionByRoute('PUT', '/orders/order-id'), 'orders.edit');
+    assert.equal(permissionByRoute('PATCH', '/orders/order-id'), undefined);
     assert.equal(permissionByRoute('GET', '/inventory/balances'), 'inventory.view');
     assert.equal(permissionByRoute('POST', '/stock/adjustments'), 'inventory.adjust');
     assert.equal(permissionByRoute('GET', '/purchase-orders'), 'purchasing.view');
