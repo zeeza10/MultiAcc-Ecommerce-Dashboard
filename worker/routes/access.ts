@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
 import { json } from '../http';
 
@@ -22,9 +21,6 @@ export async function handleAccessRoute(
   }
 
   if (path === '/access/invitations' && request.method === 'POST') {
-    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-      return json({ error: 'Employee invitation email is not configured yet. Set SUPABASE_SERVICE_ROLE_KEY as a Cloudflare Worker secret.' }, 503);
-    }
     const body = await request.json().catch(() => null) as { email?: string; roleId?: string; fullName?: string } | null;
     const email = String(body?.email || '').trim().toLowerCase();
     const roleId = String(body?.roleId || '').trim();
@@ -40,28 +36,30 @@ export async function handleAccessRoute(
       return json({ error: invitationError?.message || 'Invitation could not be created.' }, 400);
     }
 
-    const admin = createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    });
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: new URL('/', request.url).toString(),
-      data: fullName ? { full_name: fullName } : {},
+    const response = await fetch(`${env.SUPABASE_URL}/functions/v1/manage-employee-invitation`, {
+      method: 'POST',
+      headers: {
+        Authorization: request.headers.get('Authorization') || '',
+        apikey: env.SUPABASE_PUBLISHABLE_KEY || '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        organizationId: auth.organizationId,
+        invitationId,
+        email,
+        fullName,
+      }),
     });
 
-    if (error || !data.user) {
+    const result = await response.json().catch(() => ({})) as { error?: string; message?: string; success?: boolean; existingAccount?: boolean };
+    if (!response.ok || !result.success) {
       await auth.repositoryContext.supabase.from('user_invitations')
         .update({ revoked_at: new Date().toISOString() })
         .eq('id', invitationId)
         .eq('organization_id', auth.organizationId);
-      const alreadyRegistered = /already|registered|exists/i.test(error?.message || '');
-      return json({
-        error: alreadyRegistered
-          ? 'This email already has an account. Ask the employee to sign in first; existing-account invitations need a separate acceptance flow.'
-          : 'The invitation email could not be sent. No active invitation was left behind.',
-      }, alreadyRegistered ? 409 : 502);
+      return json({ error: result.error || 'Invitation could not be completed.' }, response.status || 502);
     }
-
-    return json({ success: true, invitationId, email, message: 'Invitation email sent.' }, 201);
+    return json({ success: true, invitationId, email, existingAccount: result.existingAccount, message: result.message || 'Invitation completed.' }, 201);
   }
 
   return json({ error: 'Access management route not found.' }, 404);
