@@ -14,6 +14,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/products') return 'products.view';
   if (method === 'POST' && path === '/products') return 'products.create';
   if (method === 'GET' && path === '/inventory/balances') return 'inventory.view';
+  if (method === 'POST' && path === '/inventory/allocations') return 'inventory.manage';
   if (method === 'GET' && path === '/inventory/ledger') return 'inventory.view';
   if (method === 'GET' && path === '/stock/adjustments') return 'inventory.view';
   if (method === 'POST' && path === '/stock/adjustments') return 'inventory.adjust';
@@ -39,6 +40,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/warehouse-services/packaging') return 'fulfilment.view';
   if (method === 'GET' && path === '/warehouse-services/shipping') return 'fulfilment.view';
   if (method === 'POST' && path === '/finance/payments') return 'finance.manage';
+  if (method === 'POST' && path === '/finance/allocations') return 'finance.manage';
   if (method === 'POST' && path.startsWith('/finance/invoices/') && path.endsWith('/void')) return 'finance.manage';
   if (method === 'GET' && path === '/finance/invoices') return 'finance.view';
   if (method === 'GET' && path === '/finance/payments') return 'finance.view';
