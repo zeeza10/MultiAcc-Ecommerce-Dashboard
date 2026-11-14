@@ -102,6 +102,21 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     })) });
   }
 
+  if (path === '/finance/payments' && request.method === 'GET' && auth.user.role === 'CLIENT_USER') {
+    if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
+    const { data, error } = await auth.repositoryContext.supabase.rpc('get_client_finance_payments', {
+      p_organization_id: auth.organizationId,
+    });
+    if (error) throw new Error('Client payment allocations could not be loaded.');
+    return json({ payments: (data || []).map((row: Record<string, any>) => ({
+      id: row.id, paymentNumber: row.payment_number, amountMinor: Number(row.amount_minor || 0),
+      currency: String(row.currency || 'GBP').trim(), paymentMethod: row.payment_method,
+      paymentDate: row.payment_date, reference: row.reference || '',
+      payerName: row.payer_name || '', unallocatedCreditMinor: 0,
+      allocations: row.allocations || [], recordedBy: row.recorded_by || '', createdAt: row.created_at,
+    })) });
+  }
+
   if (path === '/finance/payments' && request.method === 'GET') {
     let clientInvoiceIds: string[] | null = null;
     let clientRecipientName = '';
