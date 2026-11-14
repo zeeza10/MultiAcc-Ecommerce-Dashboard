@@ -55,6 +55,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     let balances: any[] = inventoryBalances || [];
     let invoices = invoiceResult.data || [];
     let expenses = expenseResult.data || [];
+    let storeFinanceAllocationCount = 0;
 
     if (storeScoped) {
       const { data: store, error: storeError } = await auth.repositoryContext.supabase
@@ -98,6 +99,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       }));
 
       const financeAllocations = financeAllocationsResult.data || [];
+      storeFinanceAllocationCount = financeAllocations.length;
       const invoiceIds = [...new Set(financeAllocations.filter(row => row.source_type === 'INVOICE').map(row => row.source_id))];
       const expenseIds = [...new Set(financeAllocations.filter(row => row.source_type === 'EXPENSE').map(row => row.source_id))];
       const [storeInvoices, storeExpenses] = await Promise.all([
@@ -148,7 +150,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       Number(balance.available || 0) <= Number(productById.get(balance.productId)?.low_stock_threshold || 0)
     ).length;
     const totalStockUnits = balances.reduce((sum, balance) => sum + Number(balance.onHand || 0), 0);
-    const inventoryValueMinor = (inventoryBalances || []).reduce((sum, balance) => {
+    const inventoryValueMinor = balances.reduce((sum, balance) => {
       const product = productById.get(balance.productId);
       if (String(product?.currency || 'GBP').trim() !== currency) return sum;
       return sum + Number(balance.onHand || 0) * Number(balance.weightedAverageCostMinor || 0);
@@ -182,10 +184,11 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       lowStockItems: storeScoped ? null : lowStockItems,
       totalStockUnits: storeScoped ? null : totalStockUnits,
       inventoryValueMinor: storeScoped ? null : inventoryValueMinor,
-      supplierPayablesMinor: storeScoped ? null : supplierPayablesMinor,
-      clientReceivablesMinor: storeScoped ? null : clientReceivablesMinor,
-      storageRevenueMinor: storeScoped ? null : storageRevenueMinor,
-      outstandingPaymentsMinor: storeScoped ? null : outstandingPaymentsMinor,
+      supplierPayablesMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : supplierPayablesMinor,
+      clientReceivablesMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : clientReceivablesMinor,
+      storageRevenueMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : storageRevenueMinor,
+      outstandingPaymentsMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : outstandingPaymentsMinor,
+      storeFinanceAllocationCount,
       storeScoped,
       currency,
       activePhase: settingsResult.data?.active_release_phase || 'ALL',
