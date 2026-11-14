@@ -62,8 +62,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     e.preventDefault();
     setFormError('');
 
-    if (!newSku.trim() || !newName.trim()) {
-      setFormError('SKU and Product Name are required.');
+    if (!newSku.trim() || !newName.trim() || !newCategory.trim()) {
+      setFormError('SKU, Product Name and Category are required.');
+      return;
+    }
+    const cost = Number.parseFloat(newCost);
+    const price = Number.parseFloat(newPrice);
+    const threshold = Number.parseInt(newThreshold, 10);
+    const reorder = Number.parseInt(newReorder, 10);
+    if (![cost, price].every(value => Number.isFinite(value) && value >= 0) ||
+        ![threshold, reorder].every(value => Number.isSafeInteger(value) && value >= 0)) {
+      setFormError('Enter valid non-negative cost, price and stock thresholds.');
       return;
     }
 
@@ -72,11 +81,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         sku: newSku.trim().toUpperCase(),
         name: newName.trim(),
         barcode: newBarcode.trim() || undefined,
-        category: newCategory,
-        costPriceMinor: Math.round(parseFloat(newCost || '0') * 100),
-        sellingPriceMinor: Math.round(parseFloat(newPrice || '0') * 100),
-        lowStockThreshold: parseInt(newThreshold, 10) || 10,
-        reorderLevel: parseInt(newReorder, 10) || 30,
+        category: newCategory.trim(),
+        costPriceMinor: Math.round(cost * 100),
+        sellingPriceMinor: Math.round(price * 100),
+        lowStockThreshold: threshold,
+        reorderLevel: reorder,
         ownerType: currentUser.role === 'CLIENT_USER' ? 'CLIENT' : 'OPERATOR',
         ownerId: currentUser.role === 'CLIENT_USER' ? currentUser.clientId : 'operator',
       });
@@ -86,6 +95,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
       setNewSku('');
       setNewName('');
       setNewBarcode('');
+      setNewCategory('');
+      setNewCost('');
+      setNewPrice('');
+      setNewThreshold('');
+      setNewReorder('');
       loadProducts();
     } catch (err: any) {
       setFormError(err.message || 'Failed to create product');
@@ -325,17 +339,14 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">Category</label>
-                  <select
+                  <input
+                    type="text"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md p-2 bg-white"
-                  >
-                    <option value="Audio">Audio</option>
-                    <option value="Video">Video</option>
-                    <option value="Peripherals">Peripherals</option>
-                    <option value="Accessories">Accessories</option>
-                    <option value="Packaging">Packaging</option>
-                  </select>
+                    placeholder="Enter category from your catalog"
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    required
+                  />
                 </div>
               </div>
 
