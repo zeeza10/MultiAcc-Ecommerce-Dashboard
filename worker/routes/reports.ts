@@ -93,7 +93,6 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(expenses.reduce((s:number,x:any)=>s+Number(x.amount_minor||0),0))},['Order','Revenue','Estimated COGS','Gross Profit'],data);
  }else if(id==='R-14'){
   const [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at')]);
-  const amap=new Map(accounts.map((x:any)=>[x.id,x]));
   const data=accounts.map((a:any)=>{const own=lines.filter((x:any)=>x.account_id===a.id);return {account:a.account_code+' '+a.account_name,debits:money(own.reduce((s:number,x:any)=>s+Number(x.debit_minor||0),0)),credits:money(own.reduce((s:number,x:any)=>s+Number(x.credit_minor||0),0))};});
   const debit=lines.reduce((s:number,x:any)=>s+Number(x.debit_minor||0),0),credit=lines.reduce((s:number,x:any)=>s+Number(x.credit_minor||0),0);
   report=result(id,{journalEntries:entries.length,totalDebits:money(debit),totalCredits:money(credit),variance:money(debit-credit),reconciliations:recs.length},['Account','Debits','Credits'],data);
