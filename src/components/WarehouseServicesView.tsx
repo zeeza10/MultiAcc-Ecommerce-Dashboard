@@ -44,22 +44,22 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
   // Form states for Packaging Job
   const [pkgClientId, setPkgClientId] = useState('');
   const [pkgType, setPkgType] = useState<'CUSTOM_BOX' | 'BUBBLE_MAILER' | 'PALLET_WRAP' | 'FRAGILE_PREP'>('CUSTOM_BOX');
-  const [pkgQty, setPkgQty] = useState(50);
-  const [pkgMaterialCost, setPkgMaterialCost] = useState('25.00');
-  const [pkgServiceCharge, setPkgServiceCharge] = useState('60.00');
+  const [pkgQty, setPkgQty] = useState(1);
+  const [pkgMaterialCost, setPkgMaterialCost] = useState('');
+  const [pkgServiceCharge, setPkgServiceCharge] = useState('');
   const [pkgOrderNumber, setPkgOrderNumber] = useState('');
   const [pkgNotes, setPkgNotes] = useState('');
 
   // Form states for Shipping Job
   const [shpClientId, setShpClientId] = useState('');
-  const [shpCarrier, setShpCarrier] = useState('Royal Mail');
+  const [shpCarrier, setShpCarrier] = useState('');
   const [shpTracking, setShpTracking] = useState('');
-  const [shpServiceLevel, setShpServiceLevel] = useState('Tracked 24');
-  const [shpWeight, setShpWeight] = useState('1.2');
-  const [shpCarrierCost, setShpCarrierCost] = useState('4.20');
-  const [shpServiceCharge, setShpServiceCharge] = useState('7.50');
-  const [shpDestination, setShpDestination] = useState('Manchester, UK');
-  const [shpOrderNumber, setShpOrderNumber] = useState('NX-ORD-2026-001');
+  const [shpServiceLevel, setShpServiceLevel] = useState('');
+  const [shpWeight, setShpWeight] = useState('');
+  const [shpCarrierCost, setShpCarrierCost] = useState('');
+  const [shpServiceCharge, setShpServiceCharge] = useState('');
+  const [shpDestination, setShpDestination] = useState('');
+  const [shpOrderNumber, setShpOrderNumber] = useState('');
 
   useEffect(() => {
     loadData();
