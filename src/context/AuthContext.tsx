@@ -39,7 +39,7 @@ const getAuthRedirectUrl = () => window.location.origin;
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [appUser, setAppUser] = useState<User | null>(null);
-  const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
+  const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);\n  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', authUser.id)
         .maybeSingle(),
       supabase.from('organization_members')
-        .select('organization_id,is_active,role:roles(code),organization:organizations(name)')
+        .select('organization_id,role_id,is_active,role:roles(code),organization:organizations(name)')
         .eq('user_id', authUser.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Your account has been disabled. Contact your organization administrator.');
     }
     if (!profile) throw new Error('Your account profile is not ready. Please contact support.');
-    if (!member) return;
+    if (!member) {\n      window.localStorage.removeItem('nexusops_active_organization_id');\n      setPermissions([]);\n      return;\n    }
 
     const roleRow = toOne(member.role as Workspace['role']);
     const orgRow = toOne(member.organization as Workspace['organization']);
@@ -244,9 +244,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => session && appUser && workspace
-      ? { session, user: appUser, organizationId: workspace.id, organizationName: workspace.name, signOut }
+      ? { session, user: appUser, organizationId: workspace.id, organizationName: workspace.name, permissions, signOut }
       : null,
-    [session, appUser, workspace, signOut],
+    [session, appUser, workspace, permissions, signOut],
   );
 
   if (loading) {
