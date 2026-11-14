@@ -33,6 +33,7 @@ interface WarehouseServicesViewProps {
 const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
 
 export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
+  const canManageFulfilment = currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER';
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
   const [summary, setSummary] = useState<any>(null);
   const [packagingJobs, setPackagingJobs] = useState<WarehousePackagingJob[]>([]);
@@ -227,20 +228,20 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          {canManageFulfilment && <button
             onClick={() => setShowPkgModal(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs"
           >
             <PackageCheck className="w-4 h-4 text-indigo-500" />
             <span>Record Packaging Job</span>
-          </button>
-          <button
+          </button>}
+          {canManageFulfilment && <button
             onClick={() => setShowShpModal(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition shadow-xs shadow-indigo-600/20"
           >
             <Truck className="w-4 h-4" />
             <span>Record Outbound Dispatch</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -426,13 +427,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   Tracking packaging jobs, material consumption, staff labor, and client billable rates.
                 </p>
               </div>
-              <button
+              {canManageFulfilment && <button
                 onClick={() => setShowPkgModal(true)}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition shadow-xs flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Packaging Record</span>
-              </button>
+              </button>}
             </div>
 
             <div className="overflow-x-auto">
@@ -509,13 +510,13 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   Carrier dispatch records, tracking integrations, carrier postage costs, and client shipping billable rates.
                 </p>
               </div>
-              <button
+              {canManageFulfilment && <button
                 onClick={() => setShowShpModal(true)}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition shadow-xs flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Dispatch Job</span>
-              </button>
+              </button>}
             </div>
 
             <div className="overflow-x-auto">
