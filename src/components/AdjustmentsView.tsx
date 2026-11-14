@@ -103,7 +103,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Stock Adjustments & Variance</h1>
           <p className="text-xs text-gray-500">
-            Controlled stock corrections with dual-control manager sign-offs (Threshold: {config.adjustmentApprovalThresholdQuantity} units or £{((config.adjustmentApprovalThresholdValueMinor || 5000) / 100).toFixed(2)}).
+            Controlled stock corrections with dual-control manager sign-offs (Threshold: {config.adjustmentApprovalThresholdQuantity} units or £{(config.adjustmentApprovalThresholdValueMinor / 100).toFixed(2)}).
           </p>
         </div>
 
