@@ -106,7 +106,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  const isFullPhases = true; // All 10 operational and financial KPIs fully visible
+  const formatMoney = (amountMinor: number) =>
+    new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: kpis?.currency || config.baseCurrency || 'GBP',
+    }).format((Number(amountMinor) || 0) / 100);
 
   return (
     <div className="space-y-6">
@@ -236,7 +240,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <PoundSterling className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.revenueMinor / 100).toFixed(2) : '0.00'}
+              {formatMoney(kpis.revenueMinor)}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Item totals excl. tax</span>
@@ -287,7 +291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <CircleDollarSign className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.inventoryValueMinor / 100).toFixed(2) : '6,906.00'}
+              {formatMoney(kpis.inventoryValueMinor)}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Weighted avg cost valuation</span>
@@ -304,7 +308,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Receipt className="w-4 h-4 text-purple-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.supplierPayablesMinor / 100).toFixed(2) : '1,440.00'}
+              {formatMoney(kpis.supplierPayablesMinor)}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Unpaid PO receipts / GRNI</span>
@@ -321,7 +325,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Building className="w-4 h-4 text-blue-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.clientReceivablesMinor / 100).toFixed(2) : '360.00'}
+              {formatMoney(kpis.clientReceivablesMinor)}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Unpaid issued 3PL invoices</span>
@@ -338,7 +342,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Archive className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.storageRevenueMinor / 100).toFixed(2) : '216.00'}
+              {formatMoney(kpis.storageRevenueMinor)}
             </div>
             <div className="mt-1 text-[11px] text-gray-500">
               <span>Storage charges billed</span>
@@ -355,7 +359,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <AlertCircle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900">
-              £{kpis ? (kpis.outstandingPaymentsMinor / 100).toFixed(2) : '216.00'}
+              {formatMoney(kpis.outstandingPaymentsMinor)}
             </div>
             <div className="mt-1 text-[11px] text-rose-700">
               <span>Receivables past due date</span>
@@ -383,7 +387,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
                     <div className="text-[10px] font-bold text-indigo-700 opacity-0 group-hover:opacity-100 transition">
-                      £{point.revenue.toFixed(0)}
+                      {formatMoney(Math.round(point.revenue * 100))}
                     </div>
                     <div
                       style={{ height: `${heightPercent}%` }}
@@ -538,7 +542,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-gray-900">{skuItem.units} units</div>
-                    <div className="text-[11px] text-emerald-600 font-medium">£{skuItem.revenue.toFixed(2)}</div>
+                    <div className="text-[11px] text-emerald-600 font-medium">{formatMoney(Math.round(skuItem.revenue * 100))}</div>
                   </div>
                 </div>
               ))
