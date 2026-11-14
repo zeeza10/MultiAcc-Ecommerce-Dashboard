@@ -753,7 +753,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       if (error) throw new Error('Audit history could not be loaded.');
       const actorIds = [...new Set((data || []).map(row => row.actor_id).filter(Boolean))];
       const { data: profiles } = actorIds.length
-        ? await auth.repositoryContext.supabase.from('profiles').select('id,full_name,email').in('id', actorIds)
+        ? await auth.repositoryContext.supabase.from('profiles').select('id,full_name').in('id', actorIds)
         : { data: [] };
       const actorNames = new Map((profiles || []).map(row => [row.id, row.full_name || row.email || 'System']));
       return json({ logs: (data || []).map(row => ({
