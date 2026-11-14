@@ -358,6 +358,7 @@ export interface Client3PL {
 
 export interface RateCard {
   id: string;
+  currency?: string;
   name: string;
   pickFeeMinor: number;
   packFeeMinor: number;
