@@ -123,21 +123,25 @@ export class SupabaseProductRepository implements ProductRepository {
     if (productIds.length === 0) return [];
 
     const rows: StockLedgerQuantityRow[] = [];
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      let query = this.client
-        .from('stock_ledger')
-        .select('product_id,stock_state,quantity_delta')
-        .eq('organization_id', this.organizationId)
-        .in('product_id', productIds)
-        .range(offset, offset + PAGE_SIZE - 1);
+    const productIdChunkSize = 100;
+    for (let start = 0; start < productIds.length; start += productIdChunkSize) {
+      const productIdChunk = productIds.slice(start, start + productIdChunkSize);
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        let query = this.client
+          .from('stock_ledger')
+          .select('product_id,stock_state,quantity_delta')
+          .eq('organization_id', this.organizationId)
+          .in('product_id', productIdChunk)
+          .range(offset, offset + PAGE_SIZE - 1);
 
-      if (client3plId) query = query.eq('client_3pl_id', client3plId);
+        if (client3plId) query = query.eq('client_3pl_id', client3plId);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      const page = (data || []) as StockLedgerQuantityRow[];
-      rows.push(...page);
-      if (page.length < PAGE_SIZE) break;
+        const { data, error } = await query;
+        if (error) throw error;
+        const page = (data || []) as StockLedgerQuantityRow[];
+        rows.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
     }
 
     return rows;
