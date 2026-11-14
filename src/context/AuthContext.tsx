@@ -8,6 +8,7 @@ type AuthContextValue = {
   user: User;
   organizationId: string;
   organizationName: string;
+  permissions: string[];
   signOut: () => Promise<void>;
 };
 
@@ -21,6 +22,7 @@ export function useAuth() {
 
 type Workspace = {
   organization_id: string;
+  role_id: string;
   role: { code: string } | { code: string }[];
   organization: { name: string } | { name: string }[];
 };
@@ -39,7 +41,9 @@ const getAuthRedirectUrl = () => window.location.origin;
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [appUser, setAppUser] = useState<User | null>(null);
-  const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);\n  const [permissions, setPermissions] = useState<string[]>([]);
+  const [workspace, setWorkspace] = useState<{ id: string; name: string } | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
@@ -57,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setWorkspace(null);
     if (!activeSession?.user) {
       window.localStorage.removeItem('nexusops_active_organization_id');
+      setPermissions([]);
       return;
     }
 
@@ -81,7 +86,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Your account has been disabled. Contact your organization administrator.');
     }
     if (!profile) throw new Error('Your account profile is not ready. Please contact support.');
-    if (!member) {\n      window.localStorage.removeItem('nexusops_active_organization_id');\n      setPermissions([]);\n      return;\n    }
+    if (!member) {
+      window.localStorage.removeItem('nexusops_active_organization_id');
+      setPermissions([]);
+      return;
+    }
 
     const roleRow = toOne(member.role as Workspace['role']);
     const orgRow = toOne(member.organization as Workspace['organization']);
@@ -91,7 +100,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Your organization role is not configured. Contact an administrator.');
     }
 
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from('role_permissions')
+      .select('permissions(code)')
+      .eq('role_id', member.role_id);
+    if (permissionError) throw permissionError;
+
+    const activePermissions = role === 'SUPER_ADMIN'
+      ? ['*']
+      : (permissionRows || []).map((row: any) => {
+          const relation = row.permissions;
+          return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+        }).filter((code: unknown): code is string => typeof code === 'string');
+
     window.localStorage.setItem('nexusops_active_organization_id', member.organization_id);
+    setPermissions(activePermissions);
     setWorkspace({ id: member.organization_id, name: orgRow?.name || 'Workspace' });
     setAppUser({
       id: authUser.id,
