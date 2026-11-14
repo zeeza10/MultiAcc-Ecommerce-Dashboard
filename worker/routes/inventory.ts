@@ -42,14 +42,38 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
   if (path === '/products' && request.method === 'GET') {
     const repository = new SupabaseProductRepository(auth.repositoryContext);
     const isClientUser = auth.user.role === 'CLIENT_USER';
-    const products = await repository.listForOrganization({
+    let products = await repository.listForOrganization({
       client3plId: auth.user.clientId,
       onlyClientProducts: isClientUser,
     });
-    const balances = await new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
+    const accountId = url.searchParams.get('accountId');
+    let balances = await new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
       client3plId: auth.user.clientId,
       onlyClientProducts: isClientUser,
     });
+    if (accountId && accountId !== 'ALL') {
+      if (!auth.permissions.has('*') && !auth.permissions.has('inventory.view')) return json({ error: 'Inventory access is required.' }, 403);
+      const { data: mappings, error: mappingError } = await auth.repositoryContext.supabase
+        .from('marketplace_sku_mappings').select('product_id')
+        .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId);
+      if (mappingError) throw mappingError;
+      const ids = [...new Set((mappings || []).map(row => row.product_id))];
+      products = products.filter(product => ids.includes(product.id));
+      const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
+        .from('marketplace_inventory_allocations').select('product_id,allocated_quantity,reserved_quantity')
+        .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId);
+      if (allocationError) throw allocationError;
+      const allocationByProduct = new Map((allocations || []).map(row => [row.product_id, row]));
+      balances = products.map(product => {
+        const allocation = allocationByProduct.get(product.id);
+        const allocated = Number(allocation?.allocated_quantity || 0);
+        const reserved = Number(allocation?.reserved_quantity || 0);
+        return { productId: product.id, sku: product.sku, ownerId: product.ownerId,
+          onHand: allocated, reserved, available: Math.max(0, allocated-reserved),
+          incoming: 0, damaged: 0, quarantined: 0, missing: 0, totalStock: allocated,
+          weightedAverageCostMinor: product.costPriceMinor };
+      });
+    }
     const balanceByProduct = new Map(balances.map(balance => [balance.productId, balance]));
     return json({ products: products.map(product => {
       const balance = balanceByProduct.get(product.id);
