@@ -20,9 +20,9 @@ declare
   v_shipping_charge bigint := 0;
   v_vat_rate numeric := 0;
   v_currency char(3) := 'GBP';
-  v_subtotal bigint := 0;
-  v_tax bigint := 0;
-  v_total bigint := 0;
+  v_subtotal numeric := 0;
+  v_tax numeric := 0;
+  v_total numeric := 0;
   v_line jsonb;
   v_product public.products%rowtype;
   v_quantity integer;
@@ -40,7 +40,7 @@ begin
   if p_organization_id is null or not private.has_org_permission(p_organization_id, 'orders.create') then
     raise exception 'You are not authorized to create orders in this workspace.' using errcode = '42501';
   end if;
-  if jsonb_typeof(p_order) <> 'object' then
+  if coalesce(jsonb_typeof(p_order), '') <> 'object' then
     raise exception 'Order payload must be an object.' using errcode = '22023';
   end if;
 
@@ -61,7 +61,7 @@ begin
   if jsonb_typeof(v_address) <> 'object' then
     raise exception 'Shipping address must be an object.' using errcode = '22023';
   end if;
-  if jsonb_typeof(p_order->'lines') <> 'array'
+  if coalesce(jsonb_typeof(p_order->'lines'), '') <> 'array'
      or jsonb_array_length(p_order->'lines') < 1
      or jsonb_array_length(p_order->'lines') > 100 then
     raise exception 'An order must contain between 1 and 100 line items.' using errcode = '22023';
@@ -90,7 +90,8 @@ begin
          lpad((count(*) + 1)::text, 6, '0')
     into v_order_number
   from public.orders
-  where organization_id = p_organization_id;
+  where organization_id = p_organization_id
+    and created_at >= date_trunc('year', now());
 
   insert into public.orders (
     organization_id, order_number, sales_source, owner_type, client_3pl_id,
@@ -134,7 +135,7 @@ begin
     -- The catalog price is authoritative; client-supplied price/SKU/name are ignored.
     v_unit_price := greatest(v_product.selling_price_minor, 0);
     v_line_tax := round(v_unit_price::numeric * v_quantity * v_vat_rate / 100)::bigint;
-    v_line_total := v_unit_price * v_quantity;
+    v_line_total := v_unit_price::numeric * v_quantity::numeric;
     if v_line_total > 9223372036854775807::numeric or v_line_tax > 9223372036854775807::numeric then
       raise exception 'Order line amount exceeds the supported monetary range.' using errcode = '22003';
     end if;
@@ -146,19 +147,19 @@ begin
     ) values (
       p_organization_id, v_order.id, v_product.id, v_product.sku, v_product.name,
       v_quantity, v_unit_price, v_line_tax, v_line_total, false, 0
-    ) returning to_jsonb(order_items.*) into v_lines;
+    );
 
     v_subtotal := v_subtotal + v_line_total;
     v_tax := v_tax + v_line_tax;
   end loop;
 
   v_total := v_subtotal + v_shipping_charge;
-  if v_total > 9223372036854775807::numeric or v_tax > 9223372036854775807::numeric then
+  if v_subtotal > 9223372036854775807::numeric or v_total > 9223372036854775807::numeric or v_tax > 9223372036854775807::numeric then
     raise exception 'Order total exceeds the supported monetary range.' using errcode = '22003';
   end if;
 
   update public.orders
-  set total_minor = v_total, tax_minor = v_tax, updated_at = now()
+  set total_minor = v_total::bigint, tax_minor = v_tax::bigint, updated_at = now()
   where id = v_order.id
   returning * into v_order;
 
