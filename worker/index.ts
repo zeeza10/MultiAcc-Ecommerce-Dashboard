@@ -6,6 +6,7 @@
 import { handleApiRequest } from './api';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
+import type { RateLimitBinding } from './types';
 
 export interface Env {
   ASSETS?: {
@@ -14,6 +15,9 @@ export interface Env {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   ALLOWED_ORIGIN?: string;
+  API_READ_RATE_LIMITER?: RateLimitBinding;
+  API_WRITE_RATE_LIMITER?: RateLimitBinding;
+  INVITATION_RATE_LIMITER?: RateLimitBinding;
 }
 
 export interface ExecutionContext {
