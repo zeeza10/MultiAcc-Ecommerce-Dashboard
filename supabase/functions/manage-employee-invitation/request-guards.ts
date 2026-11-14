@@ -20,7 +20,7 @@ export async function exceedsInvitationBodyLimit(request: Request, maximumBytes:
   if (!request.body) return false;
   const declaredLength = request.headers.get("Content-Length");
   if (declaredLength !== null) {
-    if (!/^\\d+$/.test(declaredLength)) return true;
+    if (!/^\d+$/.test(declaredLength)) return true;
     if (Number(declaredLength) > maximumBytes) return true;
   }
   const body = request.clone().body;
