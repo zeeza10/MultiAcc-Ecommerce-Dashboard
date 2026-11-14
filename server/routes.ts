@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import type { RepositoryContext } from './repositories/context';
 import { SupabaseProductRepository } from './repositories/productRepository';
+import { SupabaseInventoryRepository } from './repositories/inventoryRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -399,6 +400,54 @@ apiRouter.post('/products', async (req: Request, res: Response) => {
 });
 
 /**
+ * INVENTORY READS — backed by the organization-scoped PostgreSQL ledger.
+ */
+apiRouter.get('/inventory/balances', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
+    const balances = await repository.listBalances({
+      client3plId: user.clientId,
+      onlyClientProducts: user.role === 'CLIENT_USER',
+    });
+    res.json({ balances });
+  } catch (error) {
+    console.error('PostgreSQL inventory balance read failed:', error);
+    res.status(500).json({ error: 'Inventory balances could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.get('/inventory/ledger', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
+    const ledger = await repository.listLedger({
+      client3plId: user.clientId,
+      onlyClientProducts: user.role === 'CLIENT_USER',
+    });
+    res.json({ ledger });
+  } catch (error) {
+    console.error('PostgreSQL inventory ledger read failed:', error);
+    res.status(500).json({ error: 'Inventory ledger could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.get('/stock/adjustments', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
+    const adjustments = await repository.listAdjustments({
+      client3plId: user.clientId,
+      onlyClientProducts: user.role === 'CLIENT_USER',
+    });
+    res.json({ adjustments });
+  } catch (error) {
+    console.error('PostgreSQL stock adjustment read failed:', error);
+    res.status(500).json({ error: 'Stock adjustments could not be loaded from the workspace database.' });
+  }
+});
+
+/**
  * Legacy demo-backed routes remain blocked outside explicit local demo mode.
  * Migrated PostgreSQL routes above finish their response before this middleware.
  */
@@ -413,33 +462,9 @@ apiRouter.use((req: Request, res: Response, next: NextFunction) => {
 /**
  * INVENTORY & STOCK LEDGER
  */
-apiRouter.get('/inventory/balances', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const clientFilterId = user.role === 'CLIENT_USER' ? user.clientId : undefined;
-  const balances = engine.calculateBalances(undefined, clientFilterId);
-  res.json({ balances });
-});
-
-apiRouter.get('/inventory/ledger', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  let ledger = [...raw.stockLedger];
-
-  if (user.role === 'CLIENT_USER') {
-    ledger = ledger.filter((l) => l.ownerId === user.clientId);
-  }
-
-  res.json({ ledger });
-});
-
 /**
  * STOCK ADJUSTMENTS & APPROVALS
  */
-apiRouter.get('/stock/adjustments', (req: Request, res: Response) => {
-  const raw = db.getRawData();
-  res.json({ adjustments: raw.stockAdjustments });
-});
-
 apiRouter.post('/stock/adjustments', (req: Request, res: Response) => {
   const user = getActiveUser(req);
   const { productId, locationId, quantityDelta, targetState, reasonCode, note } = req.body;
