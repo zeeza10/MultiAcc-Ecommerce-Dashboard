@@ -127,7 +127,7 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
       id: row.id, name: row.name, pickFeeMinor: Number(row.pick_fee_minor), packFeeMinor: Number(row.pack_fee_minor),
       extraItemFeeMinor: Number(row.extra_item_fee_minor), storagePalletPerMonthMinor: Number(row.storage_pallet_per_month_minor),
       storageShelfPerMonthMinor: Number(row.storage_shelf_per_month_minor), storageBinPerMonthMinor: Number(row.storage_bin_per_month_minor),
-      minimumMonthlyChargeMinor: Number(row.minimum_monthly_charge_minor),
+      minimumMonthlyChargeMinor: Number(row.minimum_monthly_charge_minor), currency: String(row.currency || 'GBP').trim(),
     }));
     return json({ clients: (clientsResult.data || []).map(row => ({
       id: row.id, companyName: row.company_name, code: row.code, contactEmail: row.contact_email || '',
