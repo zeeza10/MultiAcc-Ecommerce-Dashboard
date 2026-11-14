@@ -40,21 +40,85 @@ type LocationRow = { id: string; location_code: string };
 
 const PAGE_SIZE = 1000;
 
+export interface StockAdjustmentCreateInput {
+  productId: string;
+  locationId?: string;
+  quantityDelta: number;
+  targetState: StockState;
+  reasonCode: StockAdjustment['reasonCode'];
+  note: string;
+}
+
 export interface InventoryRepository {
+  createAdjustment(input: StockAdjustmentCreateInput): Promise<StockAdjustment>;
+  decideAdjustment(adjustmentId: string, decision: 'APPROVE' | 'REJECT', approvalNote?: string): Promise<StockAdjustment>;
   listBalances(options?: { client3plId?: string; onlyClientProducts?: boolean }): Promise<StockBalance[]>;
   listLedger(options?: { client3plId?: string; onlyClientProducts?: boolean }): Promise<StockLedgerEntry[]>;
   listAdjustments(options?: { client3plId?: string; onlyClientProducts?: boolean }): Promise<StockAdjustment[]>;
 }
 
 /**
- * Read-side inventory repository. All reads use the caller's JWT and explicit
- * organization filters; RLS remains the independent tenant authorization layer.
+ * Inventory repository. Reads use the caller's JWT and explicit organization
+ * filters; writes use narrowly scoped transactional RPCs with database-side checks.
  */
 export class SupabaseInventoryRepository implements InventoryRepository {
   private readonly products: SupabaseProductRepository;
 
   constructor(private readonly context: RepositoryContext) {
     this.products = new SupabaseProductRepository(context);
+  }
+
+  async createAdjustment(input: StockAdjustmentCreateInput): Promise<StockAdjustment> {
+    const { data, error } = await this.context.supabase.rpc('submit_stock_adjustment', {
+      p_organization_id: this.context.organizationId,
+      p_product_id: input.productId,
+      p_location_id: input.locationId || null,
+      p_quantity_delta: input.quantityDelta,
+      p_target_state: input.targetState,
+      p_reason_code: input.reasonCode,
+      p_note: input.note,
+    });
+    if (error) throw error;
+    return this.mapAdjustment(data);
+  }
+
+  async decideAdjustment(
+    adjustmentId: string,
+    decision: 'APPROVE' | 'REJECT',
+    approvalNote = '',
+  ): Promise<StockAdjustment> {
+    const { data, error } = await this.context.supabase.rpc('decide_stock_adjustment', {
+      p_organization_id: this.context.organizationId,
+      p_adjustment_id: adjustmentId,
+      p_decision: decision,
+      p_approval_note: approvalNote,
+    });
+    if (error) throw error;
+    return this.mapAdjustment(data);
+  }
+
+  private mapAdjustment(value: unknown): StockAdjustment {
+    if (!value || typeof value !== 'object') throw new Error('The database returned an invalid stock adjustment.');
+    const row = value as Record<string, unknown>;
+    return {
+      id: String(row.id || ''),
+      adjustmentNumber: String(row.adjustment_number || ''),
+      productId: String(row.product_id || ''),
+      sku: String(row.sku || ''),
+      locationId: typeof row.location_id === 'string' ? row.location_id : '',
+      quantityDelta: Number(row.quantity_delta || 0),
+      targetState: String(row.target_state || 'ON_HAND') as StockState,
+      reasonCode: String(row.reason_code || 'count_correction') as StockAdjustment['reasonCode'],
+      note: String(row.note || ''),
+      requestedBy: String(row.requested_by || ''),
+      requiresApproval: Boolean(row.requires_approval),
+      status: String(row.status || 'PENDING_APPROVAL') as StockAdjustment['status'],
+      approvedBy: typeof row.approved_by === 'string' ? row.approved_by : undefined,
+      approvalNote: typeof row.approval_note === 'string' ? row.approval_note : undefined,
+      evaluatedValueMinor: Number(row.evaluated_value_minor || 0),
+      createdAt: String(row.created_at || ''),
+      updatedAt: String(row.updated_at || ''),
+    };
   }
 
   async listBalances(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<StockBalance[]> {

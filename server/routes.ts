@@ -447,6 +447,114 @@ apiRouter.get('/stock/adjustments', async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.post('/stock/adjustments', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    if (user.role === 'FINANCE_USER' || user.role === 'CLIENT_USER' || user.role === 'VIEWER') {
+      res.status(403).json({ error: 'Your workspace role cannot create stock adjustments.' });
+      return;
+    }
+
+    const body = req.body || {};
+    const productId = typeof body.productId === 'string' ? body.productId : '';
+    const quantityDelta = Number(body.quantityDelta);
+    const targetState = body.targetState;
+    const reasonCode = body.reasonCode;
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    const validStates = ['ON_HAND', 'DAMAGED', 'QUARANTINED', 'MISSING'];
+    const validReasons = ['damage', 'loss', 'found', 'count_correction', 'quarantine', 'write_off'];
+
+    if (!productId || !Number.isSafeInteger(quantityDelta) || quantityDelta === 0) {
+      res.status(400).json({ error: 'A product and non-zero whole-number quantity delta are required.' });
+      return;
+    }
+    if (!validStates.includes(targetState)) {
+      res.status(400).json({ error: 'A valid target stock state is required.' });
+      return;
+    }
+    if (!validReasons.includes(reasonCode)) {
+      res.status(400).json({ error: 'A valid stock adjustment reason is required.' });
+      return;
+    }
+    if (!note || note.length > 1000) {
+      res.status(400).json({ error: 'An audit note of 1 to 1000 characters is required.' });
+      return;
+    }
+
+    const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
+    const adjustment = await repository.createAdjustment({
+      productId,
+      locationId: typeof body.locationId === 'string' && body.locationId.trim() ? body.locationId.trim() : undefined,
+      quantityDelta,
+      targetState,
+      reasonCode,
+      note,
+    });
+    res.status(201).json({ adjustment });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+    if (code === '42501') {
+      res.status(403).json({ error: 'You are not authorized to create this stock adjustment.' });
+      return;
+    }
+    if (code === 'P0002') {
+      res.status(404).json({ error: 'The selected product or warehouse location was not found in this workspace.' });
+      return;
+    }
+    if (code === '22023' || code === '22P02' || code === '22003') {
+      res.status(400).json({ error: 'The stock adjustment contains invalid values.' });
+      return;
+    }
+    console.error('Transactional stock adjustment creation failed:', error);
+    res.status(500).json({ error: 'The stock adjustment could not be saved.' });
+  }
+});
+
+apiRouter.post('/stock/adjustments/:id/decision', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    if (user.role !== 'OPS_MANAGER' && user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Only Operations Manager or Super Admin can approve stock adjustments.' });
+      return;
+    }
+
+    const decision = req.body?.decision;
+    if (decision !== 'APPROVE' && decision !== 'REJECT') {
+      res.status(400).json({ error: 'Decision must be APPROVE or REJECT.' });
+      return;
+    }
+    const approvalNote = typeof req.body?.approvalNote === 'string' ? req.body.approvalNote.trim() : '';
+    if (approvalNote.length > 1000) {
+      res.status(400).json({ error: 'Approval note must be at most 1000 characters.' });
+      return;
+    }
+
+    const repository = new SupabaseInventoryRepository(getRepositoryContext(req));
+    const adjustment = await repository.decideAdjustment(req.params.id, decision, approvalNote);
+    res.json({ adjustment });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+    if (code === '42501') {
+      res.status(403).json({ error: 'Approval denied. Check your role and separation-of-duties requirements.' });
+      return;
+    }
+    if (code === 'P0002') {
+      res.status(404).json({ error: 'The stock adjustment was not found in this workspace.' });
+      return;
+    }
+    if (code === '55000') {
+      res.status(409).json({ error: 'This stock adjustment has already been reviewed.' });
+      return;
+    }
+    if (code === '22023' || code === '22P02') {
+      res.status(400).json({ error: 'The stock adjustment decision contains invalid values.' });
+      return;
+    }
+    console.error('Transactional stock adjustment decision failed:', error);
+    res.status(500).json({ error: 'The stock adjustment decision could not be saved.' });
+  }
+});
+
 /**
  * Legacy demo-backed routes remain blocked outside explicit local demo mode.
  * Migrated PostgreSQL routes above finish their response before this middleware.
@@ -465,52 +573,6 @@ apiRouter.use((req: Request, res: Response, next: NextFunction) => {
 /**
  * STOCK ADJUSTMENTS & APPROVALS
  */
-apiRouter.post('/stock/adjustments', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const { productId, locationId, quantityDelta, targetState, reasonCode, note } = req.body;
-
-  if (!productId || quantityDelta === undefined || !reasonCode) {
-    res.status(400).json({ error: 'Product ID, quantity delta, and reason code are required.' });
-    return;
-  }
-
-  const result = engine.submitAdjustment(
-    productId,
-    locationId,
-    Number(quantityDelta),
-    (targetState as StockState) || 'ON_HAND',
-    reasonCode,
-    note || '',
-    user
-  );
-
-  if (!result.success) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-
-  res.status(201).json({ adjustment: result.adjustment });
-});
-
-apiRouter.post('/stock/adjustments/:id/decision', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const { decision, approvalNote } = req.body;
-
-  if (!decision || (decision !== 'APPROVE' && decision !== 'REJECT')) {
-    res.status(400).json({ error: 'Valid decision ("APPROVE" or "REJECT") is required.' });
-    return;
-  }
-
-  const result = engine.processAdjustmentDecision(req.params.id, decision, user, approvalNote);
-
-  if (!result.success) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-
-  res.json({ adjustment: result.adjustment });
-});
-
 /**
  * EBAY INTEGRATION & EXCEPTION QUEUE
  */
