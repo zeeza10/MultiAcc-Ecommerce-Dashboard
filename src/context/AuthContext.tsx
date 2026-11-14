@@ -46,7 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'reset'>('login');
   const [recoveryActive, setRecoveryActive] = useState(false);
-  const [inviteSetupActive, setInviteSetupActive] = useState(() => window.location.pathname === '/accept-invitation');
+  const [inviteSetupActive, setInviteSetupActive] = useState(() => {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    return window.location.pathname === '/accept-invitation'
+      || hashParams.get('type') === 'invite'
+      || queryParams.get('type') === 'invite';
+  });
   const [inviteConfirmPassword, setInviteConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
