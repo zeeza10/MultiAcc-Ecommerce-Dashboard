@@ -64,6 +64,9 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
   const relation = membership.roles;
   const roleCode = Array.isArray(relation) ? relation[0]?.code : relation?.code;
   if (!validRoles.has(roleCode)) return json({ error: 'Your workspace role is not valid.' }, 403);
+  if (roleCode === 'CLIENT_USER' && !membership.client_3pl_id) {
+    return json({ error: 'Your client account is not linked to this workspace. Contact your workspace administrator.' }, 403);
+  }
 
   const { data: permissionRows, error: permissionError } = await client
     .from('role_permissions')
@@ -94,6 +97,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
       supabase: client,
       organizationId: membership.organization_id,
       userId: authData.user.id,
+      client3plId: membership.client_3pl_id || undefined,
       permissions,
     },
   };
