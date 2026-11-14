@@ -16,12 +16,14 @@ import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL } from '.
 interface InventoryViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onOpenNewAdjustment: () => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   onOpenNewAdjustment,
 }) => {
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
@@ -33,13 +35,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   useEffect(() => {
     loadInventoryData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadInventoryData = async () => {
     setLoading(true);
     try {
       const [balRes, ledRes, clientRes] = await Promise.all([
-        api.getBalances(), api.getStockLedger(),
+        api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId),
         api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setBalances(balRes.balances);
@@ -114,6 +116,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Inventory & Stock Ledger</h1>
+          <p className="text-[11px] text-indigo-600 mt-1">{selectedStoreId === 'ALL' ? 'All stores — physical workspace stock' : 'Selected store — allocated marketplace stock'}</p>
           <p className="text-xs text-gray-500">
             Append-only physical stock ledger ensuring 100% reconciliation between operational counts and ledger balances.
           </p>
