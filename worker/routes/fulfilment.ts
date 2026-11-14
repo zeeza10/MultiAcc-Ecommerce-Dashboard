@@ -2,6 +2,96 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleFulfilmentRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+  if (path === '/warehouse-services/packaging' && request.method === 'POST') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const clientId = String(body.clientId || '');
+    let orderId: string | null = null;
+    if (body.orderNumber) {
+      const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
+        .select('id').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId)
+        .eq('order_number', String(body.orderNumber)).maybeSingle();
+      if (orderError) throw new Error('The selected order could not be verified.');
+      if (!order) throw new Error('The selected order does not belong to this client.');
+      orderId = order.id;
+    }
+    const { data, error } = await auth.repositoryContext.supabase.rpc('create_packaging_job', {
+      p_organization_id: auth.organizationId, p_client_3pl_id: clientId,
+      p_job_date: body.jobDate ? String(body.jobDate) : new Date().toISOString().slice(0, 10),
+      p_packaging_type: String(body.packagingType || ''),
+      p_quantity: Number(body.quantity), p_material_cost_minor: Number(body.materialCostMinor || 0),
+      p_order_id: orderId, p_notes: body.notes == null ? null : String(body.notes),
+    });
+    if (error) throw new Error(error.message || 'Packaging job could not be saved.');
+    const row = data as Record<string, any>;
+    return json({ job: {
+      id: row.id, jobNumber: row.job_number, clientId: row.client_3pl_id, date: row.job_date,
+      packagingType: row.packaging_type, quantity: Number(row.quantity), materialCostMinor: Number(row.material_cost_minor),
+      serviceChargeMinor: Number(row.service_charge_minor), totalChargeMinor: Number(row.total_charge_minor),
+      status: row.status, invoiceId: row.invoice_id || undefined, orderId: row.order_id || undefined,
+      performedBy: row.performed_by || '', notes: row.notes || undefined,
+    } }, 201);
+  }
+
+  if (path === '/warehouse-services/shipping' && request.method === 'POST') {
+    if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const clientId = String(body.clientId || '');
+    let orderId: string | null = null;
+    if (body.orderNumber) {
+      const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
+        .select('id').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId)
+        .eq('order_number', String(body.orderNumber)).maybeSingle();
+      if (orderError) throw new Error('The selected order could not be verified.');
+      if (!order) throw new Error('The selected order does not belong to this client.');
+      orderId = order.id;
+    }
+    const { data, error } = await auth.repositoryContext.supabase.rpc('create_shipping_job', {
+      p_organization_id: auth.organizationId, p_client_3pl_id: clientId,
+      p_job_date: body.jobDate ? String(body.jobDate) : new Date().toISOString().slice(0, 10),
+      p_carrier: String(body.carrier || ''), p_tracking_number: body.trackingNumber == null ? null : String(body.trackingNumber),
+      p_service_level: String(body.serviceLevel || ''), p_parcel_weight_kg: Number(body.parcelWeightKg),
+      p_carrier_cost_minor: Number(body.carrierCostMinor || 0), p_service_charge_minor: Number(body.serviceChargeMinor || 0),
+      p_destination: String(body.destination || ''), p_order_id: orderId,
+    });
+    if (error) throw new Error(error.message || 'Shipping job could not be saved.');
+    const row = data as Record<string, any>;
+    return json({ job: {
+      id: row.id, dispatchId: row.dispatch_id, clientId: row.client_3pl_id, date: row.job_date,
+      carrier: row.carrier, trackingNumber: row.tracking_number || '', serviceLevel: row.service_level,
+      parcelWeightKg: Number(row.parcel_weight_kg), carrierCostMinor: Number(row.carrier_cost_minor),
+      serviceChargeMinor: Number(row.service_charge_minor), totalChargeMinor: Number(row.total_charge_minor),
+      status: row.status, invoiceId: row.invoice_id || undefined, orderId: row.order_id || undefined,
+      destination: row.destination?.destination || '',
+    } }, 201);
+  }
+
+  if (path === '/3pl/billing-preview' && request.method === 'POST') {
+    const body = await request.json() as { clientId?: string };
+    const clientId = String(body.clientId || '');
+    if (auth.user.role === 'CLIENT_USER' && clientId !== auth.repositoryContext.client3plId) return json({ error: 'You cannot view another client billing preview.' }, 403);
+    const { data: client, error: clientError } = await auth.repositoryContext.supabase.from('clients_3pl')
+      .select('id,company_name,code').eq('organization_id', auth.organizationId).eq('id', clientId).maybeSingle();
+    if (clientError) throw clientError;
+    if (!client) return json({ error: '3PL client not found.' }, 404);
+    const [storage, packaging, shipping, invoices] = await Promise.all([
+      auth.repositoryContext.supabase.from('storage_snapshots').select('estimated_cost_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
+      auth.repositoryContext.supabase.from('packaging_jobs').select('total_charge_minor,quantity').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
+      auth.repositoryContext.supabase.from('shipping_jobs').select('total_charge_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
+      auth.repositoryContext.supabase.from('invoices').select('total_minor,paid_amount_minor,status').eq('organization_id', auth.organizationId).eq('recipient_id', clientId),
+    ]);
+    for (const result of [storage, packaging, shipping, invoices]) if (result.error) throw result.error;
+    const sum = (items: any[], field: string) => (items || []).reduce((total, row) => total + Number(row[field] || 0), 0);
+    const storageMinor = sum(storage.data || [], 'estimated_cost_minor');
+    const packagingMinor = sum(packaging.data || [], 'total_charge_minor');
+    const shippingMinor = sum(shipping.data || [], 'total_charge_minor');
+    const invoicedMinor = sum(invoices.data || [], 'total_minor');
+    const paidMinor = sum(invoices.data || [], 'paid_amount_minor');
+    return json({ client, storageChargesMinor: storageMinor, packagingChargesMinor: packagingMinor,
+      shippingChargesMinor: shippingMinor, invoicedMinor, paidMinor, outstandingMinor: Math.max(0, invoicedMinor - paidMinor),
+      packedUnits: sum(packaging.data || [], 'quantity') });
+  }
+
   if (path === '/3pl/clients' && request.method === 'GET') {
     let clientsQuery = auth.repositoryContext.supabase.from('clients_3pl')
       .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
