@@ -39,6 +39,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const loadInventoryData = async () => {
     setLoading(true);
+    setBalances([]);
+    setLedger([]);
     try {
       const [balRes, ledRes, clientRes] = await Promise.all([
         api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId),
