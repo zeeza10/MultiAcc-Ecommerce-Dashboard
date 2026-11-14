@@ -471,7 +471,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <span className="font-mono text-slate-200">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(subtotalMinor / 100)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
-                    <span>VAT (20%):</span>
+                    <span>VAT ({config.defaultVatRatePercent}%):</span>
                     <span className="font-mono text-slate-200">{new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency || config.baseCurrency }).format(vatMinor / 100)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
