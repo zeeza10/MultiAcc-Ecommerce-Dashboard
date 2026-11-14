@@ -48,7 +48,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [country, setCountry] = useState(order.shippingAddress?.country || 'GB');
   const [status, setStatus] = useState<string>(order.status);
   const [notes, setNotes] = useState(order.notes || '');
-  const [reason, setReason] = useState('Order details corrected by authorized administrator');
+  const [reason, setReason] = useState('');
   const [shippingFeeMinor, setShippingFeeMinor] = useState(order.shippingChargeMinor || 0);
 
   const [lines, setLines] = useState<EditableLine[]>(
