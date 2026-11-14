@@ -111,6 +111,8 @@ export const api = {
   // Inventory & Ledger
   getBalances: (accountId?: string) => request<{ balances: StockBalance[] }>(`/inventory/balances${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   getStockLedger: (accountId?: string) => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  allocateStoreInventory: (payload: { marketplaceAccountId: string; productId: string; allocatedQuantity: number; reservedQuantity?: number }) =>
+    request<{ allocation: unknown }>('/inventory/allocations', { method: 'POST', body: JSON.stringify(payload) }),
 
   // Stock Adjustments
   getAdjustments: () => request<{ adjustments: StockAdjustment[] }>('/stock/adjustments'),
@@ -186,6 +188,8 @@ export const api = {
     }),
   getExpenses: (accountId?: string) => request<{ expenses: Expense[] }>(`/finance/expenses${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   getFinancialLedger: (accountId?: string) => request<{ ledger: FinancialLedgerEntry[] }>(`/finance/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  allocateStoreFinance: (payload: { marketplaceAccountId: string; sourceType: 'INVOICE' | 'EXPENSE' | 'PAYMENT' | 'JOURNAL_ENTRY'; sourceId: string; amountMinor: number; currency: string; note?: string }) =>
+    request<{ allocation: unknown }>('/finance/allocations', { method: 'POST', body: JSON.stringify(payload) }),
 
   // Reports
   getReport: (id: string, params: { startDate?: string; endDate?: string; accountId?: string; sku?: string } = {}) => {
