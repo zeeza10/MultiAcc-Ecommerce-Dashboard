@@ -30,6 +30,9 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/3pl/clients') return 'fulfilment.view';
   if (method === 'GET' && path === '/3pl/storage-snapshots') return 'fulfilment.view';
   if (method === 'GET' && path === '/warehouse-services/summary') return 'fulfilment.view';
+  if (method === 'POST' && path === '/3pl/billing-preview') return 'fulfilment.view';
+  if (method === 'POST' && path === '/warehouse-services/packaging') return 'fulfilment.manage';
+  if (method === 'POST' && path === '/warehouse-services/shipping') return 'fulfilment.manage';
   if (method === 'GET' && path === '/warehouse-services/packaging') return 'fulfilment.view';
   if (method === 'GET' && path === '/warehouse-services/shipping') return 'fulfilment.view';
   if (method === 'POST' && path === '/finance/payments') return 'finance.manage';
