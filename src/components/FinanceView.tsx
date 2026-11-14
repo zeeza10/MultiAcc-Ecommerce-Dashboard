@@ -347,7 +347,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     : p.createdAt
                     ? p.createdAt.split('T')[0]
                     : '—';
-                  const payer = p.payerName || (p as any).payer || 'Apex Logistics Ltd';
+                  const payer = p.payerName || (p as any).payer || '—';
                   const amt = p.amountMinor || 0;
                   const recorded = p.recordedBy || 'Elena Rostova (Finance)';
 
