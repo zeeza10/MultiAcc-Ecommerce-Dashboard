@@ -12,6 +12,7 @@
     "start": "tsx server.ts",
     "deploy": "wrangler deploy",
     "cf:dev": "wrangler dev",
+    "cf:dry-run": "wrangler deploy --dry-run",
     "cf:typegen": "wrangler types",
     "test": "tsx --test worker/*.test.ts"
   },
