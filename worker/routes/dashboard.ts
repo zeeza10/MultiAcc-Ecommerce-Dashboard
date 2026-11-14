@@ -29,7 +29,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       ordersQuery,
       canViewInventory && !storeScoped
         ? (() => {
-            let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold').eq('organization_id', auth.organizationId);
+            let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold,cost_price_minor').eq('organization_id', auth.organizationId);
             if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) query = query.eq('client_3pl_id', auth.user.clientId).eq('owner_type', 'CLIENT');
             return query;
           })()
