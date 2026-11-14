@@ -73,6 +73,7 @@ export interface OrderListOptions {
 export interface OrderRepository {
   listOrders(options?: OrderListOptions): Promise<Order[]>;
   createOrder(payload: Record<string, unknown>): Promise<Order>;
+  transitionOrder(orderId: string, targetStatus: OrderStatus, options?: { carrier?: string; trackingNumber?: string; note?: string }): Promise<Order>;
   getOrder(orderId: string, options?: Pick<OrderListOptions, 'client3plId' | 'onlyClientOrders'>): Promise<{ order: Order; histories: Array<Record<string, unknown>> } | null>;
 }
 
@@ -199,6 +200,24 @@ export class SupabaseOrderRepository implements OrderRepository {
     if (!data || typeof data !== 'object') throw new Error('The database returned an invalid order response.');
     const result = data as { order?: OrderRow; lines?: OrderItemRow[] };
     if (!result.order || !Array.isArray(result.lines)) throw new Error('The database returned an incomplete order response.');
+    return mapOrder(result.order, result.lines.map(mapOrderItem));
+  }
+
+  async transitionOrder(
+    orderId: string,
+    targetStatus: OrderStatus,
+    options: { carrier?: string; trackingNumber?: string; note?: string } = {},
+  ): Promise<Order> {
+    const { data, error } = await this.context.supabase.rpc('transition_workspace_order', {
+      p_organization_id: this.context.organizationId,
+      p_order_id: orderId,
+      p_target_status: targetStatus,
+      p_options: options,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid order transition response.');
+    const result = data as { order?: OrderRow; lines?: OrderItemRow[] };
+    if (!result.order || !Array.isArray(result.lines)) throw new Error('The database returned an incomplete order transition response.');
     return mapOrder(result.order, result.lines.map(mapOrderItem));
   }
 

@@ -255,6 +255,39 @@ apiRouter.post('/orders', async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.post('/orders/:id/transition', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    if (user.role === 'CLIENT_USER') {
+      res.status(403).json({ error: 'Client users cannot transition workspace orders.' });
+      return;
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (typeof body.targetStatus !== 'string' || !body.targetStatus.trim()) {
+      res.status(400).json({ error: 'A target order status is required.' });
+      return;
+    }
+    const repository = new SupabaseOrderRepository(getRepositoryContext(req));
+    const order = await repository.transitionOrder(
+      req.params.id,
+      body.targetStatus as OrderStatus,
+      {
+        carrier: typeof body.carrier === 'string' ? body.carrier : undefined,
+        trackingNumber: typeof body.trackingNumber === 'string' ? body.trackingNumber : undefined,
+        note: typeof body.note === 'string' ? body.note : undefined,
+      },
+    );
+    res.json({ order });
+  } catch (error) {
+    console.error('PostgreSQL order transition failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const expected = /required|authorized|invalid|not found|transition|backordered|unreserved|Configure active|Warehouse staff|membership/i.test(message);
+    res.status(expected ? 400 : 500).json({
+      error: expected ? message : 'Order status could not be updated in the workspace database.',
+    });
+  }
+});
+
 apiRouter.get('/orders', async (req: Request, res: Response) => {
   try {
     const user = getActiveUser(req);
