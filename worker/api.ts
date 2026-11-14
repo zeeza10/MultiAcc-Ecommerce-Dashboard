@@ -140,7 +140,7 @@ const permissionByRoute = (method: string, path: string): string | null | undefi
 
 export async function handleApiRequest(request: Request, env: WorkerEnv): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === '/api/health') {
+  if (url.pathname === '/api/health' || url.pathname === '/api/v1/health') {
     return json({ success: true, message: 'MultiAcc Backend Worker is running', platform: 'Cloudflare Workers' });
   }
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
