@@ -109,7 +109,7 @@ export const api = {
     }),
 
   // eBay Accounts & Sync
-  getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[] }>('/ebay/accounts'),
+  getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string }>('/ebay/accounts'),
   syncEbayAccount: (id: string) =>
     request<{ imported: number; skipped: number; exceptions: number }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
   connectEbayAccount: (id: string) =>
