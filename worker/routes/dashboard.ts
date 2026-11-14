@@ -25,7 +25,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) ordersQuery = ordersQuery.eq('client_3pl_id', auth.user.clientId);
 
     const settingsQuery = auth.repositoryContext.supabase.from('system_settings').select('active_release_phase').eq('organization_id', auth.organizationId).maybeSingle();
-    const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult] = await Promise.all([
+    const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult, payoutResult] = await Promise.all([
       ordersQuery,
       canViewInventory && !storeScoped
         ? (() => {
@@ -47,8 +47,13 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
         ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId)
         : Promise.resolve({ data: [], error: null }),
       settingsQuery,
+      storeScoped
+        ? auth.repositoryContext.supabase.from('marketplace_payouts')
+            .select('net_payout_minor,total_fees_minor,refunds_minor,currency,status')
+            .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+        : Promise.resolve({ data: [], error: null }),
     ]);
-    if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error) {
+    if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error || payoutResult.error) {
       throw new Error('Dashboard source records could not be loaded.');
     }
     let products = productsResult.data || [];
@@ -145,6 +150,10 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       || 'GBP';
     const revenueMinor = activeOrders.filter(row => String(row.currency || 'GBP').trim() === currency)
       .reduce((sum, row) => sum + Number(row.total_minor || 0), 0);
+    const storePayouts = (payoutResult.data || []).filter(row => String(row.currency || '').trim() === currency);
+    const netPayoutMinor = storePayouts.reduce((sum, row) => sum + Number(row.net_payout_minor || 0), 0);
+    const marketplaceFeesMinor = storePayouts.reduce((sum, row) => sum + Number(row.total_fees_minor || 0), 0);
+    const marketplaceRefundsMinor = storePayouts.reduce((sum, row) => sum + Number(row.refunds_minor || 0), 0);
     const productById = new Map(products.map(product => [product.id, product]));
     const lowStockItems = balances.filter(balance =>
       Number(balance.available || 0) <= Number(productById.get(balance.productId)?.low_stock_threshold || 0)
@@ -189,6 +198,10 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       storageRevenueMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : storageRevenueMinor,
       outstandingPaymentsMinor: storeScoped && storeFinanceAllocationCount === 0 ? null : outstandingPaymentsMinor,
       storeFinanceAllocationCount,
+      netPayoutMinor: storeScoped ? netPayoutMinor : null,
+      marketplaceFeesMinor: storeScoped ? marketplaceFeesMinor : null,
+      marketplaceRefundsMinor: storeScoped ? marketplaceRefundsMinor : null,
+      payoutCount: storeScoped ? storePayouts.length : null,
       storeScoped,
       currency,
       activePhase: settingsResult.data?.active_release_phase || 'ALL',
