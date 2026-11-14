@@ -286,12 +286,18 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare v_invitation_id uuid;
 begin
   if new.email_confirmed_at is not null and old.email_confirmed_at is null then
-    update public.user_invitations
-    set accepted_at=now()
+    select id into v_invitation_id
+    from public.user_invitations
     where lower(email)=lower(new.email)
-      and accepted_at is null and revoked_at is null and expires_at>now();
+      and accepted_at is null and revoked_at is null and expires_at>now()
+    order by created_at desc limit 1;
+    if v_invitation_id is not null then
+      update public.user_invitations set accepted_at=now()
+      where id=v_invitation_id;
+    end if;
   end if;
   return new;
 end;
@@ -300,3 +306,43 @@ drop trigger if exists on_auth_user_invitation_accepted on auth.users;
 create trigger on_auth_user_invitation_accepted
 after update of email_confirmed_at on auth.users
 for each row execute procedure public.mark_org_invitation_accepted();
+
+-- A custom role must never gain the authority to administer other users by
+-- merely receiving users.manage. Membership and invitation administration
+-- is reserved to the explicit organization Super Admin role.
+create or replace function public.is_org_super_admin(p_organization_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.organization_members m
+    join public.roles r on r.id=m.role_id
+    where m.organization_id=p_organization_id
+      and m.user_id=auth.uid()
+      and m.is_active
+      and r.code='SUPER_ADMIN'
+  );
+$$;
+revoke all on function public.is_org_super_admin(uuid) from public, anon;
+grant execute on function public.is_org_super_admin(uuid) to authenticated;
+
+drop policy if exists members_manage on public.organization_members;
+create policy members_manage on public.organization_members
+for all to authenticated
+using (public.is_org_super_admin(organization_id))
+with check (public.is_org_super_admin(organization_id));
+
+drop policy if exists roles_manage on public.roles;
+create policy roles_manage on public.roles
+for all to authenticated
+using (organization_id is not null and public.is_org_super_admin(organization_id))
+with check (organization_id is not null and public.is_org_super_admin(organization_id));
+
+drop policy if exists invitations_manage on public.user_invitations;
+create policy invitations_manage on public.user_invitations
+for all to authenticated
+using (public.is_org_super_admin(organization_id))
+with check (public.is_org_super_admin(organization_id));
