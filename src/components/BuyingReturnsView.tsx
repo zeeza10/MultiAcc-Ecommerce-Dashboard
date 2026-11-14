@@ -14,7 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig } from '../types';
+import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig, Product } from '../types';
 
 interface BuyingReturnsViewProps {
   currentUser: User;
@@ -30,6 +30,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [subTab, setSubTab] = useState<'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS'>(defaultSubTab);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [returns, setReturns] = useState<ReturnOrder[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -38,6 +39,15 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [receiveInputs, setReceiveInputs] = useState<Record<string, { received: number; damaged: number }>>({});
   const [discrepancyNote, setDiscrepancyNote] = useState('');
   const [receiptRequestId, setReceiptRequestId] = useState('');
+  const [showPoForm, setShowPoForm] = useState(false);
+  const [poSupplierId, setPoSupplierId] = useState('');
+  const [poExpectedDate, setPoExpectedDate] = useState('');
+  const [poNotes, setPoNotes] = useState('');
+  const [poTaxAmount, setPoTaxAmount] = useState('0');
+  const [poLines, setPoLines] = useState<Array<{ productId: string; quantity: string; unitCost: string }>>([]);
+  const [poRequestId, setPoRequestId] = useState('');
+  const [savingPo, setSavingPo] = useState(false);
+  const [approvingPoId, setApprovingPoId] = useState<string | null>(null);
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -56,14 +66,16 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [supRes, poRes, retRes, ordRes] = await Promise.all([
+      const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
         api.getSuppliers(),
         api.getPurchaseOrders(),
         api.getReturns(),
         api.getOrders(),
+        api.getProducts(),
       ]);
       setSuppliers(supRes.suppliers || []);
       setPurchaseOrders(poRes.purchaseOrders || []);
+      setProducts(prodRes.products || []);
       setReceipts(poRes.receipts || []);
       setReturns(retRes.returns || []);
       setOrders(ordRes.orders || []);
