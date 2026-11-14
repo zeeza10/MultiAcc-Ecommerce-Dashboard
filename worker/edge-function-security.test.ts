@@ -38,6 +38,15 @@ describe("employee invitation function request guards", () => {
     assert.equal(await exceedsInvitationBodyLimit(request, 32768), true);
   });
 
+  it("rejects a malformed Content-Length value", async () => {
+    const request = new Request("https://example.com", {
+      method: "POST",
+      headers: { "Content-Length": "not-a-number" },
+      body: "{}",
+    });
+    assert.equal(await exceedsInvitationBodyLimit(request, 32768), true);
+  });
+
   it("accepts a request body within the configured limit", async () => {
     const request = new Request("https://example.com", { method: "POST", body: "{}" });
     assert.equal(await exceedsInvitationBodyLimit(request, 32768), false);
