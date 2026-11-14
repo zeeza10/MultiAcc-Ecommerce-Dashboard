@@ -13,6 +13,7 @@ import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
 import { handleAccessRoute } from './routes/access';
+import { resolveEffectivePermissions } from './permission-overrides';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -98,10 +99,13 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     return Array.isArray(relation) ? relation[0]?.code : relation?.code;
   }).filter((code: unknown): code is string => typeof code === 'string'));
 
-  const permissions = new Set<string>(
-    roleCode === 'SUPER_ADMIN'
-      ? ['*']
-      : [...new Set([...rolePermissionCodes, ...granted])].filter(code => !denied.has(code)),
+  const permissions = resolveEffectivePermissions(
+    roleCode,
+    rolePermissionCodes,
+    [
+      ...granted.map(code => ({ effect: 'GRANT' as const, code })),
+      ...[...denied].map(code => ({ effect: 'DENY' as const, code })),
+    ],
   );
 
   return {
