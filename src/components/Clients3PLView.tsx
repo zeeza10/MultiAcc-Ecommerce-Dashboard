@@ -340,7 +340,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
-                    {ord.status === 'Allocated' && (
+                    {currentUser.role !== 'CLIENT_USER' && ord.status === 'Allocated' && (
                       <button
                         onClick={() => handleQuickPick(ord.id)}
                         className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-md shadow-2xs transition"
@@ -348,7 +348,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                         Confirm Pick →
                       </button>
                     )}
-                    {ord.status === 'Picked' && (
+                    {currentUser.role !== 'CLIENT_USER' && ord.status === 'Picked' && (
                       <button
                         onClick={() => handleQuickPack(ord.id)}
                         className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-md shadow-2xs transition"
