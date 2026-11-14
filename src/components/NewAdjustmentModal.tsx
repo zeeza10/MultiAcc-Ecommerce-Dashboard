@@ -65,6 +65,11 @@ export const NewAdjustmentModal: React.FC<NewAdjustmentModalProps> = ({
       setSubmitting(false);
       return;
     }
+    if (!Number.isSafeInteger(Number(delta)) || Number(delta) <= 0) {
+      setErrorMsg('Enter a positive whole-number quantity.');
+      setSubmitting(false);
+      return;
+    }
 
     try {
       await api.createAdjustment({
