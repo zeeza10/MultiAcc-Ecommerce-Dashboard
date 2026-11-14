@@ -28,7 +28,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
     return result ? json(result) : json({ error: 'Order not found in this workspace.' }, 404);
   }
 
-  const orderEditMatch = path.match(/^\\/orders\\/([^/]+)$/);
+  const orderEditMatch = path.match(/^\/orders\/([^/]+)$/);
   if (orderEditMatch && request.method === 'PUT') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot edit workspace orders.' }, 403);
     const body = await request.json() as Record<string, unknown>;
