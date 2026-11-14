@@ -41,6 +41,8 @@ BEGIN
     RAISE EXCEPTION 'Only this organization Super Admin can invite employees' USING errcode = '42501';
   END IF;
 
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_organization_id::text || ':' || v_actor::text, 0));
+
   IF (
     SELECT count(*)
     FROM public.user_invitations i
