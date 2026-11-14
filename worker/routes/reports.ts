@@ -65,7 +65,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   if(id==='R-05'){const low=data.filter(x=>Number(x.available)<=Number(x.reorderLevel));report=result(id,{lowStockSkus:low.length},['SKU','Product','Available','Reorder Level','Status'],low.map(x=>({sku:x.sku,product:x.product,available:x.available,reorderLevel:x.reorderLevel,status:x.status})));}
   if(id==='R-07')report=result(id,{inventoryValue:money(data.reduce((s,x)=>s+Number(String(x.inventoryValue).replace(/[^0-9.-]/g,''))*100,0)),skus:data.length},['SKU','Product','On Hand','Unit Cost','Inventory Value'],data.map(x=>({sku:x.sku,product:x.product,onHand:x.onHand,unitCost:x.unitCost,inventoryValue:x.inventoryValue})));
  }else if(id==='R-04'){
-  const [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id','created_at',url),rows(auth,'products','id,sku,name')]);
+  let [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id','created_at',url),rows(auth,'products','id,sku,name')]);
   if(accountId&&accountId!=='ALL')ledger=ledger.filter((x:any)=>x.marketplace_account_id===accountId);
   const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
