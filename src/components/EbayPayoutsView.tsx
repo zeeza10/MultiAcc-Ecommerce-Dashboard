@@ -42,6 +42,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   const [balances, setBalances] = useState<any>(null);
   const [reconciliations, setReconciliations] = useState<FinancialReconciliation[]>([]);
   const [loading, setLoading] = useState(true);
+  const canManageFinance = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'FINANCE_USER';
 
   // Confirm Deposit Modal
   const [selectedPayoutForConfirm, setSelectedPayoutForConfirm] = useState<EbayPayout | null>(null);
@@ -341,7 +342,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                         )}
                       </td>
                       <td className="py-3 px-3 text-right">
-                        {p.status !== 'BANK_CONFIRMED' ? (
+                        {canManageFinance && p.status !== 'BANK_CONFIRMED' ? (
                           <button
                             onClick={() => {
                               setSelectedPayoutForConfirm(p);
