@@ -72,6 +72,7 @@ export interface OrderListOptions {
 
 export interface OrderRepository {
   listOrders(options?: OrderListOptions): Promise<Order[]>;
+  createOrder(payload: Record<string, unknown>): Promise<Order>;
   getOrder(orderId: string, options?: Pick<OrderListOptions, 'client3plId' | 'onlyClientOrders'>): Promise<{ order: Order; histories: Array<Record<string, unknown>> } | null>;
 }
 
@@ -187,6 +188,18 @@ export class SupabaseOrderRepository implements OrderRepository {
       }
     }
     return rows;
+  }
+
+  async createOrder(payload: Record<string, unknown>): Promise<Order> {
+    const { data, error } = await this.context.supabase.rpc('create_workspace_order', {
+      p_organization_id: this.context.organizationId,
+      p_order: payload,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid order response.');
+    const result = data as { order?: OrderRow; lines?: OrderItemRow[] };
+    if (!result.order || !Array.isArray(result.lines)) throw new Error('The database returned an incomplete order response.');
+    return mapOrder(result.order, result.lines.map(mapOrderItem));
   }
 
   async listOrders(options: OrderListOptions = {}): Promise<Order[]> {
