@@ -55,7 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(activeSession);
     setAppUser(null);
     setWorkspace(null);
-    if (!activeSession?.user) {\n      window.localStorage.removeItem('nexusops_active_organization_id');\n      return;\n    }
+    if (!activeSession?.user) {
+      window.localStorage.removeItem('nexusops_active_organization_id');
+      return;
+    }
 
     const authUser = activeSession.user;
     const [{ data: profile, error: profileError }, { data: member, error: memberError }] = await Promise.all([
@@ -88,7 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Your organization role is not configured. Contact an administrator.');
     }
 
-    window.localStorage.setItem('nexusops_active_organization_id', member.organization_id);\n    setWorkspace({ id: member.organization_id, name: orgRow?.name || 'Workspace' });
+    window.localStorage.setItem('nexusops_active_organization_id', member.organization_id);
+    setWorkspace({ id: member.organization_id, name: orgRow?.name || 'Workspace' });
     setAppUser({
       id: authUser.id,
       email: authUser.email || '',
