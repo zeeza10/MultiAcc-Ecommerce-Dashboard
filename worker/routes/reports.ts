@@ -94,7 +94,15 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=snapshots.map((x:any)=>({client:cmap.get(x.client_3pl_id)||'—',date:x.snapshot_date,pallets:x.occupied_pallets,shelves:x.occupied_shelves,bins:x.occupied_bins,estimatedCost:money(x.estimated_cost_minor)}));
   report=result(id,{snapshots:data.length,estimatedCost:money(snapshots.reduce((n:number,x:any)=>n+Number(x.estimated_cost_minor||0),0))},['Client','Snapshot Date','Pallets','Shelves','Bins','Estimated Cost'],data);
  }else if(id==='R-12'){
-  const [invoices,pos]=await Promise.all([rows(auth,'invoices','invoice_number,recipient_name,total_minor,paid_amount_minor,due_date,status'),rows(auth,'purchase_orders','po_number,supplier_id,total_minor,expected_date,status')]);
+  let [invoices,pos]=await Promise.all([rows(auth,'invoices','id,invoice_number,recipient_name,total_minor,paid_amount_minor,due_date,status'),rows(auth,'purchase_orders','po_number,supplier_id,total_minor,expected_date,status')]);
+  if(accountId&&accountId!=='ALL'){
+   const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_finance_allocations')
+    .select('source_id,amount_minor').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId).eq('source_type','INVOICE');
+   if(error)throw new Error('Store invoice allocations could not be loaded.');
+   const amountById=new Map((allocations||[]).map((a:any)=>[a.source_id,Number(a.amount_minor)]));
+   invoices=invoices.filter((x:any)=>amountById.has(x.id)).map((x:any)=>({...x,total_minor:Math.min(Number(x.total_minor||0),amountById.get(x.id)||0)}));
+   pos=[];
+  }
   const data=[...invoices.map((x:any)=>({type:'Receivable',reference:x.invoice_number,party:x.recipient_name,balance:money(Math.max(0,Number(x.total_minor)-Number(x.paid_amount_minor||0))),dueDate:x.due_date||'—',status:x.status})),...pos.map((x:any)=>({type:'Purchase commitment',reference:x.po_number,party:x.supplier_id,balance:money(x.total_minor),dueDate:x.expected_date||'—',status:x.status}))];
   report=result(id,{receivables:invoices.length,payables:pos.length},['Type','Reference','Party','Balance','Due Date','Status'],data);
  }else if(id==='R-13'){
