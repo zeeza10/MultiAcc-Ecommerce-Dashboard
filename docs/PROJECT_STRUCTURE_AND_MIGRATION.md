@@ -15,6 +15,7 @@ This document describes the current repository layout and the target boundaries 
   - `worker/index.ts`: request routing, CORS and static asset serving.
   - `worker/api.ts`: API authentication, active-workspace resolution, permission gates and domain dispatch.
   - `worker/types.ts` and `worker/http.ts`: shared request context and JSON response helper.
+  - `worker/permissions.ts`: centralized route-to-permission policy, with unit tests in `worker/permissions.test.ts`.
   - `worker/routes/dashboard.ts`: dashboard KPI and chart aggregates.
   - `worker/routes/marketplace.ts`: account metadata, sync history, exception queue and SKU exception resolution.
   - `worker/routes/system.ts`: audit-log and notification endpoints.
