@@ -58,8 +58,8 @@ export interface InventoryRepository {
 }
 
 /**
- * Read-side inventory repository. All reads use the caller's JWT and explicit
- * organization filters; RLS remains the independent tenant authorization layer.
+ * Inventory repository. Reads use the caller's JWT and explicit organization
+ * filters; writes use narrowly scoped transactional RPCs with database-side checks.
  */
 export class SupabaseInventoryRepository implements InventoryRepository {
   private readonly products: SupabaseProductRepository;
