@@ -45,7 +45,7 @@ begin
   end if;
 
   v_sales_source := upper(btrim(coalesce(p_order->>'salesSource', 'MANUAL')));
-  if v_sales_source not in ('EBAY', 'MANUAL', 'DIRECT') then
+  if v_sales_source not in ('MANUAL', 'DIRECT') then
     raise exception 'Unsupported order sales source.' using errcode = '22023';
   end if;
   v_customer_name := btrim(coalesce(p_order->>'customerName', ''));
@@ -58,7 +58,7 @@ begin
   if v_customer_email is not null and length(v_customer_email) > 320 then
     raise exception 'Customer email is too long.' using errcode = '22023';
   end if;
-  if jsonb_typeof(v_address) <> 'object' then
+  if coalesce(jsonb_typeof(v_address), '') <> 'object' or length(v_address::text) > 10000 then
     raise exception 'Shipping address must be an object.' using errcode = '22023';
   end if;
   if coalesce(jsonb_typeof(p_order->'lines'), '') <> 'array'
@@ -133,7 +133,10 @@ begin
     end if;
 
     -- The catalog price is authoritative; client-supplied price/SKU/name are ignored.
-    v_unit_price := greatest(v_product.selling_price_minor, 0);
+    if v_product.selling_price_minor < 0 then
+      raise exception 'The selected product has an invalid selling price.' using errcode = '22023';
+    end if;
+    v_unit_price := v_product.selling_price_minor;
     v_line_tax := round(v_unit_price::numeric * v_quantity * v_vat_rate / 100);
     v_line_total := v_unit_price::numeric * v_quantity::numeric;
     if v_line_total > 9223372036854775807::numeric or v_line_tax > 9223372036854775807::numeric then
