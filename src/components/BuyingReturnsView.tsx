@@ -14,7 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig } from '../types';
+import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig, Product } from '../types';
 
 interface BuyingReturnsViewProps {
   currentUser: User;
@@ -30,6 +30,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [subTab, setSubTab] = useState<'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS'>(defaultSubTab);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [returns, setReturns] = useState<ReturnOrder[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -38,6 +39,18 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [receiveInputs, setReceiveInputs] = useState<Record<string, { received: number; damaged: number }>>({});
   const [discrepancyNote, setDiscrepancyNote] = useState('');
   const [receiptRequestId, setReceiptRequestId] = useState('');
+  const [showPoForm, setShowPoForm] = useState(false);
+  const [poSupplierId, setPoSupplierId] = useState('');
+  const [poExpectedDate, setPoExpectedDate] = useState('');
+  const [poNotes, setPoNotes] = useState('');
+  const [poTaxAmount, setPoTaxAmount] = useState('0');
+  const [poLines, setPoLines] = useState<Array<{ productId: string; quantity: string; unitCost: string }>>([]);
+  const [poRequestId, setPoRequestId] = useState('');
+  const [savingPo, setSavingPo] = useState(false);
+  const [approvingPoId, setApprovingPoId] = useState<string | null>(null);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
   const [returnDispositions, setReturnDispositions] = useState<Record<string, string>>({});
   const [issueRefund, setIssueRefund] = useState(true);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -56,14 +69,16 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [supRes, poRes, retRes, ordRes] = await Promise.all([
+      const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
         api.getSuppliers(),
         api.getPurchaseOrders(),
         api.getReturns(),
         api.getOrders(),
+        api.getProducts(),
       ]);
       setSuppliers(supRes.suppliers || []);
       setPurchaseOrders(poRes.purchaseOrders || []);
+      setProducts(prodRes.products || []);
       setReceipts(poRes.receipts || []);
       setReturns(retRes.returns || []);
       setOrders(ordRes.orders || []);
@@ -71,6 +86,87 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       console.error('Failed to load buying & returns data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateSupplier = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingSupplier(true);
+    try {
+      await api.createSupplier({
+        name: supplierForm.name,
+        code: supplierForm.code,
+        contactName: supplierForm.contactName || undefined,
+        email: supplierForm.email || undefined,
+        phone: supplierForm.phone || undefined,
+        paymentTermsDays: Number.parseInt(supplierForm.paymentTermsDays, 10) || 0,
+        currency: supplierForm.currency,
+        leadTimeDays: Number.parseInt(supplierForm.leadTimeDays, 10) || 0,
+      });
+      setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: 'GBP', leadTimeDays: '7' });
+      setShowSupplierForm(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Supplier creation failed');
+    } finally {
+      setSavingSupplier(false);
+    }
+  };
+
+  const refreshPoRequestId = () => setPoRequestId(window.crypto.randomUUID());
+
+  const openPoForm = () => {
+    const firstSupplier = suppliers.find(supplier => supplier.isActive);
+    const firstProduct = products.find(product => product.status === 'ACTIVE');
+    setPoSupplierId(firstSupplier?.id || '');
+    setPoExpectedDate('');
+    setPoNotes('');
+    setPoTaxAmount('0');
+    setPoLines(firstProduct ? [{
+      productId: firstProduct.id,
+      quantity: '1',
+      unitCost: (firstProduct.costPriceMinor / 100).toFixed(2),
+    }] : []);
+    refreshPoRequestId();
+    setShowPoForm(true);
+  };
+
+  const handleCreatePurchaseOrder = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const requestId = poRequestId || window.crypto.randomUUID();
+    setPoRequestId(requestId);
+    setSavingPo(true);
+    try {
+      await api.createPurchaseOrder({
+        supplierId: poSupplierId,
+        expectedDate: poExpectedDate || undefined,
+        notes: poNotes || undefined,
+        taxMinor: Math.round((Number.parseFloat(poTaxAmount) || 0) * 100),
+        lines: poLines.map(line => ({
+          productId: line.productId,
+          orderedQty: Number.parseInt(line.quantity, 10) || 0,
+          unitCostMinor: Math.round((Number.parseFloat(line.unitCost) || 0) * 100),
+        })),
+      }, requestId);
+      setShowPoForm(false);
+      setPoRequestId('');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Purchase order creation failed');
+    } finally {
+      setSavingPo(false);
+    }
+  };
+
+  const handleApprovePurchaseOrder = async (id: string) => {
+    setApprovingPoId(id);
+    try {
+      await api.approvePurchaseOrder(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Purchase order approval failed');
+    } finally {
+      setApprovingPoId(null);
     }
   };
 
@@ -181,6 +277,15 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       : true
   );
 
+  const poCurrency = suppliers.find(supplier => supplier.id === poSupplierId)?.currency || 'GBP';
+  const poSubtotalMinor = poLines.reduce((sum, line) =>
+    sum + (Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100), 0);
+  const poTaxMinor = Math.round((Number.parseFloat(poTaxAmount) || 0) * 100);
+  const poTotalMinor = poSubtotalMinor + poTaxMinor;
+  const formatPoMoney = (minor: number) => new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: poCurrency,
+  }).format(minor / 100);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -254,6 +359,111 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       {/* Tab: Purchase Orders */}
       {subTab === 'POS' && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-sm text-gray-900">Purchase Orders</h2>
+              <p className="text-xs text-gray-500">Create a draft, approve it, then receive goods against the approved order.</p>
+            </div>
+            <button
+              onClick={openPoForm}
+              disabled={!suppliers.some(supplier => supplier.isActive) || !products.some(product => product.status === 'ACTIVE')}
+              className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40"
+            >
+              + Create Purchase Order
+            </button>
+          </div>
+
+          {showPoForm && (
+            <form onSubmit={handleCreatePurchaseOrder} className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-gray-900">New Purchase Order</h3>
+                  <p className="text-xs text-gray-500">A new order is saved as DRAFT and must be approved before receiving.</p>
+                </div>
+                <button type="button" onClick={() => setShowPoForm(false)} className="text-xs text-gray-500 hover:text-gray-900">Close</button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="text-xs font-medium text-gray-600">Supplier
+                  <select required value={poSupplierId} onChange={e => { setPoSupplierId(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                    <option value="">Select supplier</option>
+                    {suppliers.filter(supplier => supplier.isActive).map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.currency})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600">Expected Delivery Date
+                  <input type="date" value={poExpectedDate} onChange={e => { setPoExpectedDate(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Tax Amount ({poCurrency})
+                  <input type="number" min="0" step="0.01" value={poTaxAmount} onChange={e => { setPoTaxAmount(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-800">Order Lines</h4>
+                  <button type="button" onClick={() => { setPoLines(lines => [...lines, { productId: '', quantity: '1', unitCost: '0.00' }]); refreshPoRequestId(); }} className="text-xs font-semibold text-indigo-700">+ Add Item</button>
+                </div>
+                {poLines.map((line, index) => {
+                  const selectedProduct = products.find(product => product.id === line.productId);
+                  return (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <label className="md:col-span-6 text-xs font-medium text-gray-600">Product
+                        <select required value={line.productId} onChange={e => {
+                          const product = products.find(item => item.id === e.target.value);
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? {
+                            ...item,
+                            productId: e.target.value,
+                            unitCost: product ? (product.costPriceMinor / 100).toFixed(2) : item.unitCost,
+                          } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                          <option value="">Select product</option>
+                          {products.filter(product => product.status === 'ACTIVE').map(product => (
+                            <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="md:col-span-2 text-xs font-medium text-gray-600">Quantity
+                        <input required type="number" min="1" step="1" value={line.quantity} onChange={e => {
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? { ...item, quantity: e.target.value } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                      </label>
+                      <label className="md:col-span-3 text-xs font-medium text-gray-600">Unit Cost ({poCurrency})
+                        <input required type="number" min="0" step="0.01" value={line.unitCost} onChange={e => {
+                          setPoLines(lines => lines.map((item, lineIndex) => lineIndex === index ? { ...item, unitCost: e.target.value } : item));
+                          refreshPoRequestId();
+                        }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                      </label>
+                      <div className="md:col-span-1 flex items-center justify-between md:justify-end gap-2">
+                        <span className="text-xs font-bold text-gray-800">{formatPoMoney((Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100))}</span>
+                        <button type="button" disabled={poLines.length <= 1} onClick={() => { setPoLines(lines => lines.filter((_, lineIndex) => lineIndex !== index)); refreshPoRequestId(); }} className="text-rose-600 disabled:opacity-30" aria-label="Remove purchase order line">×</button>
+                      </div>
+                      {selectedProduct && <div className="md:col-span-12 text-[11px] text-gray-500">SKU: {selectedProduct.sku}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <label className="block text-xs font-medium text-gray-600">Purchase Order Notes
+                <textarea rows={2} maxLength={2000} value={poNotes} onChange={e => { setPoNotes(e.target.value); refreshPoRequestId(); }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Delivery instructions, supplier reference, or terms..." />
+              </label>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>Subtotal: <strong>{formatPoMoney(poSubtotalMinor)}</strong></div>
+                  <div>Tax: <strong>{formatPoMoney(poTaxMinor)}</strong></div>
+                  <div className="text-sm text-gray-900">Total: <strong>{formatPoMoney(poTotalMinor)}</strong></div>
+                </div>
+                <button type="submit" disabled={savingPo || !poSupplierId || poLines.length === 0 || poLines.some(line => !line.productId)} className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold disabled:opacity-50">
+                  {savingPo ? 'Creating...' : 'Save Draft Purchase Order'}
+                </button>
+              </div>
+            </form>
+          )}
+
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -265,7 +475,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                     <th className="py-2.5 px-3">Date (UTC)</th>
                     <th className="py-2.5 px-3">Expected Date</th>
                     <th className="py-2.5 px-3">Items & Qty</th>
-                    <th className="py-2.5 px-3">Total (£)</th>
+                    <th className="py-2.5 px-3">Total</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -302,17 +512,25 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         ))}
                       </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
-                        £{((po.totalMinor || 0) / 100).toFixed(2)}
+                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || 'GBP' }).format((po.totalMinor || 0) / 100)}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {po.status !== 'RECEIVED' && po.status !== 'CLOSED' && (
+                        {po.status === 'DRAFT' ? (
+                          <button
+                            onClick={() => void handleApprovePurchaseOrder(po.id)}
+                            disabled={approvingPoId === po.id}
+                            className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition shadow-2xs disabled:opacity-50"
+                          >
+                            {approvingPoId === po.id ? 'Approving...' : 'Approve'}
+                          </button>
+                        ) : ['APPROVED', 'SENT', 'PARTIALLY_RECEIVED'].includes(po.status) ? (
                           <button
                             onClick={() => openReceiveModal(po)}
                             className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition shadow-2xs"
                           >
                             Receive Goods
                           </button>
-                        )}
+                        ) : <span className="text-[11px] text-gray-400">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -409,7 +627,55 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
       {/* Tab: Suppliers */}
       {subTab === 'SUPPLIERS' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-sm text-gray-900">Suppliers Directory</h2>
+              <p className="text-xs text-gray-500">Manage suppliers used to create purchase orders.</p>
+            </div>
+            <button onClick={() => setShowSupplierForm(value => !value)} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">
+              {showSupplierForm ? 'Close Form' : '+ Add Supplier'}
+            </button>
+          </div>
+
+          {showSupplierForm && (
+            <form onSubmit={handleCreateSupplier} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-bold text-sm text-gray-900">Create Supplier</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <label className="text-xs font-medium text-gray-600">Supplier Name
+                  <input required maxLength={160} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Supplier Code
+                  <input required maxLength={40} value={supplierForm.code} onChange={e => setSupplierForm({ ...supplierForm, code: e.target.value.toUpperCase() })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="SUP-001" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Contact Person
+                  <input maxLength={120} value={supplierForm.contactName} onChange={e => setSupplierForm({ ...supplierForm, contactName: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Email
+                  <input type="email" maxLength={254} value={supplierForm.email} onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Phone
+                  <input maxLength={40} value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Payment Terms (days)
+                  <input type="number" min="0" max="365" step="1" value={supplierForm.paymentTermsDays} onChange={e => setSupplierForm({ ...supplierForm, paymentTermsDays: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-600">Currency
+                  <select value={supplierForm.currency} onChange={e => setSupplierForm({ ...supplierForm, currency: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm">
+                    {['GBP', 'USD', 'EUR', 'PKR', 'AED', 'SAR'].map(currency => <option key={currency} value={currency}>{currency}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600">Lead Time (days)
+                  <input type="number" min="0" max="365" step="1" value={supplierForm.leadTimeDays} onChange={e => setSupplierForm({ ...supplierForm, leadTimeDays: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
+                </label>
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" disabled={savingSupplier} className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold disabled:opacity-50">{savingSupplier ? 'Saving...' : 'Save Supplier'}</button>
+              </div>
+            </form>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {suppliers.map((s) => (
             <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-2 text-xs">
               <div className="flex justify-between items-start">
@@ -442,6 +708,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               No suppliers configured.
             </div>
           )}
+          </div>
         </div>
       )}
 

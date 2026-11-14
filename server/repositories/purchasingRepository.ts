@@ -223,4 +223,80 @@ export class SupabasePurchasingRepository {
     };
   }
 
+  async createSupplier(input: {
+    name: string; code: string; contactName?: string; email?: string; phone?: string;
+    paymentTermsDays: number; currency: string; leadTimeDays: number;
+  }): Promise<Supplier> {
+    const name = input.name.trim();
+    const code = input.code.trim().toUpperCase();
+    const currency = input.currency.trim().toUpperCase();
+    if (!name || name.length > 160) throw new Error('Supplier name is required and must be at most 160 characters.');
+    if (!/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(code)) throw new Error('Supplier code must be 2–40 characters using letters, numbers, hyphens, or underscores.');
+    if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Supplier currency must be a three-letter currency code.');
+    if (!Number.isInteger(input.paymentTermsDays) || input.paymentTermsDays < 0 || input.paymentTermsDays > 365) throw new Error('Payment terms must be between 0 and 365 days.');
+    if (!Number.isInteger(input.leadTimeDays) || input.leadTimeDays < 0 || input.leadTimeDays > 365) throw new Error('Lead time must be between 0 and 365 days.');
+    const email = input.email?.trim() || '';
+    const phone = input.phone?.trim() || '';
+    const contactName = input.contactName?.trim() || '';
+    if (email.length > 254 || phone.length > 40 || contactName.length > 120) throw new Error('Supplier contact details exceed the supported length.');
+
+    const { data, error } = await this.context.supabase
+      .from('suppliers')
+      .insert({
+        organization_id: this.context.organizationId,
+        name,
+        code,
+        contact_name: contactName || null,
+        email: email || null,
+        phone: phone || null,
+        payment_terms_days: input.paymentTermsDays,
+        currency,
+        lead_time_days: input.leadTimeDays,
+        is_active: true,
+      })
+      .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      contactName: data.contact_name || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      paymentTermsDays: Number(data.payment_terms_days),
+      currency: data.currency.trim(),
+      leadTimeDays: Number(data.lead_time_days),
+      isActive: data.is_active,
+    };
+  }
+
+  async createPurchaseOrder(
+    payload: Record<string, unknown>,
+    idempotencyKey: string,
+  ): Promise<PurchaseOrder> {
+    const { data, error } = await this.context.supabase.rpc('create_workspace_purchase_order', {
+      p_organization_id: this.context.organizationId,
+      p_order: payload,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid purchase order response.');
+    const result = data as { success?: boolean; purchaseOrder?: PurchaseOrder };
+    if (!result.success || !result.purchaseOrder) throw new Error('The database returned an incomplete purchase order response.');
+    return result.purchaseOrder;
+  }
+
+  async approvePurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrder> {
+    const { data, error } = await this.context.supabase.rpc('approve_workspace_purchase_order', {
+      p_organization_id: this.context.organizationId,
+      p_purchase_order_id: purchaseOrderId,
+    });
+    if (error) throw error;
+    if (!data || typeof data !== 'object') throw new Error('The database returned an invalid purchase order approval response.');
+    const result = data as { success?: boolean; purchaseOrder?: PurchaseOrder };
+    if (!result.success || !result.purchaseOrder) throw new Error('The database returned an incomplete purchase order approval response.');
+    return result.purchaseOrder;
+  }
+
 }
