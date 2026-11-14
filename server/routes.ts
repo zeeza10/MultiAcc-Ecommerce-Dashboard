@@ -6,6 +6,7 @@ import { SupabaseInventoryRepository } from './repositories/inventoryRepository'
 import { SupabaseOrderRepository } from './repositories/orderRepository';
 import { SupabasePurchasingRepository } from './repositories/purchasingRepository';
 import { SupabaseWarehouseRepository } from './repositories/warehouseRepository';
+import { SupabaseReturnRepository } from './repositories/returnRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -853,6 +854,57 @@ apiRouter.post('/warehouses/:id/locations', async (req: Request, res: Response) 
     const message = error instanceof Error ? error.message : '';
     const status = /permission|authorized|row-level security|policy/i.test(message) ? 403 : /not active|select a warehouse|must be|characters|supported|capacity|invalid/i.test(message) ? 400 : 500;
     res.status(status).json({ error: status === 500 ? 'Warehouse location could not be created.' : message });
+  }
+});
+
+apiRouter.get('/returns', async (req: Request, res: Response) => {
+  try {
+    const repository = new SupabaseReturnRepository(getRepositoryContext(req));
+    res.json({ returns: await repository.listReturns() });
+  } catch (error) {
+    console.error('PostgreSQL returns listing failed:', error);
+    res.status(500).json({ error: 'Returns could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.post('/returns/:id/disposition', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (!Array.isArray(body.dispositions) || typeof body.idempotencyKey !== 'string') {
+      res.status(400).json({ error: 'Return dispositions and a request ID are required.' });
+      return;
+    }
+    const dispositions = body.dispositions.map(value => {
+      const item = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+      return {
+        lineId: typeof item.lineId === 'string' ? item.lineId : '',
+        disposition: typeof item.disposition === 'string' ? item.disposition : '',
+        quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity),
+      };
+    });
+    const repository = new SupabaseReturnRepository(getRepositoryContext(req));
+    const result = await repository.processDisposition(
+      req.params.id,
+      dispositions,
+      body.issueRefund === true,
+      body.idempotencyKey,
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('Transactional return disposition failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /authorized|authentication|membership|permission/i.test(message)
+      ? 403
+      : /not found/i.test(message)
+        ? 404
+        : /invalid|must |required|exceeds|cannot|only open|unsupported|already been issued|request ID|already used|location|configure|whole-number|full returned quantity/i.test(message)
+          ? 400
+          : 500;
+    res.status(status).json({
+      error: status === 500
+        ? 'Return disposition could not be posted. No stock or refund entries were committed.'
+        : message,
+    });
   }
 });
 
