@@ -46,9 +46,22 @@ Deno.serve(async (request: Request) => {
     return Response.json({ error: "Invitation is invalid or expired" }, { status: 400, headers: cors });
   }
 
-  const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (usersError) return Response.json({ error: "Could not verify the employee account" }, { status: 502, headers: cors });
-  const existing = usersData.users.find(item => item.email?.toLowerCase() === body.email!.toLowerCase());
+  const { data: role, error: roleError } = await admin.from("roles").select("code").eq("id", invite.role_id).maybeSingle();
+  if (roleError || !role) return Response.json({ error: "Assigned role could not be verified" }, { status: 400, headers: cors });
+  if (role.code === "SUPER_ADMIN") {
+    const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (assuranceError || assurance?.currentLevel !== "aal2") {
+      return Response.json({ error: "Complete multi-factor authentication before inviting a Super Admin." }, { status: 403, headers: cors });
+    }
+  }
+
+  let existing = null;
+  for (let page = 1; page <= 20; page += 1) {
+    const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (usersError) return Response.json({ error: "Could not verify the employee account" }, { status: 502, headers: cors });
+    existing = usersData.users.find(item => item.email?.toLowerCase() === body.email!.toLowerCase()) || existing;
+    if (existing || usersData.users.length < 1000) break;
+  }
 
   if (existing) {
     if (!existing.email_confirmed_at) return Response.json({ error: "An account with this email exists but is not verified. Ask the user to verify it before retrying." }, { status: 409, headers: cors });
