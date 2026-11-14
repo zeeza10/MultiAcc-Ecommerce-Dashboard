@@ -58,9 +58,9 @@ As route coverage grows, split the current dispatcher into domain modules withou
 
 ## Current migration coverage
 
-- Worker: auth/session identity, Products, Inventory, Stock Adjustments, Orders, Suppliers, Purchase Orders, Goods Receipts, Returns, Warehouse, read-only Finance, read-only 3PL, dashboard aggregates, marketplace account metadata, exception queue, audit reads and notification reads/dismissal.
-- Still gated: eBay OAuth/token lifecycle and sync execution; financial and 3PL writes; complete report/export workflows; remaining settings and dropshipping endpoints.
-- UI must not present hard-coded sample metrics as live business data. Unavailable metrics must be explicitly marked or left at a neutral empty state until their source calculation is implemented.
+- Worker: auth/session identity, Products, Inventory, Stock Adjustments, Orders (create, transition and audited edits for new/unallocated orders), Suppliers, Purchase Orders, Goods Receipts, Returns, Warehouse, Finance (invoice/payment/expense/ledger reads plus transactional payment recording and invoice void), 3PL (client-scoped reads plus transactional packaging/shipping jobs and billing preview), dashboard aggregates, workspace settings, database-backed reports/CSV exports, dropshipping calculations, marketplace account metadata, exception queue, audit reads and notification reads/dismissal.
+- Still gated: eBay OAuth/token lifecycle and real seller order synchronization; live marketplace credentials; demo-data reset/deletion; any finance or inventory workflow not covered by a transactional endpoint and explicit permission. Client users are restricted to their linked 3PL client and cannot access workspace-wide finance, marketplace, or management actions.
+- Business records, dashboard metrics, workspace currency/VAT settings, reports, and operational billing previews must come from Supabase. Static navigation labels, report definitions, and input choices are presentation metadata, not business records. Missing data must render as an empty state rather than fabricated totals.
 
 ## Validation gates
 
