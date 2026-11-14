@@ -155,7 +155,7 @@ export class SupabasePurchasingRepository {
     const poItems: Array<Pick<PurchaseOrderItemRow, 'purchase_order_id' | 'product_id' | 'sku'>> = [];
     for (let start = 0; start < poIds.length; start += 100) {
       const ids = poIds.slice(start, start + 100);
-      poItems.push(...await readAll((from, to) => this.context.supabase
+      poItems.push(...await readAll<Pick<PurchaseOrderItemRow, 'purchase_order_id' | 'product_id' | 'sku'>>((from, to) => this.context.supabase
         .from('purchase_order_items')
         .select('purchase_order_id,product_id,sku')
         .eq('organization_id', this.context.organizationId)
