@@ -2,6 +2,27 @@ import type { AuthContext } from '../types';
 import { json } from '../http';
 
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
+  const confirmPayoutMatch = path.match(/^\/payouts\/([^/]+)\/confirm-deposit$/);
+  if (confirmPayoutMatch && request.method === 'POST') {
+    const body = await request.json() as { bankReference?: string };
+    const { data, error } = await auth.repositoryContext.supabase.rpc('confirm_payout_deposit', {
+      p_organization_id: auth.organizationId,
+      p_payout_id: confirmPayoutMatch[1],
+      p_bank_reference: String(body.bankReference || ''),
+    });
+    if (error) throw new Error(error.message || 'Payout deposit confirmation failed.');
+    const row = data as Record<string, any>;
+    return json({ success: true, payout: {
+      id: row.id, payoutId: row.payout_reference, marketplaceAccountId: row.marketplace_account_id,
+      totalSalesMinor: Number(row.total_sales_minor || 0), totalFeesMinor: Number(row.total_fees_minor || 0),
+      refundsMinor: Number(row.refunds_minor || 0), shippingAdjustmentsMinor: Number(row.shipping_adjustments_minor || 0),
+      otherAdjustmentsMinor: Number(row.other_adjustments_minor || 0), netPayoutMinor: Number(row.net_payout_minor || 0),
+      currency: String(row.currency || 'GBP').trim(), payoutDate: row.payout_date, status: row.status,
+      transactionId: row.transaction_id || '', bankDepositStatus: row.bank_deposit_status,
+      bankReference: row.bank_reference || undefined, notes: row.notes || undefined,
+    } });
+  }
+
   // Client finance views are not yet scoped to a single 3PL client across every ledger relation.
   // Deny them until invoice/payment/expense/ledger queries share a verified client boundary.
   if (auth.user.role === 'CLIENT_USER') {
