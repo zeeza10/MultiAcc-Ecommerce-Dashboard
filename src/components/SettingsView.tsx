@@ -304,27 +304,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Demo Data Management */}
-      <div className="bg-white border border-rose-200 rounded-lg p-4 shadow-2xs space-y-3">
-        <div className="flex items-center space-x-2 border-b border-rose-100 pb-2">
-          <RotateCcw className="w-4 h-4 text-rose-600" />
-          <h3 className="font-bold text-gray-900 text-sm">Demo Data & Sandbox Reset</h3>
-        </div>
+      <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3">
+        <h3 className="font-bold text-gray-900 text-sm">Demo Data & Sandbox Records</h3>
         <p className="text-gray-600 text-xs">
-          Complies with SRS FR-OPS-01 ("Seed and demo data are clearly labeled and never presented as evidence of a working integration"). Resetting reinstates all baseline eBay accounts, unmapped SKU exceptions, orders, and append-only ledgers to a verified starting state.
+          Sample business records are tagged as demo data. Marketplace accounts remain disconnected in Sandbox, and no live credentials are created.
         </p>
-
-        <div className="pt-1">
-          <button
-            onClick={() => {
-              if (window.confirm('Reset database to clean baseline demo seed dataset?')) {
-                onResetDemo();
-              }
-            }}
-            className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md font-semibold text-xs transition"
-          >
-            Reset Database to Clean Demo Baseline
-          </button>
-        </div>
+        <p className="text-amber-700 text-xs">
+          Bulk reset is disabled until a verified demo-only deletion workflow is available. This screen will not delete existing business records.
+        </p>
       </div>
     </div>
   );
