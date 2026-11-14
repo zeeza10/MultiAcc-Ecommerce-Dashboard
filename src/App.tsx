@@ -335,6 +335,7 @@ export default function App() {
             <InventoryView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
             />
           )}
@@ -407,6 +408,7 @@ export default function App() {
             <FinanceView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultTab={
                 activeTab === 'payments'
                   ? 'PAYMENTS'
