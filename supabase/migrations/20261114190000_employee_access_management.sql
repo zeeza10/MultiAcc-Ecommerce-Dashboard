@@ -167,7 +167,7 @@ begin
     where m.organization_id=p_organization_id and m.user_id=v_actor and m.is_active and r.code='SUPER_ADMIN'
   ) then raise exception 'Only this organization Super Admin can suspend or reactivate employees' using errcode='42501'; end if;
 
-  select r.*,m.is_active into v_role,v_active from public.organization_members m join public.roles r on r.id=m.role_id
+  select r,m.is_active into v_role,v_active from public.organization_members m join public.roles r on r.id=m.role_id
   where m.organization_id=p_organization_id and m.user_id=p_user_id for update of m;
   if not found then raise exception 'Employee membership not found' using errcode='P0002'; end if;
 
