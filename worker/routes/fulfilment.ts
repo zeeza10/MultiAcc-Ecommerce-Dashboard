@@ -3,17 +3,20 @@ import { json } from '../http';
 
 export async function handleFulfilmentRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
   if (path === '/3pl/clients' && request.method === 'GET') {
+    let clientsQuery = auth.repositoryContext.supabase.from('clients_3pl')
+      .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
+      .eq('organization_id', auth.organizationId).order('company_name', { ascending: true });
+    if (auth.user.role === 'CLIENT_USER') clientsQuery = clientsQuery.eq('id', auth.repositoryContext.client3plId);
     const [clientsResult, ratesResult] = await Promise.all([
-      auth.repositoryContext.supabase.from('clients_3pl')
-        .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
-        .eq('organization_id', auth.organizationId).order('company_name', { ascending: true }),
+      clientsQuery,
       auth.repositoryContext.supabase.from('rate_cards')
         .select('id,name,pick_fee_minor,pack_fee_minor,extra_item_fee_minor,storage_pallet_per_month_minor,storage_shelf_per_month_minor,storage_bin_per_month_minor,minimum_monthly_charge_minor,currency')
         .eq('organization_id', auth.organizationId).order('name', { ascending: true }),
     ]);
     if (clientsResult.error) throw clientsResult.error;
     if (ratesResult.error) throw ratesResult.error;
-    const rateCards = (ratesResult.data || []).map(row => ({
+    const visibleRateCardIds = new Set((clientsResult.data || []).map(row => row.rate_card_id).filter(Boolean));
+    const rateCards = (ratesResult.data || []).filter(row => auth.user.role !== 'CLIENT_USER' || visibleRateCardIds.has(row.id)).map(row => ({
       id: row.id, name: row.name, pickFeeMinor: Number(row.pick_fee_minor), packFeeMinor: Number(row.pack_fee_minor),
       extraItemFeeMinor: Number(row.extra_item_fee_minor), storagePalletPerMonthMinor: Number(row.storage_pallet_per_month_minor),
       storageShelfPerMonthMinor: Number(row.storage_shelf_per_month_minor), storageBinPerMonthMinor: Number(row.storage_bin_per_month_minor),
@@ -27,9 +30,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/3pl/storage-snapshots' && request.method === 'GET') {
-    const { data: snapshots, error } = await auth.repositoryContext.supabase.from('storage_snapshots')
+    let snapshotsQuery = auth.repositoryContext.supabase.from('storage_snapshots')
       .select('id,client_3pl_id,snapshot_date,occupied_pallets,occupied_shelves,occupied_bins,estimated_cost_minor,currency')
       .eq('organization_id', auth.organizationId).order('snapshot_date', { ascending: false });
+    if (auth.user.role === 'CLIENT_USER') snapshotsQuery = snapshotsQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+    const { data: snapshots, error } = await snapshotsQuery;
     if (error) throw error;
     const clientIds = [...new Set((snapshots || []).map(row => row.client_3pl_id))];
     const { data: clients, error: clientError } = clientIds.length
@@ -47,9 +52,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/packaging' && request.method === 'GET') {
-    const { data: jobs, error } = await auth.repositoryContext.supabase.from('packaging_jobs')
+    let packagingQuery = auth.repositoryContext.supabase.from('packaging_jobs')
       .select('id,job_number,client_3pl_id,job_date,packaging_type,quantity,material_cost_minor,service_charge_minor,total_charge_minor,status,invoice_id,order_id,performed_by,notes')
       .eq('organization_id', auth.organizationId).order('job_date', { ascending: false });
+    if (auth.user.role === 'CLIENT_USER') packagingQuery = packagingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+    const { data: jobs, error } = await packagingQuery;
     if (error) throw error;
     const clientIds = [...new Set((jobs || []).map(row => row.client_3pl_id))];
     const orderIds = [...new Set((jobs || []).map(row => row.order_id).filter(Boolean))];
@@ -71,9 +78,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/shipping' && request.method === 'GET') {
-    const { data: jobs, error } = await auth.repositoryContext.supabase.from('shipping_jobs')
+    let shippingQuery = auth.repositoryContext.supabase.from('shipping_jobs')
       .select('id,dispatch_id,client_3pl_id,job_date,carrier,tracking_number,service_level,parcel_weight_kg,carrier_cost_minor,service_charge_minor,total_charge_minor,status,invoice_id,order_id,destination')
       .eq('organization_id', auth.organizationId).order('job_date', { ascending: false });
+    if (auth.user.role === 'CLIENT_USER') shippingQuery = shippingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+    const { data: jobs, error } = await shippingQuery;
     if (error) throw error;
     const clientIds = [...new Set((jobs || []).map(row => row.client_3pl_id))];
     const orderIds = [...new Set((jobs || []).map(row => row.order_id).filter(Boolean))];
@@ -96,11 +105,15 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/summary' && request.method === 'GET') {
-    const [packaging, shipping, storage] = await Promise.all([
-      auth.repositoryContext.supabase.from('packaging_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId),
-      auth.repositoryContext.supabase.from('shipping_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId),
-      auth.repositoryContext.supabase.from('storage_snapshots').select('id,estimated_cost_minor').eq('organization_id', auth.organizationId),
-    ]);
+    let packagingQuery = auth.repositoryContext.supabase.from('packaging_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId);
+    let shippingQuery = auth.repositoryContext.supabase.from('shipping_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId);
+    let storageQuery = auth.repositoryContext.supabase.from('storage_snapshots').select('id,estimated_cost_minor').eq('organization_id', auth.organizationId);
+    if (auth.user.role === 'CLIENT_USER') {
+      packagingQuery = packagingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+      shippingQuery = shippingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+      storageQuery = storageQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+    }
+    const [packaging, shipping, storage] = await Promise.all([packagingQuery, shippingQuery, storageQuery]);
     if (packaging.error) throw packaging.error;
     if (shipping.error) throw shipping.error;
     if (storage.error) throw storage.error;
