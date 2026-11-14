@@ -58,6 +58,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   const loadFinanceData = async () => {
     setLoading(true);
+    setInvoices([]);
+    setPayments([]);
+    setExpenses([]);
+    setLedger([]);
+    setProfitRows([]);
     try {
       const [invRes, payRes, expRes, ledRes, profRes] = await Promise.all([
         api.getInvoices(selectedStoreId), api.getPayments(selectedStoreId),
