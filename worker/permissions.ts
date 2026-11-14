@@ -36,6 +36,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/finance/payments') return 'finance.view';
   if (method === 'GET' && path === '/finance/expenses') return 'finance.view';
   if (method === 'GET' && path === '/finance/ledger') return 'finance.view';
+  if (method === 'POST' && path.startsWith('/payouts/') && path.endsWith('/confirm-deposit')) return 'finance.manage';
   if (method === 'GET' && path === '/payouts') return 'finance.view';
   if (method === 'GET' && path === '/reconciliation') return 'finance.view';
   if (method === 'GET' && path.startsWith('/reports/R-') && path.length === 13 && !Number.isNaN(Number(path.slice(-2)))) return 'reports.view';
