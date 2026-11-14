@@ -234,6 +234,27 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
   res.json({ user: getActiveUser(req), organizationId: (req as AuthenticatedRequest).organizationId });
 });
 
+apiRouter.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const user = getActiveUser(req);
+    if (user.role === 'CLIENT_USER') {
+      res.status(403).json({ error: 'Client users cannot create workspace orders.' });
+      return;
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const repository = new SupabaseOrderRepository(getRepositoryContext(req));
+    const order = await repository.createOrder(body);
+    res.status(201).json({ order });
+  } catch (error) {
+    console.error('PostgreSQL order creation failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const validation = /required|must |invalid|unsupported|between|too long|not found|inactive|authorized|amount/i.test(message);
+    res.status(validation ? 400 : 500).json({
+      error: validation ? message : 'Order could not be created in the workspace database.',
+    });
+  }
+});
+
 apiRouter.get('/orders', async (req: Request, res: Response) => {
   try {
     const user = getActiveUser(req);
