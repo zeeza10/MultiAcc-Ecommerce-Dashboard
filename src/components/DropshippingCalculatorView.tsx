@@ -57,9 +57,12 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
       const [prodRes, calcRes] = await Promise.all([
         api.getProducts(),
         api.getDropshippingCalculations(),
+        api.getConfig(),
       ]);
       setProducts(prodRes.products || []);
       setSavedSimulations(calcRes.calculations || []);
+      const baseCurrency = String(configRes.config?.baseCurrency || 'GBP').toUpperCase();
+      if (baseCurrency === 'GBP' || baseCurrency === 'USD' || baseCurrency === 'EUR') setCurrency(baseCurrency);
     } catch (err) {
       console.error('Failed to load dropshipping calculator initial data:', err);
     } finally {
