@@ -148,7 +148,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const financeResponse = await handleFinanceRoute(path, request, url, auth);
     if (financeResponse) return financeResponse;
 
-    const inventoryResponse = await handleInventoryRoute(path, request, auth);
+    const inventoryResponse = await handleInventoryRoute(path, request, url, auth);
     if (inventoryResponse) return inventoryResponse;
     const dropshippingResponse = await handleDropshippingRoute(path, request, auth);
     if (dropshippingResponse) return dropshippingResponse;
