@@ -253,7 +253,7 @@ apiRouter.get('/products', async (req: Request, res: Response) => {
     });
 
     const balances = new Map<string, { onHand: number; reserved: number; incoming: number; damaged: number }>();
-    if (context.permissions.has('inventory.view') && products.length > 0) {
+    if ((context.permissions.has('*') || context.permissions.has('inventory.view')) && products.length > 0) {
       const ledgerRows = await repository.listStockLedgerQuantities(
         products.map(product => product.id),
         isClientUser ? user.clientId : undefined,
