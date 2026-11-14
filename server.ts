@@ -69,8 +69,9 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`NexusOps server is active on port ${port} [hasDist: ${hasDist}]`);
+  const host = process.env.HOST || '127.0.0.1';
+  app.listen(port, host, () => {
+    console.log(`NexusOps server is active on http://${host}:${port} [hasDist: ${hasDist}]`);
   });
 }
 
