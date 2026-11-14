@@ -5,6 +5,7 @@ import { SupabaseProductRepository } from './repositories/productRepository';
 import { SupabaseInventoryRepository } from './repositories/inventoryRepository';
 import { SupabaseOrderRepository } from './repositories/orderRepository';
 import { SupabasePurchasingRepository } from './repositories/purchasingRepository';
+import { SupabaseWarehouseRepository } from './repositories/warehouseRepository';
 import { db } from './db';
 import { engine } from './engine';
 import { ebayAdapter } from './ebayAdapter';
@@ -717,6 +718,57 @@ apiRouter.post('/purchase-orders/:id/receive', async (req: Request, res: Respons
   }
 });
 
+
+apiRouter.get('/warehouses', async (req: Request, res: Response) => {
+  try {
+    const repository = new SupabaseWarehouseRepository(getRepositoryContext(req));
+    res.json(await repository.getLayout());
+  } catch (error) {
+    console.error('PostgreSQL warehouse layout failed:', error);
+    res.status(500).json({ error: 'Warehouse layout could not be loaded from the workspace database.' });
+  }
+});
+
+apiRouter.post('/warehouses', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const repository = new SupabaseWarehouseRepository(getRepositoryContext(req));
+    const warehouse = await repository.createWarehouse({
+      name: typeof body.name === 'string' ? body.name : '',
+      code: typeof body.code === 'string' ? body.code : '',
+      address: typeof body.address === 'string' ? body.address : undefined,
+    });
+    res.status(201).json({ warehouse });
+  } catch (error) {
+    console.error('PostgreSQL warehouse creation failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /permission|authorized|row-level security|policy/i.test(message) ? 403 : /required|must be|characters|length|invalid/i.test(message) ? 400 : 500;
+    res.status(status).json({ error: status === 500 ? 'Warehouse could not be created.' : message });
+  }
+});
+
+apiRouter.post('/warehouses/:id/locations', async (req: Request, res: Response) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const repository = new SupabaseWarehouseRepository(getRepositoryContext(req));
+    const location = await repository.createLocation({
+      warehouseId: req.params.id,
+      locationCode: typeof body.locationCode === 'string' ? body.locationCode : '',
+      locationType: typeof body.locationType === 'string' ? body.locationType : '',
+      zone: typeof body.zone === 'string' ? body.zone : undefined,
+      aisle: typeof body.aisle === 'string' ? body.aisle : undefined,
+      shelf: typeof body.shelf === 'string' ? body.shelf : undefined,
+      bin: typeof body.bin === 'string' ? body.bin : undefined,
+      capacityUnits: typeof body.capacityUnits === 'number' ? body.capacityUnits : Number(body.capacityUnits ?? 0),
+    });
+    res.status(201).json({ location });
+  } catch (error) {
+    console.error('PostgreSQL warehouse location creation failed:', error);
+    const message = error instanceof Error ? error.message : '';
+    const status = /permission|authorized|row-level security|policy/i.test(message) ? 403 : /not active|select a warehouse|must be|characters|supported|capacity|invalid/i.test(message) ? 400 : 500;
+    res.status(status).json({ error: status === 500 ? 'Warehouse location could not be created.' : message });
+  }
+});
 
 /**
  * Legacy demo-backed routes remain blocked outside explicit local demo mode.
