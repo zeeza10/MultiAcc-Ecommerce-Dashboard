@@ -248,19 +248,19 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <div key={rc.id} className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pick Fee</div>
-                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.pickFeeMinor, config.baseCurrency)} / pick</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.pickFeeMinor, rc.currency || config.baseCurrency)} / pick</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pack Fee</div>
-                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.packFeeMinor, config.baseCurrency)} / pack</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.packFeeMinor, rc.currency || config.baseCurrency)} / pack</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pallet Storage</div>
-                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storagePalletPerMonthMinor, config.baseCurrency)} / mo</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storagePalletPerMonthMinor, rc.currency || config.baseCurrency)} / mo</div>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Shelf Storage</div>
-                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storageShelfPerMonthMinor, config.baseCurrency)} / mo</div>
+                    <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.storageShelfPerMonthMinor, rc.currency || config.baseCurrency)} / mo</div>
                   </div>
                 </div>
               ))}
