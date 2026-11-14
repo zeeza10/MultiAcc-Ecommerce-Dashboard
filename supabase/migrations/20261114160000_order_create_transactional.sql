@@ -68,7 +68,10 @@ begin
   end if;
 
   begin
-    v_shipping_charge := greatest(0, coalesce((p_order->>'shippingChargeMinor')::bigint, 0));
+    if coalesce((p_order->>'shippingChargeMinor')::numeric, 0) < 0 then
+      raise exception 'negative shipping charge';
+    end if;
+    v_shipping_charge := coalesce((p_order->>'shippingChargeMinor')::bigint, 0);
   exception when others then
     raise exception 'Shipping charge must be a valid non-negative minor-unit amount.' using errcode = '22023';
   end;
@@ -78,6 +81,10 @@ begin
   from public.system_settings s
   where s.organization_id = p_organization_id
   limit 1;
+  if not found then
+    v_vat_rate := 0;
+    v_currency := 'GBP';
+  end if;
 
   if v_vat_rate < 0 or v_vat_rate > 100 then
     raise exception 'Workspace VAT rate is outside the supported range.' using errcode = '22023';
