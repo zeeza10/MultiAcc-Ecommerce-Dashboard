@@ -69,27 +69,44 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   if (path === '/3pl/billing-preview' && request.method === 'POST') {
     const body = await request.json() as { clientId?: string };
     const clientId = String(body.clientId || '');
+    if (!clientId) return json({ error: 'Select a 3PL client.' }, 400);
     if (auth.user.role === 'CLIENT_USER' && clientId !== auth.repositoryContext.client3plId) return json({ error: 'You cannot view another client billing preview.' }, 403);
     const { data: client, error: clientError } = await auth.repositoryContext.supabase.from('clients_3pl')
-      .select('id,company_name,code').eq('organization_id', auth.organizationId).eq('id', clientId).maybeSingle();
-    if (clientError) throw clientError;
+      .select('id,company_name,code,billing_period,rate_card_id').eq('organization_id', auth.organizationId).eq('id', clientId).maybeSingle();
+    if (clientError) throw new Error('3PL client details could not be loaded.');
     if (!client) return json({ error: '3PL client not found.' }, 404);
-    const [storage, packaging, shipping, invoices] = await Promise.all([
-      auth.repositoryContext.supabase.from('storage_snapshots').select('estimated_cost_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
-      auth.repositoryContext.supabase.from('packaging_jobs').select('total_charge_minor,quantity').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
-      auth.repositoryContext.supabase.from('shipping_jobs').select('total_charge_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId),
-      auth.repositoryContext.supabase.from('invoices').select('total_minor,paid_amount_minor,status').eq('organization_id', auth.organizationId).eq('recipient_id', clientId),
+    const now = new Date();
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+    const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    const [storage, packaging, shipping, invoices, rateCard, settings] = await Promise.all([
+      auth.repositoryContext.supabase.from('storage_snapshots').select('estimated_cost_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId).gte('snapshot_date', periodStart).lte('snapshot_date', periodEnd),
+      auth.repositoryContext.supabase.from('packaging_jobs').select('total_charge_minor,quantity').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId).gte('job_date', periodStart).lte('job_date', periodEnd),
+      auth.repositoryContext.supabase.from('shipping_jobs').select('total_charge_minor').eq('organization_id', auth.organizationId).eq('client_3pl_id', clientId).gte('job_date', periodStart).lte('job_date', periodEnd),
+      auth.repositoryContext.supabase.from('invoices').select('total_minor,paid_amount_minor,status').eq('organization_id', auth.organizationId).eq('recipient_type', 'CLIENT').eq('recipient_id', clientId),
+      client.rate_card_id ? auth.repositoryContext.supabase.from('rate_cards').select('currency').eq('organization_id', auth.organizationId).eq('id', client.rate_card_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      auth.repositoryContext.supabase.from('system_settings').select('base_currency,default_vat_rate_percent').eq('organization_id', auth.organizationId).maybeSingle(),
     ]);
-    for (const result of [storage, packaging, shipping, invoices]) if (result.error) throw result.error;
+    for (const result of [storage, packaging, shipping, invoices, rateCard, settings]) if (result.error) throw new Error('Billing preview source data could not be loaded.');
     const sum = (items: any[], field: string) => (items || []).reduce((total, row) => total + Number(row[field] || 0), 0);
     const storageMinor = sum(storage.data || [], 'estimated_cost_minor');
     const packagingMinor = sum(packaging.data || [], 'total_charge_minor');
     const shippingMinor = sum(shipping.data || [], 'total_charge_minor');
     const invoicedMinor = sum(invoices.data || [], 'total_minor');
     const paidMinor = sum(invoices.data || [], 'paid_amount_minor');
-    return json({ client, storageChargesMinor: storageMinor, packagingChargesMinor: packagingMinor,
-      shippingChargesMinor: shippingMinor, invoicedMinor, paidMinor, outstandingMinor: Math.max(0, invoicedMinor - paidMinor),
-      packedUnits: sum(packaging.data || [], 'quantity') });
+    const subtotalMinor = storageMinor + packagingMinor + shippingMinor;
+    const vatRatePercent = Number(settings.data?.default_vat_rate_percent ?? 0);
+    const vatMinor = Math.round(subtotalMinor * vatRatePercent / 100);
+    return json({
+      client: { id: client.id, companyName: client.company_name, code: client.code, billingPeriod: client.billing_period },
+      period: { start: periodStart, end: periodEnd },
+      currency: String(rateCard.data?.currency || settings.data?.base_currency || 'GBP').trim(),
+      vatRatePercent, estimatedStorageMinor: storageMinor,
+      estimatedHandlingMinor: packagingMinor + shippingMinor,
+      totalEstimatedChargesMinor: subtotalMinor, estimatedVatMinor: vatMinor,
+      totalWithVatMinor: subtotalMinor + vatMinor,
+      invoicedMinor, paidMinor, outstandingMinor: Math.max(0, invoicedMinor - paidMinor),
+      packedUnits: sum(packaging.data || [], 'quantity'),
+    });
   }
 
   if (path === '/3pl/clients' && request.method === 'GET') {
