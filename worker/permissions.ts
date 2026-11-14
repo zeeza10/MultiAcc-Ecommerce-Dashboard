@@ -36,6 +36,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/finance/ledger') return 'finance.view';
   if (method === 'GET' && path === '/payouts') return 'finance.view';
   if (method === 'GET' && path === '/reconciliation') return 'finance.view';
+  if (method === 'GET' && /^\\/reports\\/R-\\d{2}$/.test(path)) return 'reports.view';
   if (method === 'GET' && path === '/dropshipping/calculations') return 'orders.view';
   if (method === 'POST' && path === '/dropshipping/calculations') return 'products.create';
   if (method === 'GET' && path === '/warehouses') return 'inventory.view';
