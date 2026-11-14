@@ -164,12 +164,13 @@ export class SupabasePurchasingRepository {
     }
     const skuByPoProduct = new Map(poItems.map(item => [item.purchase_order_id + ':' + item.product_id, item.sku] as const));
     const orderNumberById = new Map(orders.map(order => [order.id, order.po_number] as const));
+    const poIdByReceipt = new Map(receipts.map(receipt => [receipt.id, receipt.purchase_order_id] as const));
     const linesByReceipt = new Map<string, GoodsReceipt['lines']>();
     for (const item of items) {
       const lines = linesByReceipt.get(item.goods_receipt_id) || [];
       lines.push({
         productId: item.product_id,
-        sku: skuByPoProduct.get(receipts.find(receipt => receipt.id === item.goods_receipt_id)?.purchase_order_id + ':' + item.product_id) || '',
+        sku: skuByPoProduct.get(poIdByReceipt.get(item.goods_receipt_id) + ':' + item.product_id) || '',
         receivedQty: Number(item.received_qty),
         shortageQty: Number(item.shortage_qty),
         damagedQty: Number(item.damaged_qty),
