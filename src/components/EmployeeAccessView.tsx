@@ -122,6 +122,12 @@ export const EmployeeAccessView: React.FC = () => {
     setTab('roles');
   };
 
+  const copyRoleTemplate = (role: Role) => {
+    setRoleId(''); setRoleName(`${role.name} Custom`); setRoleDescription(role.description || '');
+    setTemplateId(role.id); setRolePermissions(role.permissions || []);
+    setTab('roles');
+  };
+
   const inviteEmployee = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true); setError(''); setNotice('');
@@ -267,7 +273,7 @@ export const EmployeeAccessView: React.FC = () => {
             {access.roles.map(role=><div key={role.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-start justify-between gap-2"><div><div className="font-semibold text-slate-900">{role.name}</div><div className="mt-0.5 text-xs text-slate-500">{role.description || (role.is_system?'Built-in responsibility template':'Custom organization role')}</div></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">{role.is_system?'System':role.is_custom?'Custom':'Role'}</span></div>
               <div className="mt-2 text-xs text-slate-500">{role.code==='SUPER_ADMIN'?'Full access to this organization only.':(role.permissions||[]).length+' permissions assigned'}</div>
-              {role.is_custom && <button onClick={()=>editRole(role)} className="mt-3 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Edit permissions</button>}
+              {role.is_custom ? <button onClick={()=>editRole(role)} className="mt-3 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Edit permissions</button> : role.is_system && role.code !== 'SUPER_ADMIN' ? <button onClick={()=>copyRoleTemplate(role)} className="mt-3 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Customize this role</button> : null}
             </div>)}
           </div>
 
