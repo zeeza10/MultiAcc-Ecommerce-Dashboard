@@ -106,7 +106,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
   const handleCreatePurchaseOrder = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!poRequestId) refreshPoRequestId();
+    const requestId = poRequestId || window.crypto.randomUUID();
+    setPoRequestId(requestId);
     setSavingPo(true);
     try {
       await api.createPurchaseOrder({
@@ -119,7 +120,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
           orderedQty: Number.parseInt(line.quantity, 10) || 0,
           unitCostMinor: Math.round((Number.parseFloat(line.unitCost) || 0) * 100),
         })),
-      }, poRequestId);
+      }, requestId);
       setShowPoForm(false);
       setPoRequestId('');
       await loadData();
@@ -413,7 +414,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                         <span className="text-xs font-bold text-gray-800">{formatPoMoney((Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100))}</span>
                         <button type="button" disabled={poLines.length <= 1} onClick={() => { setPoLines(lines => lines.filter((_, lineIndex) => lineIndex !== index)); refreshPoRequestId(); }} className="text-rose-600 disabled:opacity-30" aria-label="Remove purchase order line">×</button>
                       </div>
-                      {selectedProduct && <div className="md:col-span-12 text-[11px] text-gray-500">SKU: {selectedProduct.sku} · Product currency: {selectedProduct.currency}</div>}
+                      {selectedProduct && <div className="md:col-span-12 text-[11px] text-gray-500">SKU: {selectedProduct.sku}</div>}
                     </div>
                   );
                 })}
