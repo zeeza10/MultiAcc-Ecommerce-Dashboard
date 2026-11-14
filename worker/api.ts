@@ -592,7 +592,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       })) });
     }
 
-    const dashboardResponse = await handleDashboardRoute(path, url, auth);
+    const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
     if (dashboardResponse) return dashboardResponse;
     const marketplaceResponse = await handleMarketplaceRoute(path, request, auth);
     if (marketplaceResponse) return marketplaceResponse;
