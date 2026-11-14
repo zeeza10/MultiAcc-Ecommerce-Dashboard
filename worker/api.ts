@@ -139,6 +139,13 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
 
   const path = url.pathname.slice('/api/v1'.length).replace(/\/$/, '') || '/';
+  // Apply an IP-based edge limit before Supabase token verification to reduce
+  // unauthenticated abuse and avoid spending database/auth resources first.
+  if (env.API_IP_RATE_LIMITER) {
+    const connectingIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const limited = await enforceRateLimit(env.API_IP_RATE_LIMITER, `ip:${connectingIp}`, 'API request');
+    if (limited) return limited;
+  }
   const auth = await authenticate(request, env);
   if (auth instanceof Response) return auth;
 
