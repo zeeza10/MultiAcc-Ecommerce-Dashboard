@@ -645,7 +645,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
       const currencies = new Map();
       for (const row of activeOrders) {
         const currency = String(row.currency || 'GBP').trim();
-        currencies.set(currency, (currencies.get(currency) || 0) + Number(row.total_minor || 0));
+        currencies.set(currency, (currencies.get(currency) || 0) + 1);
       }
       const currency = [...currencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'GBP';
       const revenueMinor = activeOrders.filter(row => String(row.currency || 'GBP').trim() === currency)
@@ -697,8 +697,16 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
         date.setDate(since.getDate() + index);
         return date.toISOString().slice(5, 10);
       });
+      const chartCurrencyCounts = new Map();
+      for (const row of ordersResult.data || []) {
+        const currency = String(row.currency || 'GBP').trim();
+        chartCurrencyCounts.set(currency, (chartCurrencyCounts.get(currency) || 0) + 1);
+      }
+      const chartCurrency = [...chartCurrencyCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'GBP';
       const trend = days.map(date => {
-        const rows = (ordersResult.data || []).filter(row => String(row.created_at).slice(5, 10) === date);
+        const rows = (ordersResult.data || []).filter(row =>
+          String(row.created_at).slice(5, 10) === date && String(row.currency || 'GBP').trim() === chartCurrency
+        );
         return { date, orders: rows.length, revenue: rows.reduce((sum, row) => sum + Number(row.total_minor || 0), 0) / 100 };
       });
       const statusCounts: Record<string, number> = {};
