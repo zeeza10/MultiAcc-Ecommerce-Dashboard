@@ -1,15 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.102.0";
+import { corsHeadersForInvitation, isAllowedInvitationOrigin, exceedsInvitationBodyLimit } from "./request-guards.ts";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const MAX_INVITATION_BODY_BYTES = 32 * 1024;
 
 Deno.serve(async (request: Request) => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
+  const origin = request.headers.get("Origin");
+  const cors = corsHeadersForInvitation(origin);
+  if (!isAllowedInvitationOrigin(origin)) return Response.json({ error: "Origin not allowed" }, { status: 403, headers: cors });
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405, headers: cors });
+  if (await exceedsInvitationBodyLimit(request, MAX_INVITATION_BODY_BYTES)) {
+    return Response.json({ error: "Invitation request body is too large." }, { status: 413, headers: cors });
+  }
 
   const url = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -38,11 +41,11 @@ Deno.serve(async (request: Request) => {
 
   const { data: invite, error: inviteError } = await admin
     .from("user_invitations")
-    .select("id,email,role_id,expires_at,accepted_at,revoked_at")
+    .select("id,email,role_id,expires_at,accepted_at,revoked_at,sent_at")
     .eq("id", body.invitationId)
     .eq("organization_id", body.organizationId)
     .maybeSingle();
-  if (inviteError || !invite || invite.email.toLowerCase() !== body.email.toLowerCase() || invite.accepted_at || invite.revoked_at || new Date(invite.expires_at).getTime() <= Date.now()) {
+  if (inviteError || !invite || invite.email.toLowerCase() !== body.email.toLowerCase() || invite.accepted_at || invite.revoked_at || invite.sent_at || new Date(invite.expires_at).getTime() <= Date.now()) {
     return Response.json({ error: "Invitation is invalid or expired" }, { status: 400, headers: cors });
   }
 
@@ -104,6 +107,22 @@ Deno.serve(async (request: Request) => {
       after_snapshot: { email: body.email, role_id: invite.role_id }, notes: "Existing verified account added to organization",
     });
     return Response.json({ success: true, existingAccount: true, message: "Existing verified account added to the organization." }, { headers: cors });
+  }
+
+  // Atomically claim the invitation before sending so a replay or concurrent request cannot resend it.
+  const { data: claimedInvite, error: claimError } = await admin
+    .from("user_invitations")
+    .update({ sent_at: new Date().toISOString() })
+    .eq("id", invite.id)
+    .eq("organization_id", body.organizationId)
+    .is("sent_at", null)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .select("id")
+    .maybeSingle();
+  if (claimError || !claimedInvite) {
+    return Response.json({ error: "Invitation has already been processed or is no longer valid." }, { status: 409, headers: cors });
   }
 
   const { data: invited, error: inviteUserError } = await admin.auth.admin.inviteUserByEmail(body.email, {
