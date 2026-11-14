@@ -15,11 +15,11 @@ const response = (body: unknown, status: number, retryAfter?: number) => {
  */
 export async function enforceRateLimit(
   binding: RateLimitBinding,
-  userId: string,
+  key: string,
   label: string,
 ): Promise<Response | null> {
   try {
-    const { success } = await binding.limit({ key: userId });
+    const { success } = await binding.limit({ key });
     if (success) return null;
     return response({ error: `Too many ${label.toLowerCase()}s. Please wait before trying again.` }, 429, 60);
   } catch {
