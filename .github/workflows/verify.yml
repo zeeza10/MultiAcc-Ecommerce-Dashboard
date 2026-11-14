@@ -2,7 +2,7 @@ name: Verify application
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase-3-worker-api-foundation]
   pull_request:
     branches: [main]
 
