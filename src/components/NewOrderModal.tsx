@@ -19,13 +19,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   onSuccess,
 }) => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [customerName, setCustomerName] = useState('TechWorld Retailers');
-  const [customerEmail, setCustomerEmail] = useState('procurement@techworld.co.uk');
-  const [street, setStreet] = useState('14 Bishopsgate');
-  const [city, setCity] = useState('London');
-  const [postalCode, setPostalCode] = useState('EC2N 4AY');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [lines, setLines] = useState<{ productId: string; quantity: number }[]>([]);
-  const [notes, setNotes] = useState('Wholesale direct invoice order');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
