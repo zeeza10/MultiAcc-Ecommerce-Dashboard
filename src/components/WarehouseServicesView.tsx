@@ -30,8 +30,6 @@ interface WarehouseServicesViewProps {
   currentUser: User;
 }
 
-const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
-
 export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
   const canManageFulfilment = currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER';
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
@@ -106,7 +104,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     }
   };
 
-  const formatMoney = (minor: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+  const formatMoney = (minor: number, currencyCode = currency) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: currencyCode }).format((Number(minor) || 0) / 100);
   const totalAvailable = balances.reduce((sum, row) => sum + Number(row.available || 0), 0);
   const totalReserved = balances.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
   const totalDamaged = balances.reduce((sum, row) => sum + Number(row.damaged || 0), 0);
