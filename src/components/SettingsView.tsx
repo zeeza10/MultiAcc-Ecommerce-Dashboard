@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Settings as SettingsIcon,
   Save,
-  RotateCcw,
   CheckCircle,
   AlertTriangle,
   Sliders,
@@ -17,14 +16,12 @@ interface SettingsViewProps {
   currentUser: User;
   config: SystemConfig;
   onUpdateConfig: (cfg: Partial<SystemConfig>) => void;
-  onResetDemo: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   currentUser,
   config,
   onUpdateConfig,
-  onResetDemo,
 }) => {
   const [baseCurrency, setBaseCurrency] = useState(config.baseCurrency);
   const [timezone, setTimezone] = useState(config.businessTimezone);
