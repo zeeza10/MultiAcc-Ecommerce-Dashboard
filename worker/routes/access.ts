@@ -33,7 +33,7 @@ export async function handleAccessRoute(
       p_role_id: roleId,
     });
     if (invitationError || !invitationId) {
-      return json({ error: invitationError?.message || 'Invitation could not be created.' }, 400);
+      return json({ error: invitationError?.message || 'Invitation could not be created.' }, invitationError?.message?.toLowerCase().includes('rate limit') ? 429 : 400);
     }
 
     const response = await fetch(`${env.SUPABASE_URL}/functions/v1/manage-employee-invitation`, {
