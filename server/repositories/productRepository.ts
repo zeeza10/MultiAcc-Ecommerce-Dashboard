@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OwnerType, Product } from '../types';
+import type { RepositoryContext } from './context';
 
 export interface ProductCreateInput {
   sku: string;
@@ -90,11 +91,10 @@ const toProduct = (row: ProductRow): Product => {
  * JWT, so PostgreSQL RLS remains the authorization boundary.
  */
 export class SupabaseProductRepository implements ProductRepository {
-  constructor(
-    private readonly client: SupabaseClient,
-    private readonly organizationId: string,
-    private readonly actorId: string,
-  ) {}
+  constructor(private readonly context: RepositoryContext) {}
+
+  private get client() { return this.context.supabase; }
+  private get organizationId() { return this.context.organizationId; }
 
   async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<Product[]> {
     if (options.onlyClientProducts && !options.client3plId) return [];
@@ -174,7 +174,6 @@ export class SupabaseProductRepository implements ProductRepository {
       low_stock_threshold: input.lowStockThreshold,
       reorder_level: input.reorderLevel,
       category_name: input.category.trim() || 'General',
-      created_by: this.actorId,
     };
 
     const { data, error } = await this.client
