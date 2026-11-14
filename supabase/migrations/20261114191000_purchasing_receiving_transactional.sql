@@ -90,6 +90,7 @@ declare
   v_requested_location uuid;
   v_received_qty integer;
   v_damaged_qty integer;
+  v_total_received_qty integer;
   v_shortage_qty integer;
   v_new_received_qty integer;
   v_good_qty integer;
@@ -207,6 +208,7 @@ begin
         v_product.id := (v_item->>'productId')::uuid;
         v_received_qty := coalesce((v_item->>'receivedQty')::integer, 0);
         v_damaged_qty := coalesce((v_item->>'damagedQty')::integer, 0);
+        v_total_received_qty := v_received_qty + v_damaged_qty;
         v_requested_location := nullif(v_item->>'locationId', '')::uuid;
       exception when invalid_text_representation or numeric_value_out_of_range then
         raise exception 'Receipt item contains an invalid product, quantity, or location.' using errcode = '22023';
@@ -215,12 +217,12 @@ begin
       if v_product.id is null then
         raise exception 'Every receipt item must identify a product.' using errcode = '22023';
       end if;
-      if v_received_qty = 0 and v_damaged_qty = 0 then
+      if v_total_received_qty = 0 then
         continue;
       end if;
-      if v_received_qty < 1 or v_received_qty > 1000000
-         or v_damaged_qty < 0 or v_damaged_qty > v_received_qty then
-        raise exception 'Received quantity must be 1 to 1,000,000 and damaged quantity cannot exceed received quantity.' using errcode = '22023';
+      if v_received_qty < 0 or v_damaged_qty < 0
+         or v_total_received_qty < 1 or v_total_received_qty > 1000000 then
+        raise exception 'Sellable and damaged quantities must be non-negative and their total must be 1 to 1,000,000.' using errcode = '22023';
       end if;
       if v_product.id = any(v_seen_products) then
         raise exception 'A product may appear only once in a receipt. Combine duplicate purchase-order lines first.' using errcode = '22023';
@@ -252,12 +254,12 @@ begin
         raise exception 'A purchase-order product no longer exists in this workspace.' using errcode = 'P0002';
       end if;
 
-      v_new_received_qty := v_po_line.received_qty + v_received_qty;
+      v_new_received_qty := v_po_line.received_qty + v_total_received_qty;
       if v_new_received_qty > v_po_line.ordered_qty then
         raise exception 'Receipt quantity exceeds the remaining quantity for SKU %.', v_po_line.sku using errcode = '22023';
       end if;
       v_shortage_qty := v_po_line.ordered_qty - v_new_received_qty;
-      v_good_qty := v_received_qty - v_damaged_qty;
+      v_good_qty := v_received_qty;
 
       if v_requested_location is null then
         select l.id into v_location_id
@@ -279,7 +281,7 @@ begin
       if v_po_line.unit_cost_minor < 0 then
         raise exception 'Purchase-order unit cost cannot be negative.' using errcode = '22023';
       end if;
-      v_line_value := v_received_qty::numeric * v_po_line.unit_cost_minor::numeric;
+      v_line_value := v_total_received_qty::numeric * v_po_line.unit_cost_minor::numeric;
       if v_line_value > 9223372036854775807::numeric then
         raise exception 'Receipt value exceeds the supported monetary range.' using errcode = '22003';
       end if;
@@ -425,6 +427,9 @@ begin
   select s.name into v_supplier_name
   from public.suppliers s
   where s.id = v_po.supplier_id and s.organization_id = p_organization_id;
+  if not found then
+    raise exception 'The purchase-order supplier does not belong to this workspace.' using errcode = '42501';
+  end if;
 
   select jsonb_build_object(
     'id', gr.id,
