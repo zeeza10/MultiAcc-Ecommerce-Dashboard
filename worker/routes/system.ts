@@ -95,11 +95,13 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
   }
 
   if (path === '/notifications' && request.method === 'GET') {
-    const { data, error } = await auth.repositoryContext.supabase.from('notifications')
+    let notificationsQuery = auth.repositoryContext.supabase.from('notifications')
       .select('id,notification_type,title,message,severity,reference_url,is_read,is_dismissed,created_at,user_id')
       .eq('organization_id', auth.organizationId)
-      .or(`user_id.is.null,user_id.eq.${auth.user.id}`)
       .eq('is_dismissed', false).order('created_at', { ascending: false }).limit(100);
+    if (auth.user.role === 'CLIENT_USER') notificationsQuery = notificationsQuery.eq('user_id', auth.user.id);
+    else notificationsQuery = notificationsQuery.or(`user_id.is.null,user_id.eq.${auth.user.id}`);
+    const { data, error } = await notificationsQuery;
     if (error) throw new Error('Notifications could not be loaded.');
     return json({ notifications: (data || []).map(row => ({
       id: row.id, type: row.notification_type, title: row.title, message: row.message,
