@@ -109,7 +109,18 @@ export const EmployeeAccessView: React.FC = () => {
     setSelectedMemberPermissions([...effective]);
   };
 
+
+  const requireMfaStepUp = async (action: string): Promise<boolean> => {
+    const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (assuranceError || assurance?.currentLevel !== 'aal2') {
+      setError(`Complete authenticator MFA before ${action}. Use the Administrator MFA panel above to enroll or verify your authenticator.`);
+      return false;
+    }
+    return true;
+  };
+
   const saveMemberPermissions = async () => {
+    if (!(await requireMfaStepUp('changing individual employee permissions'))) return;
     if (!selectedMember) return;
     const defaults = access.roles.find(role => role.id === selectedMember.role_id)?.permissions || [];
     const selected = new Set(selectedMemberPermissions);
@@ -141,6 +152,7 @@ export const EmployeeAccessView: React.FC = () => {
 
   const createOrUpdateRole = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!(await requireMfaStepUp('creating or changing organization roles'))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: saveError } = await supabase.rpc('manage_org_role', {
@@ -174,6 +186,7 @@ export const EmployeeAccessView: React.FC = () => {
 
   const inviteEmployee = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!(await requireMfaStepUp('inviting an employee'))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const result = await api.inviteEmployee({ email: inviteEmail.trim(), fullName: inviteName.trim(), roleId: inviteRole });
@@ -187,14 +200,7 @@ export const EmployeeAccessView: React.FC = () => {
 
   const changeRole = async (member: Member, nextRoleId: string) => {
     if (!nextRoleId || nextRoleId === member.role_id) return;
-    const selectedRole = access.roles.find(role => role.id === nextRoleId);
-    if (selectedRole?.code === 'SUPER_ADMIN') {
-      const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (assuranceError || assurance?.currentLevel !== 'aal2') {
-        setError('Set up and complete multi-factor authentication before granting Super Admin access.');
-        return;
-      }
-    }
+    if (!(await requireMfaStepUp('changing an employee role'))) return;
     if (!window.confirm(`Change ${member.full_name || member.email || 'this employee'}'s role?`)) return;
     setSaving(true); setError(''); setNotice('');
     try {
@@ -209,6 +215,7 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const setMemberActive = async (member: Member, active: boolean) => {
+    if (!(await requireMfaStepUp('suspending or reactivating an employee'))) return;
     const action = active ? 'reactivate' : 'suspend and immediately block workspace API access for';
     if (!window.confirm(`Are you sure you want to ${action} ${member.full_name || member.email || 'this employee'}?`)) return;
     setSaving(true); setError(''); setNotice('');
@@ -224,6 +231,7 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const revokeInvitation = async (invitation: Invitation) => {
+    if (!(await requireMfaStepUp('revoking an employee invitation'))) return;
     if (!window.confirm(`Revoke the pending invitation for ${invitation.email}?`)) return;
     setSaving(true); setError(''); setNotice('');
     try {
