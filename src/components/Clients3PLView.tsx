@@ -412,7 +412,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                         <div className="text-[11px] text-gray-500">{ord.shippingAddress?.city}, {ord.shippingAddress?.postalCode}</div>
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-800">
-                        {ord.carrier || 'Royal Mail 24'}
+                        {ord.carrier || 'Not assigned'}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-indigo-700 font-medium">
                         {ord.trackingNumber || 'GB-RM-99210284'}
