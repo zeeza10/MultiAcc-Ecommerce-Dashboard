@@ -86,6 +86,62 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     }
   };
 
+  const refreshPoRequestId = () => setPoRequestId(window.crypto.randomUUID());
+
+  const openPoForm = () => {
+    const firstSupplier = suppliers.find(supplier => supplier.isActive);
+    const firstProduct = products.find(product => product.status === 'ACTIVE');
+    setPoSupplierId(firstSupplier?.id || '');
+    setPoExpectedDate('');
+    setPoNotes('');
+    setPoTaxAmount('0');
+    setPoLines(firstProduct ? [{
+      productId: firstProduct.id,
+      quantity: '1',
+      unitCost: (firstProduct.costPriceMinor / 100).toFixed(2),
+    }] : []);
+    refreshPoRequestId();
+    setShowPoForm(true);
+  };
+
+  const handleCreatePurchaseOrder = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!poRequestId) refreshPoRequestId();
+    setSavingPo(true);
+    try {
+      await api.createPurchaseOrder({
+        supplierId: poSupplierId,
+        expectedDate: poExpectedDate || undefined,
+        notes: poNotes || undefined,
+        taxMinor: Math.round((Number.parseFloat(poTaxAmount) || 0) * 100),
+        lines: poLines.map(line => ({
+          productId: line.productId,
+          orderedQty: Number.parseInt(line.quantity, 10) || 0,
+          unitCostMinor: Math.round((Number.parseFloat(line.unitCost) || 0) * 100),
+        })),
+      }, poRequestId);
+      setShowPoForm(false);
+      setPoRequestId('');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Purchase order creation failed');
+    } finally {
+      setSavingPo(false);
+    }
+  };
+
+  const handleApprovePurchaseOrder = async (id: string) => {
+    setApprovingPoId(id);
+    try {
+      await api.approvePurchaseOrder(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Purchase order approval failed');
+    } finally {
+      setApprovingPoId(null);
+    }
+  };
+
   const openReceiveModal = (po: PurchaseOrder) => {
     setSelectedPo(po);
     const initialInputs: Record<string, { received: number; damaged: number }> = {};
