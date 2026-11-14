@@ -20,6 +20,8 @@ interface ProductsViewProps {
   initialFilter?: any;
 }
 
+const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+
 export const ProductsView: React.FC<ProductsViewProps> = ({
   currentUser,
   config,
@@ -275,12 +277,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </td>
                       {!isWarehouseStaff && (
                         <td className="py-2.5 px-3 font-medium text-gray-700">
-                          £{(p.costPriceMinor / 100).toFixed(2)}
+                          {formatMoney(p.costPriceMinor, config.baseCurrency)}
                         </td>
                       )}
                       {!isWarehouseStaff && (
                         <td className="py-2.5 px-3 font-bold text-gray-900">
-                          £{(p.sellingPriceMinor / 100).toFixed(2)}
+                          {formatMoney(p.sellingPriceMinor, config.baseCurrency)}
                         </td>
                       )}
                       <td className="py-2.5 px-3">
