@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OwnerType, Product } from '../types';
 import type { RepositoryContext } from './context';
 
