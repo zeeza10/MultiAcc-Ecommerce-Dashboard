@@ -41,7 +41,7 @@ create or replace function public.set_org_member_permission_overrides(
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_actor uuid := auth.uid();
   v_before jsonb;
