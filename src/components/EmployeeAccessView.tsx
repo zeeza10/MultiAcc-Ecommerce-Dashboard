@@ -137,6 +137,14 @@ export const EmployeeAccessView: React.FC = () => {
 
   const changeRole = async (member: Member, nextRoleId: string) => {
     if (!nextRoleId || nextRoleId === member.role_id) return;
+    const selectedRole = access.roles.find(role => role.id === nextRoleId);
+    if (selectedRole?.code === 'SUPER_ADMIN') {
+      const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceError || assurance?.currentLevel !== 'aal2') {
+        setError('Set up and complete multi-factor authentication before granting Super Admin access.');
+        return;
+      }
+    }
     if (!window.confirm(`Change ${member.full_name || member.email || 'this employee'}'s role?`)) return;
     setSaving(true); setError(''); setNotice('');
     try {
