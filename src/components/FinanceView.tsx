@@ -108,11 +108,19 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const inv = invoices.find((i) => i.id === selectedInvoiceForPay);
     if (!inv) return;
 
-    const amtMinor = Math.round(parseFloat(paymentAmount) * 100);
+    const amount = Number.parseFloat(paymentAmount);
+    const amtMinor = Math.round(amount * 100);
+    const outstanding = Math.max(0, inv.totalMinor - inv.paidAmountMinor);
+    if (!Number.isFinite(amount) || amtMinor <= 0 || amtMinor > outstanding) {
+      alert('Enter a positive payment amount that does not exceed the invoice balance.');
+      return;
+    }
 
     try {
       await api.recordPayment({
+        invoiceId: inv.id,
         amountMinor: amtMinor,
+        paymentDate: new Date().toISOString().slice(0, 10),
         paymentMethod,
         reference: paymentRef,
         payerName: inv.recipientName,
