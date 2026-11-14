@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { apiRouter } from './server/routes';
 
 import fs from 'fs';
+import { createLocalRateLimit } from './server/local-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +15,7 @@ async function startServer() {
   const app = express();
   const port = 3000;
   const distPath = path.resolve(__dirname, 'dist');
+  const limitLocalSpaFallback = createLocalRateLimit({ maxRequests: 120, windowMs: 60_000 });
 
   app.use(express.json());
 
@@ -54,7 +56,7 @@ async function startServer() {
       },
     }));
 
-    app.get('*', (_req, res) => {
+    app.get('*', limitLocalSpaFallback, (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
