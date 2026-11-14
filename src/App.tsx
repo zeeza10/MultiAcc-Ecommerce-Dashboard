@@ -261,6 +261,7 @@ export default function App() {
           activeTab={activeTab}
           onNavigate={handleNavigate}
           currentUser={currentUser}
+          permissions={permissions}
           config={config}
           unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}
