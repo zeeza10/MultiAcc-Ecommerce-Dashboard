@@ -7,6 +7,9 @@ import { handleFinanceRoute } from './routes/finance';
 import { handleOrderPurchasingRoute } from './routes/orders-purchasing';
 import { handleReturnRoute } from './routes/returns';
 import { handleInventoryRoute } from './routes/inventory';
+import { handleDashboardRoute } from './routes/dashboard';
+import { handleMarketplaceRoute } from './routes/marketplace';
+import { handleSystemRoute } from './routes/system';
 import { json } from './http';
 import type { AuthContext, WorkerEnv } from './types';
 import { permissionByRoute } from './permissions';
@@ -125,6 +128,13 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   }
 
   try {
+    const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
+    if (dashboardResponse) return dashboardResponse;
+    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth);
+    if (marketplaceResponse) return marketplaceResponse;
+    const systemResponse = await handleSystemRoute(path, request, auth);
+    if (systemResponse) return systemResponse;
+
     const orderPurchasingResponse = await handleOrderPurchasingRoute(path, request, url, auth);
     if (orderPurchasingResponse) return orderPurchasingResponse;
     const returnResponse = await handleReturnRoute(path, request, auth);
