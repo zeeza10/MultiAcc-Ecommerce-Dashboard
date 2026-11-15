@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker entry point for the MultiAcc E-Commerce Dashboard.
+ * Cloudflare Worker entry point for the OriaFuture E-commerce Operations Platform.
  * Authenticated business API requests are handled at the edge and use the
  * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
