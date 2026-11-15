@@ -41,6 +41,10 @@ The current Cloudflare Worker serves static assets only. It intentionally return
 The Supabase business tables already have `organization_id` columns and RLS policies. The policy audit found RLS enabled across the public tables; the credentials table intentionally has no client policies (default deny). The remaining work is to move the business API from the in-memory demo repository to organization-scoped Supabase queries so the existing RLS policies enforce isolation end-to-end.
 
 
+## Canonical production application URL
+
+Use `https://app.oriafuture.com` as the only production dashboard URL. Do not use or re-enable the old `workers.dev` URL; Cloudflare's Worker subdomain and preview subdomain are disabled.
+
 ## Cloudflare deployment variables
 
 The frontend reads Supabase values at Vite build time. Configure these under the Cloudflare Pages/Workers build environment for both Preview and Production:
@@ -51,7 +55,7 @@ The frontend reads Supabase values at Vite build time. Configure these under the
 The Cloudflare Worker also needs:
 
 - `API_ORIGIN=https://<your-express-api-host>` — origin only, no `/api/v1` suffix. The Worker proxies `/api/*` to this host and preserves the caller's Bearer token.
-- `ALLOWED_ORIGIN=https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev` — exact deployed frontend origin.
+- `ALLOWED_ORIGIN=https://app.oriafuture.com` — exact deployed frontend origin.
 
 For local Vite/Express development, copy `.env.example` to `.env` and fill in the publishable key. For local Wrangler development, copy `.dev.vars.example` to `.dev.vars` and set API_ORIGIN to the local Express origin.
 
@@ -61,8 +65,8 @@ The publishable key is intentionally public and must still be protected by RLS. 
 
 In Supabase Dashboard → Authentication → URL Configuration:
 
-- Site URL: the exact deployed frontend origin.
-- Redirect URLs: add the exact local origin (for example `http://localhost:3000/**`) and deployed frontend origin (for example `https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/**`).
+- Site URL: `https://app.oriafuture.com`.
+- Redirect URLs: add `https://app.oriafuture.com/**` and the exact local development origin (for example `http://localhost:5173/**`).
 
 Keep email confirmation enabled. In Authentication → Security and Protection (the exact menu label can vary), enable leaked-password protection.
 

@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Verify production health and security headers
         env:
-          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+          WORKER_URL: https://app.oriafuture.com
         run: |
           set -euo pipefail
           curl --silent --show-error --fail-with-body -D health.headers "$WORKER_URL/api/v1/health" -o health.json
@@ -29,7 +29,7 @@ jobs:
 
       - name: Verify unauthenticated API requests are rejected
         env:
-          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+          WORKER_URL: https://app.oriafuture.com
         run: |
           set -euo pipefail
           status=$(curl --silent --show-error -D unauth.headers -o unauth.json -w '%{http_code}' "$WORKER_URL/api/v1/products")
@@ -38,7 +38,7 @@ jobs:
 
       - name: Verify oversized API bodies are rejected
         env:
-          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+          WORKER_URL: https://app.oriafuture.com
         run: |
           set -euo pipefail
           head -c 1048577 /dev/zero > oversized.bin
@@ -49,7 +49,7 @@ jobs:
 
       - name: Verify hostile CORS origins are rejected
         env:
-          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+          WORKER_URL: https://app.oriafuture.com
         run: |
           set -euo pipefail
           status=$(curl --silent --show-error -D cors.headers -o cors.txt -w '%{http_code}' \

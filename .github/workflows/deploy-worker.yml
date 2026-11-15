@@ -56,7 +56,7 @@ jobs:
       - name: Verify production health and security headers
         if: steps.cloudflare-token.outputs.available == 'true'
         env:
-          WORKER_URL: https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev
+          WORKER_URL: https://app.oriafuture.com
         run: |
           curl --silent --show-error --fail-with-body -D headers.txt "$WORKER_URL/api/v1/health" -o body.json
           grep -qi '^HTTP/.* 200' headers.txt

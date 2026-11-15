@@ -157,7 +157,7 @@ export default function App() {
   };
 
   if (loading && !configLoaded) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">Loading workspace data from Supabase…</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">Loading your Oria Future workspace…</div>;
   }
   if (!configLoaded) {
     return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">

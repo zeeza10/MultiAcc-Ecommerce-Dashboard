@@ -49,7 +49,7 @@ export const AdminMfaSetup: React.FC = () => {
       });
       if (enrollError) throw enrollError;
       if (!data?.id || !data.totp?.qr_code || !data.totp?.secret) {
-        throw new Error('Supabase did not return a complete authenticator QR code and setup key.');
+        throw new Error('The authenticator setup could not generate a complete QR code and setup key.');
       }
       setFactorId('');
       setPendingFactorId(data.id);

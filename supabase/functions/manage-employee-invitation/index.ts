@@ -51,12 +51,12 @@ Deno.serve(async (request: Request) => {
 
   let invitationRedirect: URL;
   try {
-    invitationRedirect = new URL(body.redirectTo || "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/accept-invitation");
+    invitationRedirect = new URL(body.redirectTo || "https://app.oriafuture.com/accept-invitation");
   } catch {
     return Response.json({ error: "Invitation redirect URL is invalid" }, { status: 400, headers: cors });
   }
   if (
-    invitationRedirect.origin !== "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev" ||
+    invitationRedirect.origin !== "https://app.oriafuture.com" ||
     invitationRedirect.pathname !== "/accept-invitation" ||
     invitationRedirect.search ||
     invitationRedirect.hash
@@ -127,7 +127,7 @@ Deno.serve(async (request: Request) => {
 
   const { data: invited, error: inviteUserError } = await admin.auth.admin.inviteUserByEmail(body.email, {
     redirectTo: invitationRedirect.toString(),
-    data: body.fullName ? { full_name: body.fullName } : {},
+    data: { company_name: 'Oria Future', product_name: 'Oria Future', ...(body.fullName ? { full_name: body.fullName } : {}) },
   });
   if (inviteUserError || !invited.user) {
     await admin.from("user_invitations").update({ revoked_at: new Date().toISOString() }).eq("id", invite.id);

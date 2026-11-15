@@ -17,7 +17,8 @@ Run `npm install`, then `npm run dev`. If the preview is already running, restar
 2. Choose whether email confirmation is required. If enabled, users must click the verification link before signing in.
 3. Open Authentication → URL Configuration.
 4. Set Site URL to the actual deployed application URL.
-5. Add each trusted application origin to Redirect URLs, including the local development origin (normally `http://localhost:3000`) and the production/preview origins you actually use.
+5. Set Site URL to `https://app.oriafuture.com`.
+6. Add `https://app.oriafuture.com/**` to Redirect URLs. Keep only the local development origins and any explicitly approved preview origins needed for development. Production invitations and password recovery must return to `https://app.oriafuture.com`.
 
 ## First organization owner
 1. Open the application and create the first account with your own business email.
