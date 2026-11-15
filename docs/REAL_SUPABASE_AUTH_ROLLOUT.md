@@ -41,6 +41,10 @@ The current Cloudflare Worker serves static assets only. It intentionally return
 The Supabase business tables already have `organization_id` columns and RLS policies. The policy audit found RLS enabled across the public tables; the credentials table intentionally has no client policies (default deny). The remaining work is to move the business API from the in-memory demo repository to organization-scoped Supabase queries so the existing RLS policies enforce isolation end-to-end.
 
 
+## Canonical production application URL
+
+Use `https://app.oriafuture.com` as the only production dashboard URL. Do not use or re-enable the old `workers.dev` URL; Cloudflare's Worker subdomain and preview subdomain are disabled.
+
 ## Cloudflare deployment variables
 
 The frontend reads Supabase values at Vite build time. Configure these under the Cloudflare Pages/Workers build environment for both Preview and Production:
