@@ -129,6 +129,12 @@ export const api = {
 
   // eBay Accounts & Sync
   getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string }>('/ebay/accounts'),
+  createEbayAccount: (payload: { name: string; marketplace: 'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'; environment: 'SANDBOX' | 'PRODUCTION'; sellerUsername?: string }) =>
+    request<{ account: MarketplaceAccount }>('/ebay/accounts', { method: 'POST', body: JSON.stringify(payload) }),
+  beginEbayAuthorization: (id: string) =>
+    request<{ authorizationUrl: string; expiresAt: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
+  syncEbayAccount: (id: string, idempotencyKey: string) =>
+    request<{ queued: boolean; jobId: string | null; status: string }>(`/ebay/accounts/${id}/sync`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }),
   getExceptions: () => request<{ exceptions: ExceptionItem[] }>('/ebay/exceptions'),
   resolveException: (id: string, targetProductId: string, resolutionNote?: string) =>
     request<{ success: boolean; exception: ExceptionItem }>(`/ebay/exceptions/${id}/resolve`, {
