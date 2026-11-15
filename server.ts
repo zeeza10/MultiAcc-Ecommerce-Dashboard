@@ -54,7 +54,35 @@ async function startServer() {
       },
     }));
 
-    app.get('*', (_req, res) => {
+    // The local Express fallback can be exposed when HOST is overridden.
+    // Apply a bounded per-IP fixed-window limit before serving the SPA shell.
+    const spaFallbackWindows = new Map<string, { count: number; resetAt: number }>();
+    const spaFallbackRateLimit = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const now = Date.now();
+      const clientKey = req.socket.remoteAddress || 'unknown';
+      let window = spaFallbackWindows.get(clientKey);
+      if (!window || window.resetAt <= now) {
+        window = { count: 0, resetAt: now + 60_000 };
+        spaFallbackWindows.set(clientKey, window);
+      }
+
+      window.count += 1;
+      if (window.count > 120) {
+        res.setHeader('Retry-After', String(Math.max(1, Math.ceil((window.resetAt - now) / 1000))));
+        res.status(429).json({ error: 'Too many page requests. Please try again shortly.' });
+        return;
+      }
+
+      // Bound memory use if many distinct client addresses hit this local server.
+      if (spaFallbackWindows.size > 5_000) {
+        for (const [key, value] of spaFallbackWindows) {
+          if (value.resetAt <= now) spaFallbackWindows.delete(key);
+        }
+      }
+      next();
+    };
+
+    app.get('*', spaFallbackRateLimit, (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
