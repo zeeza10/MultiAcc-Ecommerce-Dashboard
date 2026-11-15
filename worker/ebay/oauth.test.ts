@@ -18,6 +18,12 @@ describe('eBay OAuth token protection', () => {
     assert.notEqual(first, second);
   });
 
+  it('binds encrypted tokens to the intended marketplace account', async () => {
+    const ciphertext = await encryptToken('account-token', testKey, 'org-a:account-a:access');
+    assert.equal(await decryptToken(ciphertext, testKey, 'org-a:account-a:access'), 'account-token');
+    await assert.rejects(() => decryptToken(ciphertext, testKey, 'org-b:account-b:access'));
+  });
+
   it('rejects decryption with the wrong key', async () => {
     const ciphertext = await encryptToken('seller-access-token', testKey);
     const wrongKey = btoa(String.fromCharCode(...new Uint8Array(32).fill(8)));
