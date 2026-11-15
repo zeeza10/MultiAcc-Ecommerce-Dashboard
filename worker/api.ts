@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { handleDashboardRoute } from './routes/dashboard';
 import { handleMarketplaceRoute } from './routes/marketplace';
+import { handleEbayOAuthCallback } from './ebay/oauth';
 import { handleSystemRoute } from './routes/system';
 import { handleFulfilmentRoute } from './routes/fulfilment';
 import { handleFinanceRoute } from './routes/finance';
@@ -146,6 +147,10 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const limited = await enforceRateLimit(env.API_IP_RATE_LIMITER, `ip:${connectingIp}`, 'API request');
     if (limited) return limited;
   }
+  if (request.method === 'GET' && path === '/ebay/oauth/callback') {
+    return handleEbayOAuthCallback(request, env);
+  }
+
   const auth = await authenticate(request, env);
   if (auth instanceof Response) return auth;
 
@@ -178,7 +183,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     if (accessResponse) return accessResponse;
     const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
     if (dashboardResponse) return dashboardResponse;
-    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth);
+    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth, env);
     if (marketplaceResponse) return marketplaceResponse;
     const systemResponse = await handleSystemRoute(path, request, auth);
     if (systemResponse) return systemResponse;
