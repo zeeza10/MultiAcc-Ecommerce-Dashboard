@@ -269,10 +269,10 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-1">
-                    <button onClick={() => handleConnect(acc.id)} disabled={!integrationReady || acc.isDemo} title={acc.isDemo ? 'Demo accounts cannot be connected.' : !integrationReady ? integrationMessage : undefined} className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={() => handleConnect(acc.id)} disabled={!acc.oauthReady} title={acc.isDemo ? 'Demo accounts cannot be connected.' : !acc.oauthReady ? integrationMessage : undefined} className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                       {acc.authStatus === 'CONNECTED' ? 'Reconnect eBay' : 'Connect eBay'}
                     </button>
-                    <button onClick={() => handleSync(acc.id)} disabled={!integrationReady || acc.isDemo || acc.authStatus !== 'CONNECTED' || isSyncing} className="px-3 py-1.5 text-xs text-white bg-indigo-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+                    <button onClick={() => handleSync(acc.id)} disabled={!acc.oauthReady || acc.isDemo || acc.authStatus !== 'CONNECTED' || isSyncing} className="px-3 py-1.5 text-xs text-white bg-indigo-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                       {isSyncing ? 'Queuing…' : 'Sync orders'}
                     </button>
