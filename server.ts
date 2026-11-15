@@ -71,7 +71,7 @@ async function startServer() {
 
   const host = process.env.HOST || '127.0.0.1';
   app.listen(port, host, () => {
-    console.log(`NexusOps server is active on http://${host}:${port} [hasDist: ${hasDist}]`);
+    console.log(`OriaFuture server is active on http://${host}:${port} [hasDist: ${hasDist}]`);
   });
 }
 
