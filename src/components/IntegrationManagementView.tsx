@@ -93,7 +93,7 @@ export const IntegrationManagementView: React.FC = () => {
             <h1 className="text-xl font-bold tracking-tight text-gray-900">Integrations & API Management</h1>
           </div>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-gray-500">
-            Manage platform-level eBay Developer credentials. Seller accounts and their OAuth permissions remain separate from these application credentials.
+            Manage platform-level eBay Developer credentials. Seller accounts, OAuth consent and synchronization remain separate and are managed in the eBay Accounts module. Access requires the platform-owner allowlist and MFA; an organization Super Admin role alone is not sufficient.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
@@ -188,8 +188,8 @@ export const IntegrationManagementView: React.FC = () => {
         </div>
         <code className="block break-all rounded-md bg-slate-50 p-3 text-[11px] text-slate-700">{window.location.origin}/api/v1/ebay/oauth/callback</code>
         <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
-          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Required Seller scopes</div><div className="mt-1 break-all text-gray-500">sell.fulfillment.readonly</div><div className="mt-1 break-all text-gray-500">sell.inventory.readonly</div></div>
-          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Environment separation</div><div className="mt-1 text-gray-500">Sandbox and Production use separate keysets, authorization endpoints and Seller accounts.</div></div>
+          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Required read-only Seller scopes</div><div className="mt-1 break-all font-mono text-[10px] text-gray-500">https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly</div><div className="mt-1 break-all font-mono text-[10px] text-gray-500">https://api.ebay.com/oauth/api_scope/sell.inventory.readonly</div></div>
+          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Environment separation</div><div className="mt-1 text-gray-500">Sandbox and Production use separate keysets, authorization endpoints and Seller accounts. Developer ID is not required by the current OAuth 2.0 flow; API endpoints are selected automatically.</div></div>
         </div>
       </section>
 
