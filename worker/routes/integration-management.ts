@@ -67,12 +67,18 @@ export async function handleIntegrationManagementRoute(
       return json({ error: 'A same-origin browser request is required for credential changes.' }, 403);
     }
     const environment = match[1] as EbayEnvironment;
-    if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
-      return json({ error: 'Content-Type must be application/json.' }, 415);
-    }
+    const mediaType = (request.headers.get('Content-Type') || '').split(';', 1)[0].trim().toLowerCase();
+    if (mediaType !== 'application/json') return json({ error: 'Content-Type must be application/json.' }, 415);
     let body: Record<string, unknown>;
-    try { body = await request.json() as Record<string, unknown>; }
-    catch { return json({ error: 'A valid JSON request is required.' }, 400); }
+    try {
+      const parsed: unknown = await request.json();
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return json({ error: 'A JSON object is required.' }, 400);
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return json({ error: 'A valid JSON request is required.' }, 400);
+    }
 
     if (Object.keys(body).some(key => !['clientId', 'clientSecret', 'ruName', 'expectedVersion'].includes(key))) {
       return json({ error: 'Unexpected credential fields were supplied.' }, 400);
