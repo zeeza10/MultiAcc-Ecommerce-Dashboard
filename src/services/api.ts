@@ -129,10 +129,6 @@ export const api = {
 
   // eBay Accounts & Sync
   getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string }>('/ebay/accounts'),
-  syncEbayAccount: (id: string) =>
-    request<{ imported: number; skipped: number; exceptions: number }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
-  connectEbayAccount: (id: string) =>
-    request<{ success: boolean; message: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
   getExceptions: () => request<{ exceptions: ExceptionItem[] }>('/ebay/exceptions'),
   resolveException: (id: string, targetProductId: string, resolutionNote?: string) =>
     request<{ success: boolean; exception: ExceptionItem }>(`/ebay/exceptions/${id}/resolve`, {
