@@ -13,7 +13,7 @@ Implemented in the secure integration branch:
 - Server-side authorization-code exchange; authorization codes are never persisted.
 - AES-256-GCM encryption of access and refresh tokens before storage, with authenticated additional data binding each ciphertext to its organization, marketplace account, and token type. Tokens are never returned to the browser or logged.
 - Server-only service-role access for OAuth state, encrypted credentials and sync jobs. Browser roles have explicit deny policies and no table write grants.
-- A five-minute Worker Cron for token refresh and due sync jobs.
+- A five-minute Worker Cron for token refresh and due sync jobs; new real eBay accounts default to a five-minute polling interval, adjustable per account.
 - eBay Sell Fulfillment API order retrieval with pagination and a 90-day initial lookback, then a seven-day overlap on subsequent runs.
 - Organization/account-scoped SKU mapping. Only verified marketplace SKU mappings are used automatically; unmatched SKUs are imported with a review exception.
 - Atomic order + line-item import through a service-role-only database function.
