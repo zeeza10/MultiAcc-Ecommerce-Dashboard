@@ -25,6 +25,9 @@ describe('Worker route permission policy', () => {
   it('requires separate permissions for finance, marketplace, audit and fulfilment data', () => {
     assert.equal(permissionByRoute('GET', '/finance/invoices'), 'finance.view');
     assert.equal(permissionByRoute('GET', '/ebay/accounts'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts'), 'marketplace.manage');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/connect'), 'marketplace.manage');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync'), 'marketplace.manage');
     assert.equal(permissionByRoute('POST', '/ebay/exceptions/exception-id/resolve'), 'marketplace.manage');
     assert.equal(permissionByRoute('GET', '/audit-logs'), 'audit.view');
     assert.equal(permissionByRoute('GET', '/access/overview'), 'users.manage');
