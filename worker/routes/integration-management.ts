@@ -16,6 +16,7 @@ export async function handleIntegrationManagementRoute(
 ): Promise<Response | null> {
   if (!path.startsWith('/integrations/')) return null;
   if (auth.user.role !== 'SUPER_ADMIN') return json({ error: 'Platform Super Admin access is required.' }, 403);
+  if (auth.assuranceLevel !== 'aal2') return json({ error: 'Complete an authenticator MFA verification before managing platform credentials.' }, 403);
 
   const service = serviceClient(env);
   if (!service) return json({ error: 'Secure integration storage is unavailable.' }, 503);
@@ -54,6 +55,11 @@ export async function handleIntegrationManagementRoute(
 
   const match = path.match(/^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/);
   if (match && request.method === 'PUT') {
+    const origin = request.headers.get('Origin');
+    const requestOrigin = new URL(request.url).origin;
+    if (!origin || (origin !== requestOrigin && origin !== env.ALLOWED_ORIGIN)) {
+      return json({ error: 'A same-origin browser request is required for credential changes.' }, 403);
+    }
     const environment = match[1] as EbayEnvironment;
     if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
       return json({ error: 'Content-Type must be application/json.' }, 415);
@@ -62,6 +68,9 @@ export async function handleIntegrationManagementRoute(
     try { body = await request.json() as Record<string, unknown>; }
     catch { return json({ error: 'A valid JSON request is required.' }, 400); }
 
+    if (Object.keys(body).some(key => !['clientId', 'clientSecret', 'ruName'].includes(key))) {
+      return json({ error: 'Unexpected credential fields were supplied.' }, 400);
+    }
     const clientId = cleanCredential(body.clientId, 256);
     const clientSecret = cleanCredential(body.clientSecret, 512);
     const ruName = cleanCredential(body.ruName, 256);
