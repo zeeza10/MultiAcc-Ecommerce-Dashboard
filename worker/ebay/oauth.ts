@@ -373,24 +373,43 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
   if (!service || !encryptionKey) return;
 
   const refreshBefore = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const { data: credentials, error } = await service
-    .from('marketplace_credentials')
-    .select('organization_id,marketplace_account_id,refresh_token_ciphertext,encryption_key_version,scopes,expires_at,refresh_token_expires_at,marketplace_accounts!marketplace_credentials_account_org_fkey!inner(environment)')
-    .not('refresh_token_ciphertext', 'is', null)
-    .is('revoked_at', null)
-    .lt('expires_at', refreshBefore)
-    .limit(50);
+  // The database leases each credential atomically. A second cron invocation
+  // cannot receive a credential while its first refresh is in progress.
+  const { data: credentials, error } = await service.rpc('claim_marketplace_token_refreshes', {
+    p_refresh_before: refreshBefore,
+    p_limit: 50,
+  });
   if (error || !credentials?.length) return;
 
   for (const credential of credentials as any[]) {
-    const account = Array.isArray(credential.marketplace_accounts)
-      ? credential.marketplace_accounts[0] : credential.marketplace_accounts;
-    const environment = account?.environment as EbayEnvironment;
+    const leaseToken = credential.refresh_lease_token as string;
+    const environment = credential.environment as EbayEnvironment;
     const config = configFor(env, environment);
-    if (!config) continue;
+
+    const releaseLease = async (updates: Record<string, unknown> = {}) => {
+      await service.from('marketplace_credentials')
+        .update({
+          ...updates,
+          refresh_lease_until: null,
+          refresh_lease_token: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('organization_id', credential.organization_id)
+        .eq('marketplace_account_id', credential.marketplace_account_id)
+        .eq('refresh_lease_token', leaseToken);
+    };
+
+    if (!config) {
+      await releaseLease();
+      continue;
+    }
 
     try {
-      const refreshToken = await decryptToken(credential.refresh_token_ciphertext, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:refresh`);
+      const refreshToken = await decryptToken(
+        credential.refresh_token_ciphertext,
+        encryptionKey,
+        `${credential.organization_id}:${credential.marketplace_account_id}:refresh`,
+      );
       const form = new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
@@ -405,6 +424,7 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
         },
         body: form.toString(),
       });
+
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         const revoked = response.status === 400 && body.error === 'invalid_grant';
@@ -417,17 +437,39 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
           message: revoked ? 'eBay rejected the refresh token. Seller authorization is required again.' : 'The eBay token refresh failed and will be retried.',
         });
         if (revoked) {
-          await service.from('marketplace_credentials').update({ revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('marketplace_account_id', credential.marketplace_account_id);
-          await service.from('marketplace_accounts').update({ auth_status: 'EXPIRED', last_sync_status: 'AUTH_REQUIRED', last_sync_message: 'eBay authorization expired or was revoked. Reconnect this account.' }).eq('id', credential.marketplace_account_id).eq('organization_id', credential.organization_id);
+          await releaseLease({ revoked_at: new Date().toISOString() });
+          await service.from('marketplace_accounts').update({
+            auth_status: 'EXPIRED',
+            last_sync_status: 'AUTH_REQUIRED',
+            last_sync_message: 'eBay authorization expired or was revoked. Reconnect this account.',
+          }).eq('id', credential.marketplace_account_id).eq('organization_id', credential.organization_id);
+        } else {
+          await releaseLease();
         }
         continue;
       }
 
-      const tokenData = await response.json() as { access_token?: string; refresh_token?: string; expires_in?: number; refresh_token_expires_in?: number };
-      if (!tokenData.access_token || !Number.isFinite(tokenData.expires_in)) throw new Error('INVALID_REFRESH_RESPONSE');
-      const accessCiphertext = await encryptToken(tokenData.access_token, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:access`);
+      const tokenData = await response.json() as {
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+        refresh_token_expires_in?: number;
+      };
+      if (!tokenData.access_token || !Number.isFinite(tokenData.expires_in) || tokenData.expires_in! <= 0) {
+        throw new Error('INVALID_REFRESH_RESPONSE');
+      }
+
+      const accessCiphertext = await encryptToken(
+        tokenData.access_token,
+        encryptionKey,
+        `${credential.organization_id}:${credential.marketplace_account_id}:access`,
+      );
       const refreshCiphertext = tokenData.refresh_token
-        ? await encryptToken(tokenData.refresh_token, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:refresh`)
+        ? await encryptToken(
+            tokenData.refresh_token,
+            encryptionKey,
+            `${credential.organization_id}:${credential.marketplace_account_id}:refresh`,
+          )
         : credential.refresh_token_ciphertext;
       const now = new Date();
       const expiresAt = new Date(now.getTime() + tokenData.expires_in! * 1000).toISOString();
@@ -436,18 +478,50 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
         refresh_token_ciphertext: refreshCiphertext,
         expires_at: expiresAt,
         last_refreshed_at: now.toISOString(),
-        updated_at: now.toISOString(),
         revoked_at: null,
       };
-      if (Number.isFinite(tokenData.refresh_token_expires_in)) {
+      if (Number.isFinite(tokenData.refresh_token_expires_in) && tokenData.refresh_token_expires_in! > 0) {
         updates.refresh_token_expires_at = new Date(now.getTime() + tokenData.refresh_token_expires_in! * 1000).toISOString();
       }
-      const { error: updateError } = await service.from('marketplace_credentials').update(updates).eq('marketplace_account_id', credential.marketplace_account_id);
-      if (updateError) throw new Error('CREDENTIAL_REFRESH_STORAGE_FAILED');
-      await service.from('marketplace_accounts').update({ auth_status: 'CONNECTED', token_expires_at: expiresAt, updated_at: now.toISOString() }).eq('id', credential.marketplace_account_id).eq('organization_id', credential.organization_id);
-      await logEvent(service, { organizationId: credential.organization_id, accountId: credential.marketplace_account_id, eventType: 'OAUTH_REFRESHED', severity: 'INFO', message: 'The eBay access token was refreshed and encrypted successfully.' });
+
+      // Compare-and-set the lease token: stale workers cannot overwrite a newer
+      // credential refresh or clear another worker's lease.
+      const { data: savedCredential, error: updateError } = await service.from('marketplace_credentials')
+        .update({
+          ...updates,
+          refresh_lease_until: null,
+          refresh_lease_token: null,
+          updated_at: now.toISOString(),
+        })
+        .eq('organization_id', credential.organization_id)
+        .eq('marketplace_account_id', credential.marketplace_account_id)
+        .eq('refresh_lease_token', leaseToken)
+        .select('marketplace_account_id')
+        .maybeSingle();
+      if (updateError || !savedCredential) throw new Error('CREDENTIAL_REFRESH_LEASE_LOST');
+
+      await service.from('marketplace_accounts').update({
+        auth_status: 'CONNECTED',
+        token_expires_at: expiresAt,
+        updated_at: now.toISOString(),
+      }).eq('id', credential.marketplace_account_id).eq('organization_id', credential.organization_id);
+      await logEvent(service, {
+        organizationId: credential.organization_id,
+        accountId: credential.marketplace_account_id,
+        eventType: 'OAUTH_REFRESHED',
+        severity: 'INFO',
+        message: 'The eBay access token was refreshed and encrypted successfully.',
+      });
     } catch {
-      await logEvent(service, { organizationId: credential.organization_id, accountId: credential.marketplace_account_id, eventType: 'OAUTH_REFRESH_ERROR', severity: 'ERROR', errorCode: 'REFRESH_PROCESSING_FAILED', message: 'The token refresh could not be completed safely.' });
+      await releaseLease();
+      await logEvent(service, {
+        organizationId: credential.organization_id,
+        accountId: credential.marketplace_account_id,
+        eventType: 'OAUTH_REFRESH_ERROR',
+        severity: 'ERROR',
+        errorCode: 'REFRESH_PROCESSING_FAILED',
+        message: 'The token refresh could not be completed safely.',
+      });
     }
   }
 }
