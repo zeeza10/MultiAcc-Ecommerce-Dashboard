@@ -954,82 +954,8 @@ apiRouter.use((req: Request, res: Response, next: NextFunction) => {
  * STOCK ADJUSTMENTS & APPROVALS
  */
 /**
- * EBAY INTEGRATION & EXCEPTION QUEUE
+ * eBay account, OAuth, synchronization and exception routes are handled by the Cloudflare Worker only.
  */
-apiRouter.get('/ebay/accounts', (_req: Request, res: Response) => {
-  const raw = db.getRawData();
-  res.json({
-    accounts: raw.marketplaceAccounts,
-    recentSyncs: raw.syncRuns.slice(0, 10),
-  });
-});
-
-apiRouter.get('/ebay/exceptions', (_req: Request, res: Response) => {
-  const raw = db.getRawData();
-  res.json({ exceptions: raw.exceptions });
-});
-
-apiRouter.post('/ebay/exceptions/:id/resolve', (req: Request, res: Response) => {
-  const user = getActiveUser(req);
-  const raw = db.getRawData();
-  const exc = raw.exceptions.find((e) => e.id === req.params.id);
-
-  if (!exc) {
-    res.status(404).json({ error: 'Exception item not found' });
-    return;
-  }
-
-  const { targetProductId, resolutionNote } = req.body;
-  const product = raw.products.find((p) => p.id === targetProductId);
-
-  if (!product) {
-    res.status(400).json({ error: 'Target product not found for mapping.' });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  exc.status = 'RESOLVED';
-  exc.resolvedAt = now;
-  exc.resolvedBy = user.name;
-  exc.resolutionNote = resolutionNote || `Mapped to internal product ${product.sku} (${product.name})`;
-
-  // Extract external sku from snippet if available
-  let externalSku = 'UNKNOWN_EXT_SKU';
-  try {
-    if (exc.rawPayloadSnippet) {
-      const parsed = JSON.parse(exc.rawPayloadSnippet);
-      externalSku = parsed.sku || parsed.externalSku || externalSku;
-    }
-  } catch {}
-
-  // Add to MarketplaceSkuMap
-  raw.skuMappings.push({
-    id: `map_${Date.now()}`,
-    productId: product.id,
-    marketplaceAccountId: 'mkt_ebay_uk',
-    externalSku,
-    externalListingId: `lst_${Date.now()}`,
-    listingTitle: product.name,
-    createdAt: now,
-  });
-
-  // Re-link pending orders with this external SKU
-  for (const o of raw.orders) {
-    for (const l of o.lines) {
-      if (l.sku === externalSku || l.productId === 'UNMAPPED') {
-        l.productId = product.id;
-        l.sku = product.sku;
-        l.productName = product.name;
-      }
-    }
-    if (o.notes?.includes('unmapped')) {
-      o.notes = undefined;
-    }
-  }
-
-  db.save();
-  res.json({ success: true, exception: exc });
-});
 
 /**
  * PURCHASING & RECEIVING (PHASE 2)
