@@ -29,3 +29,6 @@ Never place real credentials in Git, `.env`, `.dev.vars.example`, frontend varia
 
 ## Validation boundary
 The module stores credentials securely; it does not yet prove the eBay keyset or RuName is valid. A provider-side validation and Sandbox Seller OAuth test must be performed after credentials are entered.
+
+## Platform-owner bootstrap
+An organization-level `SUPER_ADMIN` role is not sufficient to administer shared application credentials. Configure `PLATFORM_SUPER_ADMIN_USER_IDS` as a Cloudflare Worker Secret containing the comma-separated Supabase Auth user UUIDs of the application owner(s). The Worker requires both this allowlist and the `SUPER_ADMIN` role. Tenant permission overrides cannot grant platform-owner status. Credential writes additionally require an AAL2 authenticator MFA session and a same-origin browser request.
