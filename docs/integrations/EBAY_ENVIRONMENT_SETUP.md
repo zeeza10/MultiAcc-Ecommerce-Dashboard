@@ -1,66 +1,85 @@
 # eBay environments — MultiAcc Dashboard
 
-This project keeps eBay Sandbox and Production credentials separate. OAuth credentials are read only by the Cloudflare Worker; they must never be placed in Vite variables, browser code, GitHub commits, or Supabase client-side configuration.
+## Credential management model
 
-## Where the environment lives
+The eBay Developer App credentials are platform-level credentials shared by this application. They are not Seller tokens and are not tenant-owned. Configure them in the Dashboard:
 
-1. **Local development template:** repository root, `.dev.vars.example`. Copy it to `.dev.vars` for local Wrangler use. The real `.dev.vars` file is local-only and must never be committed.
-2. **Cloudflare runtime (recommended for deployed testing):** Cloudflare Dashboard → Workers & Pages → `multiacc-ecommerce-dashboard` → Settings → Variables and Secrets. Add the values below as **Secrets**, not plain-text variables. Add them to the correct Worker deployment environment. Do not put secrets in `wrangler.jsonc`.
-3. **Code configuration:** `worker/ebay/oauth.ts` selects the Sandbox or Production keyset from the marketplace account's `environment` field. Sandbox and Production endpoints are selected by the Worker; they are not interchangeable.
+**Super Admin → Integrations & API Management → eBay**
 
-## Required Worker Secrets
+The page has separate Sandbox and Production keysets. App ID, Cert ID and RuName are write-only. The browser never receives saved plaintext values. The Worker encrypts each field before it reaches the database and records a metadata-only audit event atomically with the update.
 
-| Secret name | eBay portal value / purpose | Needed |
-|---|---|---|
-| `EBAY_SANDBOX_CLIENT_ID` | Sandbox App ID (Client ID) | Sandbox |
-| `EBAY_SANDBOX_CLIENT_SECRET` | Sandbox Cert ID (Client Secret) | Sandbox |
-| `EBAY_SANDBOX_RUNAME` | Sandbox OAuth-enabled RuName (not the accepted URL) | Sandbox |
-| `EBAY_PRODUCTION_CLIENT_ID` | Production App ID (Client ID) | When approved for live use |
-| `EBAY_PRODUCTION_CLIENT_SECRET` | Production Cert ID (Client Secret) | When approved for live use |
-| `EBAY_PRODUCTION_RUNAME` | Production OAuth-enabled RuName | When approved for live use |
-| `EBAY_TOKEN_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-GCM key used to encrypt seller tokens in Supabase | Required for OAuth |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key; server-side only | Required for OAuth/background jobs |
+## eBay Developer Portal values
 
-The existing non-secret `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are configured in `wrangler.jsonc`. Do not copy the service-role key into that file.
+For each environment, obtain the matching values from Developer Portal → Application Keys:
 
-## eBay Developer Portal checklist
+| eBay value | Dashboard field |
+|---|---|
+| Sandbox App ID | Sandbox App ID / Client ID |
+| Sandbox Cert ID | Sandbox Cert ID / Client Secret |
+| Sandbox OAuth RuName | Sandbox OAuth RuName |
+| Production App ID | Production App ID / Client ID |
+| Production Cert ID | Production Cert ID / Client Secret |
+| Production OAuth RuName | Production OAuth RuName |
 
-Open Developer Portal → Your Account → Application Keys → select the relevant keyset:
+Dev ID is not used by the current OAuth authorization-code flow. Do not confuse the RuName identifier with the callback URL text.
 
-- Copy **App ID** into the matching `*_CLIENT_ID` secret.
-- Copy **Cert ID** into the matching `*_CLIENT_SECRET` secret.
-- Do not confuse **Dev ID** with OAuth Client ID. Dev ID is not currently consumed by this OAuth flow.
-- Open **User Tokens** and configure an OAuth-enabled Redirect URL/RuName. Copy the generated **RuName** into the matching `*_RUNAME` secret. The OAuth request uses this RuName as `redirect_uri`; it is not the callback URL text itself.
-- Ensure the Sandbox keyset has the required scopes enabled. Sandbox and Production keysets can have different scope grants.
+## Cloudflare Worker Secrets
 
-## Current application permissions
+The Dashboard vault requires these server-side secrets:
 
-The authorization request currently asks for read-only access to:
+| Secret name | Purpose |
+|---|---|
+| `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` | Base64 encoding of exactly 32 random bytes; encrypts platform App ID, Cert ID and RuName |
+| `EBAY_TOKEN_ENCRYPTION_KEY` | Separate Base64 32-byte key for each Seller's access and refresh tokens |
+| `SUPABASE_SERVICE_ROLE_KEY` | Worker-only access to protected credential tables and background jobs |
 
-- `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly` — read seller orders/fulfillment data for order import.
-- `https://api.ebay.com/oauth/api_scope/sell.inventory.readonly` — read seller inventory/SKU records for inventory matching and reconciliation.
+Set them in Cloudflare Dashboard → Workers & Pages → `multiacc-ecommerce-dashboard` → Settings → Variables and Secrets. Add them as **Secrets**, not plaintext variables. Never commit real values or place them in `wrangler.jsonc`, Vite variables, browser storage, GitHub, logs or chat.
 
-These are user-consent scopes. If the Developer Portal keyset does not show the required scopes, the seller authorization cannot grant them; check the keyset's OAuth scope list before testing. Do not request write scopes until the product explicitly implements and needs write operations.
+For local Wrangler development, use a local `.dev.vars` file copied from `.dev.vars.example`; never commit `.dev.vars`. The platform credential vault still needs the encryption key and service-role key available to the local Worker.
 
-## Environment endpoints
+The non-secret `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` remain configured in `wrangler.jsonc`.
+
+## OAuth callback and scopes
+
+The callback route is:
+
+`https://<your-dashboard-worker-host>/api/v1/ebay/oauth/callback`
+
+Configure the eBay OAuth-enabled RuName so its accepted URL points to the correct deployed callback URL for the corresponding environment. The app sends the generated RuName as the OAuth `redirect_uri`.
+
+Current user-consent scopes are read-only:
+
+- `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly` — seller orders / fulfillment data.
+- `https://api.ebay.com/oauth/api_scope/sell.inventory.readonly` — seller inventory and SKU data.
+
+Do not request write scopes until the application implements and needs those write operations.
+
+## API endpoints
 
 | Operation | Sandbox | Production |
 |---|---|---|
 | Seller authorization | `https://auth.sandbox.ebay.com/oauth2/authorize` | `https://auth.ebay.com/oauth2/authorize` |
-| OAuth token exchange/refresh | `https://api.sandbox.ebay.com/identity/v1/oauth2/token` | `https://api.ebay.com/identity/v1/oauth2/token` |
+| Token exchange / refresh | `https://api.sandbox.ebay.com/identity/v1/oauth2/token` | `https://api.ebay.com/identity/v1/oauth2/token` |
 | Sell REST APIs | `https://api.sandbox.ebay.com` | `https://api.ebay.com` |
 
-## Safe setup order
+## Safe activation sequence
 
-1. Wait for the Developer Account/keyset review to finish. No need to enter credentials into the repository.
-2. Create/confirm the Sandbox keyset and its OAuth-enabled RuName.
-3. Add the three Sandbox eBay values as Worker Secrets, plus the existing server-side encryption and Supabase service-role secrets if not already configured. Secret values should be entered directly in Cloudflare, never sent in chat.
-4. Create a non-demo Sandbox seller account in eBay Sandbox and authorize that seller from a Sandbox marketplace account in MultiAcc.
-5. Verify order import, inventory/SKU read access, duplicate-order protection, and concurrent token refresh before enabling Production.
-6. Add Production credentials only after approval and explicit production readiness. Keep Production seller accounts and tokens isolated from Sandbox.
+1. Wait for eBay Developer Account/keyset review and confirm the correct Sandbox keyset.
+2. Configure the three required Cloudflare Worker Secrets listed above. Generate independent encryption keys for platform credentials and Seller tokens.
+3. In the Dashboard, open Super Admin → Integrations & API Management, choose Sandbox, and enter the Sandbox App ID, Cert ID and RuName.
+4. Verify the eBay OAuth-enabled RuName accepted URL and scope grants.
+5. Create a non-demo eBay Sandbox Seller account and initiate Seller OAuth from the eBay Accounts module.
+6. Verify token encryption, refresh, orders, inventory/SKU mapping, duplicate protection, rate limits and audit behavior.
+7. Configure Production separately only after eBay approval and successful Sandbox validation.
 
-## Important
+## Security boundaries
 
-- The Developer Account review status is separate from the local code environment. Creating this configuration does not bypass eBay review or activate API access.
-- Do not expose Client Secret, access tokens, refresh tokens, service-role key, or encryption key in frontend code, logs, screenshots, GitHub, or chat.
-- Never test Production using Sandbox credentials or Sandbox seller accounts.
+- Platform credentials are encrypted using AES-256-GCM with fresh random nonces and field/environment-bound authenticated additional data.
+- The database credential tables have RLS enabled and forced, no browser-role grants, and no browser policies. Only the Worker service role reads ciphertext.
+- Credential writes and metadata-only audit events are performed atomically by a restricted service-role-only database function.
+- The status API returns only a masked Client ID and metadata. It never returns plaintext secrets.
+- Seller access and refresh tokens remain separately encrypted and bound to organization/account/token type.
+
+Encryption protects stored values and reduces risk from repository/source-code disclosure. It does not protect against a malicious Worker deployment, compromised Cloudflare account, compromised Worker runtime, stolen Super Admin session or stolen service-role key. Protect Cloudflare, GitHub and Supabase control planes with phishing-resistant MFA, least privilege, protected branches and reviewed deployments. For stronger separation from runtime compromise, use an external KMS/HSM with envelope encryption.
+
+The Dashboard credential page currently stores and rotates credentials; saving alone does not prove the eBay keyset is valid. A real Sandbox Seller OAuth test and provider API verification are still required before calling the integration ready.
