@@ -39,7 +39,8 @@
   ],
   "vars": {
     "SUPABASE_URL": "https://nmlwnezlsqystjrvszcd.supabase.co",
-    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI"
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI",
+    "ALLOWED_ORIGIN": "https://app.oriafuture.com"
   },
   "previews": {
     "vars": {
