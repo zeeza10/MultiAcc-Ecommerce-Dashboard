@@ -7,7 +7,6 @@ export type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
 
 export const REQUIRED_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
-  'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
 ];
 
 export type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
