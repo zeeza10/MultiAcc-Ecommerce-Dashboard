@@ -54,16 +54,16 @@ async function sha256Hex(value: string): Promise<string> {
   return toHex(new Uint8Array(digest));
 }
 
-export async function encryptToken(plaintext: string, encodedKey: string): Promise<string> {
+export async function encryptToken(plaintext: string, encodedKey: string, associatedData = ''): Promise<string> {
   const rawKey = fromBase64(encodedKey);
   if (rawKey.byteLength !== 32) throw new Error('Token encryption key must decode to exactly 32 bytes.');
   const key = await crypto.subtle.importKey('raw', rawKey.buffer as ArrayBuffer, 'AES-GCM', false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, new TextEncoder().encode(plaintext).buffer as ArrayBuffer);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer, additionalData: new TextEncoder().encode(associatedData).buffer as ArrayBuffer }, key, new TextEncoder().encode(plaintext).buffer as ArrayBuffer);
   return `v1.${toBase64(iv)}.${toBase64(new Uint8Array(encrypted))}`;
 }
 
-export async function decryptToken(ciphertext: string, encodedKey: string): Promise<string> {
+export async function decryptToken(ciphertext: string, encodedKey: string, associatedData = ''): Promise<string> {
   const [version, ivText, dataText] = ciphertext.split('.');
   if (version !== 'v1' || !ivText || !dataText) throw new Error('Unsupported encrypted token format.');
   const rawKey = fromBase64(encodedKey);
@@ -71,7 +71,7 @@ export async function decryptToken(ciphertext: string, encodedKey: string): Prom
   const key = await crypto.subtle.importKey('raw', rawKey.buffer as ArrayBuffer, 'AES-GCM', false, ['decrypt']);
   const iv = fromBase64(ivText);
   const data = fromBase64(dataText);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, data.buffer as ArrayBuffer);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer, additionalData: new TextEncoder().encode(associatedData).buffer as ArrayBuffer }, key, data.buffer as ArrayBuffer);
   return new TextDecoder().decode(decrypted);
 }
 
@@ -316,8 +316,8 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
 
   try {
     const [accessCiphertext, refreshCiphertext] = await Promise.all([
-      encryptToken(tokenData.access_token, env.EBAY_TOKEN_ENCRYPTION_KEY),
-      encryptToken(tokenData.refresh_token, env.EBAY_TOKEN_ENCRYPTION_KEY),
+      encryptToken(tokenData.access_token, env.EBAY_TOKEN_ENCRYPTION_KEY, `${state.organization_id}:${state.marketplace_account_id}:access`),
+      encryptToken(tokenData.refresh_token, env.EBAY_TOKEN_ENCRYPTION_KEY, `${state.organization_id}:${state.marketplace_account_id}:refresh`),
     ]);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + expiresIn * 1000).toISOString();
@@ -390,7 +390,7 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
     if (!config) continue;
 
     try {
-      const refreshToken = await decryptToken(credential.refresh_token_ciphertext, encryptionKey);
+      const refreshToken = await decryptToken(credential.refresh_token_ciphertext, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:refresh`);
       const form = new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
@@ -425,9 +425,9 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
 
       const tokenData = await response.json() as { access_token?: string; refresh_token?: string; expires_in?: number; refresh_token_expires_in?: number };
       if (!tokenData.access_token || !Number.isFinite(tokenData.expires_in)) throw new Error('INVALID_REFRESH_RESPONSE');
-      const accessCiphertext = await encryptToken(tokenData.access_token, encryptionKey);
+      const accessCiphertext = await encryptToken(tokenData.access_token, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:access`);
       const refreshCiphertext = tokenData.refresh_token
-        ? await encryptToken(tokenData.refresh_token, encryptionKey)
+        ? await encryptToken(tokenData.refresh_token, encryptionKey, `${credential.organization_id}:${credential.marketplace_account_id}:refresh`)
         : credential.refresh_token_ciphertext;
       const now = new Date();
       const expiresAt = new Date(now.getTime() + tokenData.expires_in! * 1000).toISOString();
