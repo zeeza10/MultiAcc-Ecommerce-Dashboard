@@ -11,6 +11,7 @@ export type WorkerEnv = {
   EBAY_TOKEN_ENCRYPTION_KEY?: string;
   INTEGRATION_CREDENTIALS_ENCRYPTION_KEY?: string;
   PLATFORM_SUPER_ADMIN_USER_IDS?: string;
+  ALLOWED_ORIGIN?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
