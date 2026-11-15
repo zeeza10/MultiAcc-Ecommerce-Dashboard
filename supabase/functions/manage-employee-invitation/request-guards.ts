@@ -1,4 +1,4 @@
-export const INVITATION_APP_ORIGIN = "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev";
+export const INVITATION_APP_ORIGIN = "https://app.oriafuture.com";
 const ALLOWED_INVITATION_ORIGINS = new Set([
   INVITATION_APP_ORIGIN,
   "http://localhost:5173",
