@@ -1,0 +1,38 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { decryptToken, encryptToken, isEbayOAuthConfigured } from './oauth';
+
+const testKey = Buffer.from(new Uint8Array(32).fill(7)).toString('base64');
+
+describe('eBay OAuth token protection', () => {
+  it('encrypts and decrypts tokens using AES-256-GCM', async () => {
+    const ciphertext = await encryptToken('seller-refresh-token', testKey);
+    assert.match(ciphertext, /^v1\./);
+    assert.notEqual(ciphertext, 'seller-refresh-token');
+    assert.equal(await decryptToken(ciphertext, testKey), 'seller-refresh-token');
+  });
+
+  it('uses a fresh nonce for every encryption', async () => {
+    const first = await encryptToken('same-token', testKey);
+    const second = await encryptToken('same-token', testKey);
+    assert.notEqual(first, second);
+  });
+
+  it('rejects decryption with the wrong key', async () => {
+    const ciphertext = await encryptToken('seller-access-token', testKey);
+    const wrongKey = Buffer.from(new Uint8Array(32).fill(8)).toString('base64');
+    await assert.rejects(() => decryptToken(ciphertext, wrongKey));
+  });
+
+  it('does not report OAuth ready without all server-side secrets', () => {
+    assert.equal(isEbayOAuthConfigured({}), false);
+    assert.equal(isEbayOAuthConfigured({
+      EBAY_SANDBOX_CLIENT_ID: 'sandbox-id',
+      EBAY_SANDBOX_CLIENT_SECRET: 'sandbox-secret',
+      EBAY_SANDBOX_RUNAME: 'sandbox-runame',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role',
+      EBAY_TOKEN_ENCRYPTION_KEY: testKey,
+    }, 'SANDBOX'), true);
+  });
+});
