@@ -36,7 +36,7 @@ BEGIN
   UPDATE public.marketplace_sync_jobs AS j
   SET status = 'RUNNING',
       attempt_count = j.attempt_count + 1,
-      locked_until = now() + interval '15 minutes',
+      locked_until = now() + interval '5 minutes',
       updated_at = now()
   FROM candidates
   WHERE j.id = candidates.id
