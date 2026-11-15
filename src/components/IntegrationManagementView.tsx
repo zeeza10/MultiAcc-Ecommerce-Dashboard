@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 type Environment = 'SANDBOX' | 'PRODUCTION';
+type AuditEvent = { environment: Environment; actorUserId: string | null; action: string; credentialVersion: number; metadata: Record<string, unknown>; createdAt: string };
 type CredentialStatus = {
   environment: Environment;
   configured: boolean;
@@ -19,6 +20,7 @@ export const IntegrationManagementView: React.FC = () => {
   const { user } = useAuth();
   const [environment, setEnvironment] = useState<Environment>('SANDBOX');
   const [statuses, setStatuses] = useState<CredentialStatus[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,8 +31,9 @@ export const IntegrationManagementView: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const result = await api.getIntegrationCredentials();
+      const [result, audit] = await Promise.all([api.getIntegrationCredentials(), api.getIntegrationAudit()]);
       setStatuses(result.environments);
+      setAuditEvents(audit.events);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Credential status could not be loaded.');
     } finally {
@@ -172,6 +175,35 @@ export const IntegrationManagementView: React.FC = () => {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+        <div>
+          <h2 className="text-sm font-bold text-gray-900">OAuth Configuration Reference</h2>
+          <p className="mt-1 text-[11px] text-gray-500">Register this callback URL as the accepted URL for the matching OAuth-enabled RuName in eBay Developer Portal.</p>
+        </div>
+        <code className="block break-all rounded-md bg-slate-50 p-3 text-[11px] text-slate-700">{window.location.origin}/api/v1/ebay/oauth/callback</code>
+        <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
+          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Required Seller scopes</div><div className="mt-1 break-all text-gray-500">sell.fulfillment.readonly</div><div className="mt-1 break-all text-gray-500">sell.inventory.readonly</div></div>
+          <div className="rounded-md border border-gray-100 p-3"><div className="font-semibold text-gray-800">Environment separation</div><div className="mt-1 text-gray-500">Sandbox and Production use separate keysets, authorization endpoints and Seller accounts.</div></div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-3">
+          <h2 className="text-sm font-bold text-gray-900">Credential Change Audit</h2>
+          <p className="mt-1 text-[11px] text-gray-500">Latest 50 credential operations. Audit entries contain metadata only, never secret values.</p>
+        </div>
+        {auditEvents.length === 0 ? (
+          <p className="rounded-md bg-slate-50 p-3 text-xs text-gray-500">No credential changes have been recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-[11px]">
+              <thead><tr className="border-b border-gray-100 text-gray-500"><th className="px-2 py-2 font-semibold">Time</th><th className="px-2 py-2 font-semibold">Environment</th><th className="px-2 py-2 font-semibold">Action</th><th className="px-2 py-2 font-semibold">Version</th><th className="px-2 py-2 font-semibold">Actor ID</th></tr></thead>
+              <tbody>{auditEvents.map((event, index) => <tr key={`${event.environment}-${event.credentialVersion}-${index}`} className="border-b border-gray-50"><td className="px-2 py-2 text-gray-600">{new Date(event.createdAt).toLocaleString()}</td><td className="px-2 py-2 font-semibold text-gray-800">{event.environment}</td><td className="px-2 py-2 text-gray-700">{event.action.replaceAll('_', ' ')}</td><td className="px-2 py-2 text-gray-700">{event.credentialVersion}</td><td className="px-2 py-2 font-mono text-gray-500">{event.actorUserId || 'Unknown'}</td></tr>)}</tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
