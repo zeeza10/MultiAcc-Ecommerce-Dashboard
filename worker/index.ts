@@ -8,6 +8,7 @@ import type { RateLimitBinding } from './types';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
 import { refreshExpiringEbayTokens } from './ebay/oauth';
+import { processDueEbaySyncJobs } from './ebay/sync';
 
 export interface Env {
   ASSETS?: {
@@ -79,6 +80,6 @@ export default {
     return secure(new Response('Not Found', { status: 404 }));
   },
   async scheduled(_event: { cron: string }, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(refreshExpiringEbayTokens(env));
+    ctx.waitUntil(Promise.all([refreshExpiringEbayTokens(env), processDueEbaySyncJobs(env)]));
   },
 };
