@@ -9,18 +9,23 @@ Implemented in the secure integration branch:
 - Real marketplace account creation for eBay UK, US, and Germany, with separate Sandbox/Production environment selection. Existing demo rows remain marked as demo and cannot be authorized or synchronized.
 - Account-scoped OAuth Authorization Code Grant start endpoint protected by the `marketplace.manage` permission.
 - 256-bit random OAuth state, stored only as a SHA-256 hash and bound to user, organization, account and environment.
-- Ten-minute state expiry and atomic delete-on-callback to prevent replay.
+- Ten-minute state expiry and atomic delete-on-callback to prevent replay. The callback rechecks active organization membership and effective `marketplace.manage` permission before exchanging the code.
 - Server-side authorization-code exchange; authorization codes are never persisted.
-- AES-256-GCM encryption of access and refresh tokens before storage. Tokens are never returned to the browser or logged.
-- Server-only service-role access for OAuth state, encrypted credentials and sync jobs.
+- AES-256-GCM encryption of access and refresh tokens before storage, with authenticated additional data binding each ciphertext to its organization, marketplace account, and token type. Tokens are never returned to the browser or logged.
+- Server-only service-role access for OAuth state, encrypted credentials and sync jobs. Browser roles have explicit deny policies and no table write grants.
 - A five-minute Worker Cron for token refresh and due sync jobs.
 - eBay Sell Fulfillment API order retrieval with pagination and a 90-day initial lookback, then a seven-day overlap on subsequent runs.
 - Organization/account-scoped SKU mapping. Only verified marketplace SKU mappings are used automatically; unmatched SKUs are imported with a review exception.
 - Atomic order + line-item import through a service-role-only database function.
 - Duplicate order prevention using the existing unique key on `(marketplace_account_id, external_order_id)`.
-- Durable sync jobs with atomic `SKIP LOCKED` claiming, bounded retries, exponential backoff, and dead-letter status.
+- Durable sync jobs with atomic `SKIP LOCKED` claiming, bounded retries, exponential backoff, dead-letter status, and recovery of abandoned jobs after the 15-minute lease expires.
 - Sanitized integration audit events and sync-run counters.
 - Per-account UI readiness; demo accounts cannot be connected or synchronized.
+
+## Additional database hardening
+
+- Employee permission overrides are now read-only for browser roles. All writes must go through the audited `set_org_member_permission_overrides` RPC; direct table INSERT/UPDATE/DELETE grants and the broad write policy have been removed.
+- Marketplace credential, OAuth-state, event and sync-job foreign-key paths have supporting indexes.
 
 ## Not yet verified
 
