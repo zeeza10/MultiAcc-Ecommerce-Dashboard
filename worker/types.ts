@@ -7,6 +7,14 @@ export type RateLimitBinding = {
 export type WorkerEnv = {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  EBAY_SANDBOX_CLIENT_ID?: string;
+  EBAY_SANDBOX_CLIENT_SECRET?: string;
+  EBAY_SANDBOX_RUNAME?: string;
+  EBAY_PRODUCTION_CLIENT_ID?: string;
+  EBAY_PRODUCTION_CLIENT_SECRET?: string;
+  EBAY_PRODUCTION_RUNAME?: string;
+  EBAY_TOKEN_ENCRYPTION_KEY?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
