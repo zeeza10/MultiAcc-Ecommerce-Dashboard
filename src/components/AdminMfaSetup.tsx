@@ -121,6 +121,13 @@ export const AdminMfaSetup: React.FC = () => {
       </button>
     )}
 
+    {pendingFactorId && !qr && (
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+        <p className="text-xs text-amber-800">An unfinished authenticator setup was found. Replace it to generate a fresh QR code and setup key.</p>
+        <button type="button" onClick={() => void discardPendingAndRestart()} disabled={busy} className="mt-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Preparing…' : 'Discard old setup and create a new QR code'}</button>
+      </div>
+    )}
+
     {pendingFactorId && qr && (
       <form onSubmit={verify} className="mt-4 grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
         <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-slate-200 bg-white p-3">
