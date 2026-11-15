@@ -3,7 +3,6 @@ import { json } from '../http';
 import { encryptToken, serviceClient } from '../ebay/oauth';
 
 type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
-const validEnvironment = (value: string): value is EbayEnvironment => value === 'SANDBOX' || value === 'PRODUCTION';
 const cleanCredential = (value: unknown, max: number): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
