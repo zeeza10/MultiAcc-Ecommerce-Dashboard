@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className={`${isCollapsed ? "w-16" : "w-64"} bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 min-h-[calc(100vh-4rem)] transition-[width] duration-200 ease-in-out overflow-hidden`}>
+    <aside className={`${isCollapsed ? "w-16" : "w-64"} h-full min-h-0 bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 transition-[width] duration-200 ease-in-out overflow-hidden`}>
       <div className="p-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between border-b border-gray-200">
         {!isCollapsed && <span>Operations Menu</span>}
         <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -161,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </span>}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5 text-xs">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-3 space-y-5 text-xs">
         {navGroups.map((group) => {
           const visibleItems = group.items.filter(isAllowedForRole);
           if (visibleItems.length === 0) return null;
