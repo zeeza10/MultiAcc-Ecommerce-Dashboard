@@ -365,12 +365,13 @@ export async function processDueEbaySyncJobs(env: WorkerEnv): Promise<void> {
 
   const now = Date.now();
   const { data: accounts } = await service.from('marketplace_accounts')
-    .select('id,organization_id,auto_sync_interval_minutes,last_sync_at')
+    .select('id,organization_id,auto_sync_interval_minutes,last_sync_at,last_sync_status')
     .in('marketplace', ['EBAY_UK','EBAY_US','EBAY_DE'])
     .eq('is_demo', false)
     .eq('auth_status', 'CONNECTED')
     .limit(100);
   for (const account of accounts || []) {
+    if (account.last_sync_status === 'FAILED' || account.last_sync_status === 'AUTH_REQUIRED') continue;
     const { data: activeJobs } = await service.from('marketplace_sync_jobs')
       .select('id')
       .eq('marketplace_account_id', account.id)
