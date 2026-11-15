@@ -80,7 +80,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     const accountRows = accountsResult.data || [];
     const readiness = await Promise.all(accountRows.map(async row => !row.is_demo && await isEbayOAuthConfigured(env, row.environment)));
     const integrationReady = readiness.some(Boolean);
-    return json({ integrationReady, integrationMessage: integrationReady ? 'Secure eBay authorization is configured for at least one real account.' : 'Create a real eBay account and configure the server-only Sandbox or Production secrets before authorization. Demo records cannot be connected.', accounts: accountRows.map(row => ({
+    return json({ integrationReady, integrationMessage: integrationReady ? 'Secure eBay authorization is configured for at least one real account.' : 'Create a real eBay account and save the matching Sandbox or Production credentials in Super Admin > Integrations & API Management. Demo records cannot be connected.', accounts: accountRows.map(row => ({
       id: row.id, name: row.name, marketplace: row.marketplace, sellerUsername: row.seller_username || '',
       authStatus: row.auth_status, environment: row.environment, lastSyncAt: row.last_sync_at || '',
       lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
