@@ -119,6 +119,7 @@ function callbackPage(title: string, message: string, success: boolean): Respons
 export function isEbayOAuthConfigured(env: WorkerEnv, environment: EbayEnvironment = 'SANDBOX'): boolean {
   return Boolean(
     configFor(env, environment) &&
+    env.SUPABASE_URL &&
     env.SUPABASE_SERVICE_ROLE_KEY &&
     env.EBAY_TOKEN_ENCRYPTION_KEY,
   );
