@@ -24,6 +24,7 @@ export interface Env {
   EBAY_PRODUCTION_CLIENT_SECRET?: string;
   EBAY_PRODUCTION_RUNAME?: string;
   EBAY_TOKEN_ENCRYPTION_KEY?: string;
+  INTEGRATION_CREDENTIALS_ENCRYPTION_KEY?: string;
   ALLOWED_ORIGIN?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
