@@ -33,9 +33,13 @@ async function startServer() {
   const clientPath = fs.existsSync(path.resolve(distPath, 'client', 'index.html'))
     ? path.resolve(distPath, 'client')
     : distPath;
-  const hasDist = fs.existsSync(path.resolve(clientPath, 'index.html'));
+  const indexHtmlPath = path.resolve(clientPath, 'index.html');
+  const hasDist = fs.existsSync(indexHtmlPath);
 
   if (hasDist) {
+    // Read the SPA shell once at startup; request handlers never access the filesystem.
+    const spaIndexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+
     // Ultra-fast instant static serving (zero bundle delay)
     // Assets with content hashes can be cached safely
     app.use('/assets', express.static(path.resolve(clientPath, 'assets'), {
@@ -55,7 +59,7 @@ async function startServer() {
     }));
 
     // The local Express fallback can be exposed when HOST is overridden.
-    // Apply a bounded per-IP fixed-window limit before serving the SPA shell.
+    // Apply a bounded per-IP fixed-window limit before serving the cached SPA shell.
     const spaFallbackWindows = new Map<string, { count: number; resetAt: number }>();
     const spaFallbackRateLimit = (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const now = Date.now();
@@ -86,7 +90,7 @@ async function startServer() {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.sendFile(path.resolve(clientPath, 'index.html'));
+      res.status(200).type('html').send(spaIndexHtml);
     });
   } else {
     // Mount Vite middleware in development if dist not built yet
