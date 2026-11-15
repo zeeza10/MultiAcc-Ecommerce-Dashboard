@@ -51,12 +51,12 @@ Deno.serve(async (request: Request) => {
 
   let invitationRedirect: URL;
   try {
-    invitationRedirect = new URL(body.redirectTo || "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev/accept-invitation");
+    invitationRedirect = new URL(body.redirectTo || "https://app.oriafuture.com/accept-invitation");
   } catch {
     return Response.json({ error: "Invitation redirect URL is invalid" }, { status: 400, headers: cors });
   }
   if (
-    invitationRedirect.origin !== "https://multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev" ||
+    invitationRedirect.origin !== "https://app.oriafuture.com" ||
     invitationRedirect.pathname !== "/accept-invitation" ||
     invitationRedirect.search ||
     invitationRedirect.hash
