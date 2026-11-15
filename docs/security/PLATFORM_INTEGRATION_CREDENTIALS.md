@@ -32,3 +32,16 @@ The module stores credentials securely; it does not yet prove the eBay keyset or
 
 ## Platform-owner bootstrap
 An organization-level `SUPER_ADMIN` role is not sufficient to administer shared application credentials. Configure `PLATFORM_SUPER_ADMIN_USER_IDS` as a Cloudflare Worker Secret containing the comma-separated Supabase Auth user UUIDs of the application owner(s). The Worker requires both this allowlist and the `SUPER_ADMIN` role. Tenant permission overrides cannot grant platform-owner status. Credential writes additionally require an AAL2 authenticator MFA session and a same-origin browser request.
+
+## Generating independent encryption keys on Windows PowerShell
+Run this locally for each key (run it twice to create independent keys); paste the output directly into the corresponding Cloudflare Worker Secret and do not commit or send it in chat:
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+Use one output for `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` and a different output for `EBAY_TOKEN_ENCRYPTION_KEY`. Back up keys in an approved secrets manager. Losing an encryption key makes its existing ciphertext unreadable; replacing it without re-encrypting stored values causes an outage.
+
+To populate `PLATFORM_SUPER_ADMIN_USER_IDS`, use the platform owner's Supabase Auth user UUID (the matching `profiles.id`) and configure it in Cloudflare Worker Secrets. Multiple UUIDs may be comma-separated. Never use an email address or a tenant role as a substitute for this allowlist.
