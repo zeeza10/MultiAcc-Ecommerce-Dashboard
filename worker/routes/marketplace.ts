@@ -57,6 +57,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
       tokenExpiresAt: row.token_expires_at || '', autoSyncIntervalMinutes: row.auto_sync_interval_minutes,
       isDemo: row.is_demo,
+      oauthReady: !row.is_demo && isEbayOAuthConfigured(env, row.environment),
     })), recentSyncs: (syncResult.data || []).map(row => ({ id: row.id, accountId: row.marketplace_account_id, startedAt: row.started_at, completedAt: row.completed_at || '', status: row.status, ordersFetched: row.orders_fetched, ordersImported: row.orders_imported, ordersSkippedDuplicate: row.orders_skipped_duplicate, exceptionsRaised: row.exceptions_raised, logMessage: row.log_message || '' })) });
   }
 
