@@ -12,6 +12,9 @@ export const REQUIRED_SCOPES = [
 
 export type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
 
+// Legacy Worker Secrets remain a controlled fallback during migration. New values
+// saved in the Super Admin vault always take precedence and are decrypted only in
+// the Worker process; plaintext is never returned to a browser response.
 export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | null {
   const sandbox = environment === 'SANDBOX';
   const clientId = sandbox ? env.EBAY_SANDBOX_CLIENT_ID : env.EBAY_PRODUCTION_CLIENT_ID;
@@ -19,6 +22,36 @@ export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthCo
   const ruName = sandbox ? env.EBAY_SANDBOX_RUNAME : env.EBAY_PRODUCTION_RUNAME;
   if (!clientId || !clientSecret || !ruName) return null;
   return { clientId, clientSecret, ruName, environment };
+}
+
+function credentialAad(environment: EbayEnvironment, field: string): string {
+  return `platform:EBAY:${environment}:${field}:v1`;
+}
+
+export async function resolveEbayOAuthConfig(env: WorkerEnv, environment: EbayEnvironment): Promise<OAuthConfig | null> {
+  const service = serviceClient(env);
+  if (service && env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY) {
+    const { data, error } = await service.from('platform_integration_credentials')
+      .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext')
+      .eq('provider', 'EBAY').eq('environment', environment).maybeSingle();
+    if (error) return null;
+    if (data) {
+      try {
+        const [clientId, clientSecret, ruName] = await Promise.all([
+          decryptToken(data.client_id_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'client-id')),
+          decryptToken(data.client_secret_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'client-secret')),
+          decryptToken(data.ru_name_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'runame')),
+        ]);
+        if (!clientId || !clientSecret || !ruName) return null;
+        return { clientId, clientSecret, ruName, environment };
+      } catch {
+        // Fail closed: a corrupt/unreadable vault record must never fall back to
+        // a possibly stale credential set from environment variables.
+        return null;
+      }
+    }
+  }
+  return configFor(env, environment);
 }
 
 export function serviceClient(env: WorkerEnv): any {
@@ -116,9 +149,9 @@ function callbackPage(title: string, message: string, success: boolean): Respons
   );
 }
 
-export function isEbayOAuthConfigured(env: WorkerEnv, environment: EbayEnvironment = 'SANDBOX'): boolean {
+export async function isEbayOAuthConfigured(env: WorkerEnv, environment: EbayEnvironment = 'SANDBOX'): Promise<boolean> {
   return Boolean(
-    configFor(env, environment) &&
+    await resolveEbayOAuthConfig(env, environment) &&
     env.SUPABASE_URL &&
     env.SUPABASE_SERVICE_ROLE_KEY &&
     env.EBAY_TOKEN_ENCRYPTION_KEY,
@@ -149,7 +182,7 @@ export async function startEbayOAuth(
   }
 
   const environment = account.environment as EbayEnvironment;
-  const config = configFor(env, environment);
+  const config = await resolveEbayOAuthConfig(env, environment);
   const service = serviceClient(env);
   if (!config || !service || !env.EBAY_TOKEN_ENCRYPTION_KEY) {
     return json({ error: 'Secure eBay authorization is not configured yet. No credentials were changed.' }, 503);
@@ -385,7 +418,7 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
   for (const credential of credentials as any[]) {
     const leaseToken = credential.refresh_lease_token as string;
     const environment = credential.environment as EbayEnvironment;
-    const config = configFor(env, environment);
+    const config = await resolveEbayOAuthConfig(env, environment);
 
     const releaseLease = async (updates: Record<string, unknown> = {}) => {
       await service.from('marketplace_credentials')
