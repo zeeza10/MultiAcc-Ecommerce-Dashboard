@@ -12,13 +12,33 @@ export const REQUIRED_SCOPES = [
 
 export type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
 
-export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | null {
-  const sandbox = environment === 'SANDBOX';
-  const clientId = sandbox ? env.EBAY_SANDBOX_CLIENT_ID : env.EBAY_PRODUCTION_CLIENT_ID;
-  const clientSecret = sandbox ? env.EBAY_SANDBOX_CLIENT_SECRET : env.EBAY_PRODUCTION_CLIENT_SECRET;
-  const ruName = sandbox ? env.EBAY_SANDBOX_RUNAME : env.EBAY_PRODUCTION_RUNAME;
-  if (!clientId || !clientSecret || !ruName) return null;
-  return { clientId, clientSecret, ruName, environment };
+// Application credentials are resolved from the encrypted platform vault only.
+function credentialAad(environment: EbayEnvironment, field: string): string {
+  return `platform:EBAY:${environment}:${field}:v1`;
+}
+
+export async function resolveEbayOAuthConfig(env: WorkerEnv, environment: EbayEnvironment): Promise<OAuthConfig | null> {
+  const service = serviceClient(env);
+  const encryptionKey = env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY;
+  // Fail closed: no legacy plaintext Worker-variable fallback. The vault is the
+  // single source of truth for application credentials.
+  if (!service || !encryptionKey) return null;
+  const { data, error } = await service.from('platform_integration_credentials')
+    .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext')
+    .eq('provider', 'EBAY').eq('environment', environment).maybeSingle();
+  if (error || !data) return null;
+  try {
+    const [clientId, clientSecret, ruName] = await Promise.all([
+      decryptToken(data.client_id_ciphertext, encryptionKey, credentialAad(environment, 'client-id')),
+      decryptToken(data.client_secret_ciphertext, encryptionKey, credentialAad(environment, 'client-secret')),
+      decryptToken(data.ru_name_ciphertext, encryptionKey, credentialAad(environment, 'runame')),
+    ]);
+    if (!clientId || !clientSecret || !ruName) return null;
+    return { clientId, clientSecret, ruName, environment };
+  } catch {
+    // A corrupt record or wrong key must never trigger a plaintext fallback.
+    return null;
+  }
 }
 
 export function serviceClient(env: WorkerEnv): any {
@@ -116,9 +136,9 @@ function callbackPage(title: string, message: string, success: boolean): Respons
   );
 }
 
-export function isEbayOAuthConfigured(env: WorkerEnv, environment: EbayEnvironment = 'SANDBOX'): boolean {
+export async function isEbayOAuthConfigured(env: WorkerEnv, environment: EbayEnvironment = 'SANDBOX'): Promise<boolean> {
   return Boolean(
-    configFor(env, environment) &&
+    await resolveEbayOAuthConfig(env, environment) &&
     env.SUPABASE_URL &&
     env.SUPABASE_SERVICE_ROLE_KEY &&
     env.EBAY_TOKEN_ENCRYPTION_KEY,
@@ -149,7 +169,7 @@ export async function startEbayOAuth(
   }
 
   const environment = account.environment as EbayEnvironment;
-  const config = configFor(env, environment);
+  const config = await resolveEbayOAuthConfig(env, environment);
   const service = serviceClient(env);
   if (!config || !service || !env.EBAY_TOKEN_ENCRYPTION_KEY) {
     return json({ error: 'Secure eBay authorization is not configured yet. No credentials were changed.' }, 503);
@@ -260,7 +280,7 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     return callbackPage('Marketplace permission was removed', 'Your current workspace role no longer permits connecting this eBay account.', false);
   }
 
-  const config = configFor(env, environment);
+  const config = await resolveEbayOAuthConfig(env, environment);
   if (!config) {
     await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CONFIGURATION_MISSING', severity: 'ERROR', message: 'The eBay application configuration is incomplete.' });
     return callbackPage('Authorization configuration is incomplete', 'The eBay application settings for this environment are missing.', false);
@@ -385,7 +405,7 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
   for (const credential of credentials as any[]) {
     const leaseToken = credential.refresh_lease_token as string;
     const environment = credential.environment as EbayEnvironment;
-    const config = configFor(env, environment);
+    const config = await resolveEbayOAuthConfig(env, environment);
 
     const releaseLease = async (updates: Record<string, unknown> = {}) => {
       await service.from('marketplace_credentials')

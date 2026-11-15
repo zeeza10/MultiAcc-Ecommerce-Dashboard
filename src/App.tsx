@@ -15,6 +15,7 @@ import { ReportsView } from './components/ReportsView';
 import { NotificationsView } from './components/NotificationsView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
+import { IntegrationManagementView } from './components/IntegrationManagementView';
 import { EmployeeAccessView } from './components/EmployeeAccessView';
 import { WarehouseServicesView } from './components/WarehouseServicesView';
 import { DropshippingCalculatorView } from './components/DropshippingCalculatorView';
@@ -439,6 +440,10 @@ export default function App() {
           )}
 
           {activeTab === 'employee-access' && <EmployeeAccessView />}
+
+          {activeTab === 'integration-management' && currentUser.role === 'SUPER_ADMIN' && (
+            <IntegrationManagementView />
+          )}
 
           {activeTab === 'settings' && (
             <SettingsView

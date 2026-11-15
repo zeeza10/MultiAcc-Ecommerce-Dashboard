@@ -2,9 +2,9 @@ name: Verify application
 
 on:
   push:
-    branches: [main, phase-3-worker-api-foundation, feature/employee-access-control, feature/user-specific-permission-overrides]
+    branches: [main, phase-3-worker-api-foundation, feature/employee-access-control, feature/user-specific-permission-overrides, feature/secure-ebay-integration-final, feature/secure-integration-management]
   pull_request:
-    branches: [main]
+    branches: [main, feature/secure-ebay-integration-final]
 
 permissions:
   contents: read

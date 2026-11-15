@@ -2,9 +2,9 @@ name: CodeQL Security Analysis
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/secure-integration-management]
   pull_request:
-    branches: [main]
+    branches: [main, feature/secure-ebay-integration-final]
   schedule:
     - cron: "30 2 * * 1"
 

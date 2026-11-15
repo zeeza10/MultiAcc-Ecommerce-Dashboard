@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { handleDashboardRoute } from './routes/dashboard';
 import { handleMarketplaceRoute } from './routes/marketplace';
+import { handleIntegrationManagementRoute } from './routes/integration-management';
 import { handleEbayOAuthCallback } from './ebay/oauth';
 import { handleSystemRoute } from './routes/system';
 import { handleFulfilmentRoute } from './routes/fulfilment';
@@ -18,6 +19,20 @@ import { resolveEffectivePermissions } from './permission-overrides';
 import { enforceRateLimit } from './rate-limits';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
+
+function readVerifiedJwtAssurance(token: string): 'aal1' | 'aal2' {
+  // Supabase auth.getUser(token) is called before this helper. The JWT signature
+  // is therefore verified by Supabase; we only read its signed assurance claim.
+  try {
+    const segment = token.split('.')[1];
+    if (!segment) return 'aal1';
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')));
+    return payload?.aal === 'aal2' ? 'aal2' : 'aal1';
+  } catch {
+    return 'aal1';
+  }
+}
 
 async function authenticate(request: Request, env: WorkerEnv): Promise<AuthContext | Response> {
   const authorization = request.headers.get('Authorization') || '';
@@ -111,6 +126,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
   );
 
   return {
+    assuranceLevel: readVerifiedJwtAssurance(token),
     user: {
       id: authData.user.id,
       email: authData.user.email || '',
@@ -161,7 +177,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const limited = await enforceRateLimit(generalLimiter, auth.user.id, 'API request');
     if (limited) return limited;
   }
-  if (request.method === 'POST' && (path === '/ebay/accounts' || new RegExp('^/ebay/accounts/[^/]+/(connect|sync)$').test(path)) && env.EBAY_INTEGRATION_RATE_LIMITER) {
+  if ((path === '/integrations/ebay/credentials' || path === '/integrations/ebay/audit' || /^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/.test(path) || path === '/ebay/accounts' || /^\/ebay\/accounts\/[^/]+\/(connect|sync)$/.test(path)) && env.EBAY_INTEGRATION_RATE_LIMITER) {
     const limited = await enforceRateLimit(env.EBAY_INTEGRATION_RATE_LIMITER, auth.user.id, 'eBay integration request');
     if (limited) return limited;
   }
@@ -183,6 +199,8 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
   }
 
   try {
+    const integrationManagementResponse = await handleIntegrationManagementRoute(path, request, auth, env);
+    if (integrationManagementResponse) return integrationManagementResponse;
     const accessResponse = await handleAccessRoute(path, request, auth, env);
     if (accessResponse) return accessResponse;
     const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
