@@ -30,28 +30,26 @@ function credentialAad(environment: EbayEnvironment, field: string): string {
 
 export async function resolveEbayOAuthConfig(env: WorkerEnv, environment: EbayEnvironment): Promise<OAuthConfig | null> {
   const service = serviceClient(env);
-  if (service && env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY) {
-    const { data, error } = await service.from('platform_integration_credentials')
-      .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext')
-      .eq('provider', 'EBAY').eq('environment', environment).maybeSingle();
-    if (error) return null;
-    if (data) {
-      try {
-        const [clientId, clientSecret, ruName] = await Promise.all([
-          decryptToken(data.client_id_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'client-id')),
-          decryptToken(data.client_secret_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'client-secret')),
-          decryptToken(data.ru_name_ciphertext, env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY, credentialAad(environment, 'runame')),
-        ]);
-        if (!clientId || !clientSecret || !ruName) return null;
-        return { clientId, clientSecret, ruName, environment };
-      } catch {
-        // Fail closed: a corrupt/unreadable vault record must never fall back to
-        // a possibly stale credential set from environment variables.
-        return null;
-      }
-    }
+  const encryptionKey = env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY;
+  // Fail closed: no legacy plaintext Worker-variable fallback. The vault is the
+  // single source of truth for application credentials.
+  if (!service || !encryptionKey) return null;
+  const { data, error } = await service.from('platform_integration_credentials')
+    .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext')
+    .eq('provider', 'EBAY').eq('environment', environment).maybeSingle();
+  if (error || !data) return null;
+  try {
+    const [clientId, clientSecret, ruName] = await Promise.all([
+      decryptToken(data.client_id_ciphertext, encryptionKey, credentialAad(environment, 'client-id')),
+      decryptToken(data.client_secret_ciphertext, encryptionKey, credentialAad(environment, 'client-secret')),
+      decryptToken(data.ru_name_ciphertext, encryptionKey, credentialAad(environment, 'runame')),
+    ]);
+    if (!clientId || !clientSecret || !ruName) return null;
+    return { clientId, clientSecret, ruName, environment };
+  } catch {
+    // A corrupt record or wrong key must never trigger a plaintext fallback.
+    return null;
   }
-  return configFor(env, environment);
 }
 
 export function serviceClient(env: WorkerEnv): any {
