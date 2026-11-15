@@ -4,7 +4,7 @@
 
 Set these on the production Worker `multiacc-ecommerce-dashboard` as **Secrets**, never as plain variables, GitHub Actions variables, Vite variables, or committed files:
 
-- `SUPABASE_SECRET_KEY`: Supabase Dashboard → Settings → API Keys → Secret keys → the default `sb_secret_...` key. This key is server-only and must never be sent to the browser.
+- `SUPABASE_SECRET_KEY`: Supabase Dashboard → Settings → API Keys → Secret keys → the default `sb_secret_...` key. This key is server-only, bypasses RLS, and must never be sent to the browser.
 - `EBAY_TOKEN_ENCRYPTION_KEY`: a base64-encoded 32-byte random key. Generate locally with `openssl rand -base64 32`. Keep a protected backup. The current ciphertext format is versioned `v1`; do not replace this key after credentials/tokens have been stored unless a coordinated re-encryption migration is performed.
 
 Do not paste either value into chat, issues, commits, or logs.
