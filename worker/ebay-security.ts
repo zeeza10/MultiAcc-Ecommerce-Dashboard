@@ -18,7 +18,7 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-function encodeBase64(value: Uint8Array): string {
+function toArrayBuffer(value: Uint8Array): ArrayBuffer {\n  const copy = new Uint8Array(value.byteLength);\n  copy.set(value);\n  return copy.buffer;\n}\n\nfunction encodeBase64(value: Uint8Array): string {
   let binary = '';
   for (const byte of value) binary += String.fromCharCode(byte);
   return btoa(binary);
@@ -29,12 +29,12 @@ async function encryptionKey(env: WorkerEnv): Promise<CryptoKey> {
   if (!encoded) throw new Error('eBay token encryption is not configured.');
   const raw = decodeBase64(encoded);
   if (raw.byteLength !== 32) throw new Error('eBay encryption key must be a base64-encoded 32-byte key.');
-  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', toArrayBuffer(raw), 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 
 export async function encryptEbayValue(value: string, env: WorkerEnv): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(env), new TextEncoder().encode(value));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv) }, await encryptionKey(env), new TextEncoder().encode(value));
   return `v1.${encodeBase64(iv)}.${encodeBase64(new Uint8Array(encrypted))}`;
 }
 
@@ -42,9 +42,9 @@ export async function decryptEbayValue(value: string, env: WorkerEnv): Promise<s
   const [version, ivPart, ciphertextPart] = value.split('.');
   if (version !== 'v1' || !ivPart || !ciphertextPart) throw new Error('Unsupported encrypted eBay credential format.');
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: decodeBase64(ivPart) },
+    { name: 'AES-GCM', iv: toArrayBuffer(decodeBase64(ivPart)) },
     await encryptionKey(env),
-    decodeBase64(ciphertextPart),
+    toArrayBuffer(decodeBase64(ciphertextPart)),
   );
   return new TextDecoder().decode(decrypted);
 }
