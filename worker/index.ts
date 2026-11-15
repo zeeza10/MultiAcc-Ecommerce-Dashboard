@@ -7,6 +7,8 @@ import { handleApiRequest } from './api';
 import type { RateLimitBinding } from './types';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
+import { refreshExpiringEbayTokens } from './ebay/oauth';
+import { processDueEbaySyncJobs } from './ebay/sync';
 
 export interface Env {
   ASSETS?: {
@@ -14,11 +16,20 @@ export interface Env {
   };
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  EBAY_SANDBOX_CLIENT_ID?: string;
+  EBAY_SANDBOX_CLIENT_SECRET?: string;
+  EBAY_SANDBOX_RUNAME?: string;
+  EBAY_PRODUCTION_CLIENT_ID?: string;
+  EBAY_PRODUCTION_CLIENT_SECRET?: string;
+  EBAY_PRODUCTION_RUNAME?: string;
+  EBAY_TOKEN_ENCRYPTION_KEY?: string;
   ALLOWED_ORIGIN?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
   INVITATION_RATE_LIMITER?: RateLimitBinding;
+  EBAY_INTEGRATION_RATE_LIMITER?: RateLimitBinding;
 }
 
 export interface ExecutionContext {
@@ -68,5 +79,11 @@ export default {
 
     if (env.ASSETS) return secure(await env.ASSETS.fetch(request));
     return secure(new Response('Not Found', { status: 404 }));
+  },
+  async scheduled(_event: { cron: string }, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil((async () => {
+      await refreshExpiringEbayTokens(env);
+      await processDueEbaySyncJobs(env);
+    })());
   },
 };
