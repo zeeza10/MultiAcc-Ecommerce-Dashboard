@@ -45,4 +45,4 @@ Save the RuName changes. The RuName value itself is the `redirect_uri` parameter
 
 ## Current implementation boundary
 
-This phase implements credential setup, seller account creation, OAuth authorization start, callback validation, authorization-code exchange, encrypted token persistence, and connection status. Real token refresh and order/inventory synchronization must be implemented and verified separately before enabling the Sync control or calling the overall integration complete.
+This phase implements credential setup, seller account creation, OAuth authorization start, one-time callback validation, authorization-code exchange, encrypted token persistence, refresh-token renewal with a database lease, and manual order import through the Sell Fulfillment API. Inventory listing/quantity synchronization, payout/finance import, fulfilment updates, scheduled/background sync, deletion-notification webhook verification, and end-to-end Sandbox testing remain separate completion gates. Do not call the whole eBay integration complete until those gates pass.
