@@ -224,7 +224,6 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
   const state = url.searchParams.get('state') || '';
   const code = url.searchParams.get('code') || '';
   const eBayError = url.searchParams.get('error');
-  const stateError = url.searchParams.get('error_description');
   const returnUrl = (status: string) => Response.redirect(`https://app.oriafuture.com/?ebay_oauth=${encodeURIComponent(status)}`, 302);
   if (!state || state.length > 512) return returnUrl('invalid_state');
   const admin = createServiceClient(env);
