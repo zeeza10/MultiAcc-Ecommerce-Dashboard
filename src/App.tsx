@@ -166,7 +166,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="h-screen overflow-hidden bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Navigation */}
       <Navbar
         currentUser={currentUser}
@@ -277,7 +277,7 @@ export default function App() {
       )}
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 min-h-0 flex max-w-7xl w-full mx-auto overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -290,7 +290,7 @@ export default function App() {
         />
 
         {/* Center Main View */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
           {activeTab === 'dashboard' && (
             <DashboardView
               currentUser={currentUser}
