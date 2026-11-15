@@ -40,6 +40,7 @@ export interface MarketplaceAccount {
   tokenExpiresAt?: string;
   autoSyncIntervalMinutes: number;
   isDemo: boolean;
+  oauthReady?: boolean;
 }
 
 export interface SyncRun {
