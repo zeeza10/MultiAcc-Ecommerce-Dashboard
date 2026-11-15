@@ -41,15 +41,13 @@ describe('eBay OAuth token protection', () => {
 
   it('fails closed unless encrypted platform credentials and server keys are available', async () => {
     assert.equal(await isEbayOAuthConfigured({}), false);
-    // Legacy plaintext environment values must not activate OAuth.
     assert.equal(await isEbayOAuthConfigured({
-      EBAY_SANDBOX_CLIENT_ID: 'legacy-id',
-      EBAY_SANDBOX_CLIENT_SECRET: 'legacy-secret',
-      EBAY_SANDBOX_RUNAME: 'legacy-runame',
       SUPABASE_URL: 'https://example.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'service-role',
       EBAY_TOKEN_ENCRYPTION_KEY: testKey,
     }, 'SANDBOX'), false);
+    const source = readFileSync(new URL('./oauth.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /EBAY_SANDBOX_CLIENT_ID|EBAY_SANDBOX_CLIENT_SECRET|EBAY_PRODUCTION_CLIENT_ID/);
   });
 });
 
