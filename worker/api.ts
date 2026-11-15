@@ -20,6 +20,20 @@ import { enforceRateLimit } from './rate-limits';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
+function readVerifiedJwtAssurance(token: string): 'aal1' | 'aal2' {
+  // Supabase auth.getUser(token) is called before this helper. The JWT signature
+  // is therefore verified by Supabase; we only read its signed assurance claim.
+  try {
+    const segment = token.split('.')[1];
+    if (!segment) return 'aal1';
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')));
+    return payload?.aal === 'aal2' ? 'aal2' : 'aal1';
+  } catch {
+    return 'aal1';
+  }
+}
+
 async function authenticate(request: Request, env: WorkerEnv): Promise<AuthContext | Response> {
   const authorization = request.headers.get('Authorization') || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
@@ -112,6 +126,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
   );
 
   return {
+    assuranceLevel: readVerifiedJwtAssurance(token),
     user: {
       id: authData.user.id,
       email: authData.user.email || '',
