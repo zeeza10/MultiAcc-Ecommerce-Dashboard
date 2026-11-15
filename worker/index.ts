@@ -81,6 +81,6 @@ export default {
     return secure(new Response('Not Found', { status: 404 }));
   },
   async scheduled(_event: { cron: string }, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(Promise.all([refreshExpiringEbayTokens(env), processDueEbaySyncJobs(env)]));
+    ctx.waitUntil((async () => {\n      await refreshExpiringEbayTokens(env);\n      await processDueEbaySyncJobs(env);\n    })());
   },
 };
