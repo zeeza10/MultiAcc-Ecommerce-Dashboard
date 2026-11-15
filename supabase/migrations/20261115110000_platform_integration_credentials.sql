@@ -108,7 +108,7 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.save_platform_integration_credentials(text, integer, text, text, text, text, uuid)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.save_platform_integration_credentials(text, text, text, text, text, uuid)
+GRANT EXECUTE ON FUNCTION public.save_platform_integration_credentials(text, integer, text, text, text, text, uuid)
   TO service_role;
-COMMENT ON FUNCTION public.save_platform_integration_credentials(text, text, text, text, text, uuid) IS
+COMMENT ON FUNCTION public.save_platform_integration_credentials(text, integer, text, text, text, text, uuid) IS
   'Atomically stores encrypted platform eBay application credentials and a metadata-only audit event. Service-role only.';
