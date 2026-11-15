@@ -11,7 +11,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
-  "observability": {
+  "triggers": {\n    "crons": ["*/15 * * * *"]\n  },\n  "observability": {
     "enabled": true,
     "redact_query_string": true
   },
