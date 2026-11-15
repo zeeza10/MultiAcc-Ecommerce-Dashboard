@@ -68,32 +68,6 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     }
   };
 
-  const handleSync = async (accountId: string) => {
-    setSyncingAccountId(accountId);
-    setSyncFeedback(null);
-    try {
-      const res = await api.syncEbayAccount(accountId);
-      setSyncFeedback(
-        `Sync completed: ${res.imported} new imported, ${res.skipped} skipped as duplicates (AT-01 idempotent), ${res.exceptions} exceptions raised.`
-      );
-      loadData();
-    } catch (err: any) {
-      setSyncFeedback(`Sync failed: ${err.message}`);
-    } finally {
-      setSyncingAccountId(null);
-    }
-  };
-
-  const handleReconnect = async (accountId: string) => {
-    try {
-      const res = await api.connectEbayAccount(accountId);
-      alert(res.message);
-      loadData();
-    } catch (err: any) {
-      alert(`OAuth connect failed: ${err.message}`);
-    }
-  };
-
   const handleResolveException = async () => {
     if (!selectedException || !targetProductId) return;
 
@@ -226,24 +200,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end space-x-2 pt-1">
-                    <button
-                      onClick={() => handleReconnect(acc.id)}
-                      disabled={!integrationReady}
-                      title={!integrationReady ? integrationMessage : undefined}
-                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Renew OAuth
-                    </button>
-
-                    <button
-                      onClick={() => handleSync(acc.id)}
-                      disabled={!integrationReady || isSyncing}
-                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Polling...' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
-                    </button>
+                  <div className="pt-1 text-[11px] text-amber-700">
+                    Live connection and order synchronization will be enabled after the secure eBay authorization service is configured.
                   </div>
                 </div>
               );
