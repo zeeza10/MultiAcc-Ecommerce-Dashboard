@@ -151,10 +151,9 @@ async function importOneOrder(
     const itemTaxMinor = Array.isArray(line.taxes)
       ? line.taxes.reduce((sum: number, tax: any) => sum + moneyMinor(amountValue(tax.amount)), 0)
       : 0;
-    const mappedProductId = mappings.get(sku) || products.get(sku)?.id || null;
-    const mappedProduct = mappedProductId
-      ? [...products.values()].find(product => product.id === mappedProductId)
-      : undefined;
+    const mappedId = mappings.get(sku);
+    const mappedProduct = mappedId ? productById.get(mappedId) : products.get(sku);
+    const mappedProductId = mappedProduct?.id || null;
     return {
       product_id: mappedProductId,
       sku,
@@ -305,7 +304,8 @@ async function processOneJob(env: WorkerEnv, service: any, job: any): Promise<vo
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'SYNC_FAILED';
-    const retryable = code.includes('RETRYABLE') || code === 'EBAY_ACCESS_TOKEN_REJECTED' || code === 'EBAY_ACCESS_TOKEN_EXPIRED' || code === 'EBAY_UNREACHABLE';
+    const authRequired = code === 'EBAY_ACCESS_TOKEN_REJECTED' || code === 'EBAY_ACCESS_TOKEN_EXPIRED' || code === 'EBAY_AUTH_REQUIRED';
+    const retryable = code.includes('RETRYABLE') || code === 'EBAY_UNREACHABLE';
     const exhausted = Number(job.attempt_count || 1) >= Number(job.max_attempts || 5);
     const completedAt = new Date().toISOString();
     const nextRetryAt = new Date(Date.now() + Math.min(60, 2 ** Math.max(1, Number(job.attempt_count || 1))) * 60_000).toISOString();
@@ -334,8 +334,9 @@ async function processOneJob(env: WorkerEnv, service: any, job: any): Promise<vo
       last_error_message: safeMessage,
     }).eq('id', job.id);
     await service.from('marketplace_accounts').update({
-      last_sync_status: exhausted || !retryable ? 'FAILED' : 'RETRYING',
-      last_sync_message: safeMessage,
+      auth_status: authRequired ? 'EXPIRED' : undefined,
+      last_sync_status: authRequired ? 'AUTH_REQUIRED' : exhausted || !retryable ? 'FAILED' : 'RETRYING',
+      last_sync_message: authRequired ? 'eBay authorization must be renewed before synchronization can continue.' : safeMessage,
       updated_at: completedAt,
     }).eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id);
     await logEvent(service, {
