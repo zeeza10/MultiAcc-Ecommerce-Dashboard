@@ -284,7 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   if (loading) {
-    return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Loading secure session…</div>;
+    return <div className="min-h-screen grid place-items-center bg-slate-950 text-white">Securing your Oria Future session…</div>;
   }
 
   if (value && !recoveryActive && !inviteSetupActive) {
@@ -297,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-8">
         <div className="mb-7">
-          <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">OriaFuture</div>
+          <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">Oria Future</div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">
             {inviteSetupActive ? 'Set up your account' : signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
           </h1>
@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ? session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
               : signedInWithoutWorkspace
                 ? 'This account has no active organization invitation. Contact your organization administrator.'
-                : 'Secure sign-in powered by Supabase Authentication.'}
+                : 'Secure sign-in to your Oria Future workspace.'}
           </p>
         </div>
 
