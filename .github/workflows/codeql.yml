@@ -31,8 +31,9 @@ jobs:
         with:
           category: "/language:javascript-typescript"
           output: codeql-results
+          upload: false
 
-      - name: Archive CodeQL SARIF for review
+      - name: Archive CodeQL SARIF results for review (private repository fallback)
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
