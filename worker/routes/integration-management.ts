@@ -74,10 +74,10 @@ export async function handleIntegrationManagementRoute(
     try { body = await request.json() as Record<string, unknown>; }
     catch { return json({ error: 'A valid JSON request is required.' }, 400); }
 
-    if (Object.keys(body).some(key => !['clientId', 'clientSecret', 'ruName'].includes(key))) {
+    if (Object.keys(body).some(key => !['clientId', 'clientSecret', 'ruName', 'expectedVersion'].includes(key))) {
       return json({ error: 'Unexpected credential fields were supplied.' }, 400);
     }
-    if (!Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+    if (typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 0) {
       return json({ error: 'A valid expected credential version is required. Refresh the page and try again.' }, 409);
     }
     const clientId = cleanCredential(body.clientId, 256);
