@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { handleDashboardRoute } from './routes/dashboard';
 import { handleMarketplaceRoute } from './routes/marketplace';
+import { handleIntegrationManagementRoute } from './routes/integration-management';
 import { handleEbayOAuthCallback } from './ebay/oauth';
 import { handleSystemRoute } from './routes/system';
 import { handleFulfilmentRoute } from './routes/fulfilment';
@@ -161,7 +162,64 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const limited = await enforceRateLimit(generalLimiter, auth.user.id, 'API request');
     if (limited) return limited;
   }
-  if (request.method === 'POST' && (path === '/ebay/accounts' || new RegExp('^/ebay/accounts/[^/]+/(connect|sync)$').test(path)) && env.EBAY_INTEGRATION_RATE_LIMITER) {
+  if ((path === '/integrations/ebay/credentials' || /^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/.test(path) || path === '/ebay/accounts' || new RegExp('^/ebay/accounts/[^/]+/(connect|sync)
+    const limited = await enforceRateLimit(env.EBAY_INTEGRATION_RATE_LIMITER, auth.user.id, 'eBay integration request');
+    if (limited) return limited;
+  }
+  if (request.method === 'POST' && path === '/access/invitations' && env.INVITATION_RATE_LIMITER) {
+    const limited = await enforceRateLimit(env.INVITATION_RATE_LIMITER, auth.user.id, 'Invitation request');
+    if (limited) return limited;
+  }
+
+  if (request.method === 'GET' && (path === '/auth/me' || path === '/me')) {
+    return json({ user: { ...auth.user, isActive: true }, organizationId: auth.organizationId });
+  }
+
+  const requiredPermission = permissionByRoute(request.method, path);
+  if (requiredPermission === undefined) {
+    return json({ error: 'This API module has not yet been migrated to the Cloudflare Worker.' }, 501);
+  }
+  if (requiredPermission && !auth.permissions.has('*') && !auth.permissions.has(requiredPermission)) {
+    return json({ error: 'You do not have permission to perform this action in the selected workspace.' }, 403);
+  }
+
+  try {
+    const integrationManagementResponse = await handleIntegrationManagementRoute(path, request, auth, env);
+    if (integrationManagementResponse) return integrationManagementResponse;
+    const accessResponse = await handleAccessRoute(path, request, auth, env);
+    if (accessResponse) return accessResponse;
+    const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
+    if (dashboardResponse) return dashboardResponse;
+    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth, env);
+    if (marketplaceResponse) return marketplaceResponse;
+    const systemResponse = await handleSystemRoute(path, request, auth);
+    if (systemResponse) return systemResponse;
+
+    const orderPurchasingResponse = await handleOrderPurchasingRoute(path, request, url, auth);
+    if (orderPurchasingResponse) return orderPurchasingResponse;
+    const returnResponse = await handleReturnRoute(path, request, auth);
+    if (returnResponse) return returnResponse;
+
+    const fulfilmentResponse = await handleFulfilmentRoute(path, request, auth);
+    if (fulfilmentResponse) return fulfilmentResponse;
+    const financeResponse = await handleFinanceRoute(path, request, url, auth);
+    if (financeResponse) return financeResponse;
+
+    const inventoryResponse = await handleInventoryRoute(path, request, url, auth);
+    if (inventoryResponse) return inventoryResponse;
+    const dropshippingResponse = await handleDropshippingRoute(path, request, auth);
+    if (dropshippingResponse) return dropshippingResponse;
+    const reportResponse = await handleReportRoute(path, request, url, auth);
+    if (reportResponse) return reportResponse;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const expected = /required|must |invalid|unsupported|between|too long|not found|inactive|authorized|amount|select|decision|stock|adjustment/i.test(message);
+    return json({ error: expected ? message : 'The workspace database request could not be completed.' }, expected ? 400 : 500);
+  }
+
+  return json({ error: 'API route not found.' }, 404);
+}
+).test(path)) && env.EBAY_INTEGRATION_RATE_LIMITER) {
     const limited = await enforceRateLimit(env.EBAY_INTEGRATION_RATE_LIMITER, auth.user.id, 'eBay integration request');
     if (limited) return limited;
   }
