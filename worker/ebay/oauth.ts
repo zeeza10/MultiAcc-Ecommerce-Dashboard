@@ -248,6 +248,9 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     const code = Array.isArray(relation) ? relation[0]?.code : relation?.code;
     return { effect: row.effect, code };
   }).filter((row: any) => typeof row.code === 'string');
+  if (typeof roleCode !== 'string') {
+    return callbackPage('Authorization could not be verified', 'Your workspace role could not be verified. Ask an administrator to review access.', false);
+  }
   const currentPermissions = resolveEffectivePermissions(roleCode, basePermissions, overrides);
   if (!currentPermissions.has('*') && !currentPermissions.has('marketplace.manage')) {
     await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CALLBACK_PERMISSION_DENIED', severity: 'WARNING', errorCode: 'MARKETPLACE_MANAGE_REVOKED', message: 'Marketplace management permission was removed before OAuth callback.' });
