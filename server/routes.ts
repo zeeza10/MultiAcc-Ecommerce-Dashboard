@@ -11,7 +11,6 @@ import { resolveEffectivePermissions } from '../worker/permission-overrides';
 import { permissionByRoute as workerPermissionByRoute } from '../worker/permissions';
 import { db } from './db';
 import { engine } from './engine';
-import { ebayAdapter } from './ebayAdapter';
 import { reportsService } from './reports';
 import {
   User,
@@ -963,24 +962,6 @@ apiRouter.get('/ebay/accounts', (_req: Request, res: Response) => {
     accounts: raw.marketplaceAccounts,
     recentSyncs: raw.syncRuns.slice(0, 10),
   });
-});
-
-apiRouter.post('/ebay/accounts/:id/sync', async (req: Request, res: Response) => {
-  try {
-    const result = await ebayAdapter.fetchOrders(req.params.id);
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Sync failed' });
-  }
-});
-
-apiRouter.post('/ebay/accounts/:id/connect', async (req: Request, res: Response) => {
-  try {
-    const result = await ebayAdapter.connect(req.params.id);
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'OAuth connect failed' });
-  }
 });
 
 apiRouter.get('/ebay/exceptions', (_req: Request, res: Response) => {
