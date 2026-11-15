@@ -119,7 +119,7 @@ async function fetchEbayOrders(account: any, accessToken: string, since: string)
     const payload = await response.json() as { orders?: any[]; total?: number };
     const batch = Array.isArray(payload.orders) ? payload.orders : [];
     all.push(...batch);
-    total = Number.isFinite(payload.total) ? Number(payload.total) : offset + batch.length;
+    total = Number.isFinite(payload.total) ? Number(payload.total) : Number.POSITIVE_INFINITY;
     pages++;
     if (batch.length < PAGE_SIZE) break;
     offset += batch.length;
