@@ -129,10 +129,13 @@ export const api = {
 
   // eBay Accounts & Sync
   getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string }>('/ebay/accounts'),
+  createEbayAccount: (payload: { name: string; marketplace: 'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'; environment: 'SANDBOX' | 'PRODUCTION' }) => request<{ account: MarketplaceAccount }>('/ebay/accounts', { method: 'POST', body: JSON.stringify(payload) }),
+  getEbayIntegrationConfig: () => request<{ environments: Array<{ environment: string; configured: boolean; clientIdMasked: string; credentialVersion: number; updatedAt: string | null }>; productionOAuthEnabled: boolean; encryptionReady: boolean }>('/ebay/integration/config'),
+  saveEbayIntegrationConfig: (payload: { environment: 'SANDBOX' | 'PRODUCTION'; clientId: string; clientSecret: string; ruName: string; expectedVersion: number }) => request<{ success: boolean }>('/ebay/integration/config', { method: 'POST', body: JSON.stringify(payload) }),
   syncEbayAccount: (id: string) =>
     request<{ imported: number; skipped: number; exceptions: number }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
   connectEbayAccount: (id: string) =>
-    request<{ success: boolean; message: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
+    request<{ authorizationUrl: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
   getExceptions: () => request<{ exceptions: ExceptionItem[] }>('/ebay/exceptions'),
   resolveException: (id: string, targetProductId: string, resolutionNote?: string) =>
     request<{ success: boolean; exception: ExceptionItem }>(`/ebay/exceptions/${id}/resolve`, {
