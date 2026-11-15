@@ -326,7 +326,7 @@ export async function refreshExpiringEbayTokens(env: WorkerEnv): Promise<void> {
   const refreshBefore = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const { data: credentials, error } = await service
     .from('marketplace_credentials')
-    .select('organization_id,marketplace_account_id,refresh_token_ciphertext,encryption_key_version,scopes,expires_at,refresh_token_expires_at,marketplace_accounts!inner(environment)')
+    .select('organization_id,marketplace_account_id,refresh_token_ciphertext,encryption_key_version,scopes,expires_at,refresh_token_expires_at,marketplace_accounts!marketplace_credentials_account_org_fkey!inner(environment)')
     .not('refresh_token_ciphertext', 'is', null)
     .is('revoked_at', null)
     .lt('expires_at', refreshBefore)
