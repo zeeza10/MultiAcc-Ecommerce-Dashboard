@@ -21,9 +21,9 @@ export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthCo
   return { clientId, clientSecret, ruName, environment };
 }
 
-export function serviceClient(env: WorkerEnv) {
+export function serviceClient(env: WorkerEnv): any {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient<any>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
@@ -57,9 +57,9 @@ async function sha256Hex(value: string): Promise<string> {
 export async function encryptToken(plaintext: string, encodedKey: string): Promise<string> {
   const rawKey = fromBase64(encodedKey);
   if (rawKey.byteLength !== 32) throw new Error('Token encryption key must decode to exactly 32 bytes.');
-  const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
+  const key = await crypto.subtle.importKey('raw', rawKey.buffer as ArrayBuffer, 'AES-GCM', false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, new TextEncoder().encode(plaintext).buffer as ArrayBuffer);
   return `v1.${toBase64(iv)}.${toBase64(new Uint8Array(encrypted))}`;
 }
 
@@ -68,8 +68,10 @@ export async function decryptToken(ciphertext: string, encodedKey: string): Prom
   if (version !== 'v1' || !ivText || !dataText) throw new Error('Unsupported encrypted token format.');
   const rawKey = fromBase64(encodedKey);
   if (rawKey.byteLength !== 32) throw new Error('Token encryption key must decode to exactly 32 bytes.');
-  const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivText) }, key, fromBase64(dataText));
+  const key = await crypto.subtle.importKey('raw', rawKey.buffer as ArrayBuffer, 'AES-GCM', false, ['decrypt']);
+  const iv = fromBase64(ivText);
+  const data = fromBase64(dataText);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, data.buffer as ArrayBuffer);
   return new TextDecoder().decode(decrypted);
 }
 
@@ -90,7 +92,7 @@ export function basicAuthorization(config: OAuthConfig): string {
 }
 
 export async function logEvent(
-  client: ReturnType<typeof createClient>,
+  client: any,
   input: { organizationId: string; accountId: string; eventType: string; severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'; errorCode?: string; message: string; metadata?: Record<string, unknown> },
 ): Promise<void> {
   await client.from('marketplace_integration_events').insert({
@@ -305,7 +307,9 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     access_token?: string; refresh_token?: string; expires_in?: number;
     refresh_token_expires_in?: number; token_type?: string;
   };
-  if (!tokenData.access_token || !tokenData.refresh_token || !Number.isFinite(tokenData.expires_in) || !Number.isFinite(tokenData.refresh_token_expires_in)) {
+  const expiresIn = tokenData.expires_in;
+  const refreshTokenExpiresIn = tokenData.refresh_token_expires_in;
+  if (!tokenData.access_token || !tokenData.refresh_token || typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || typeof refreshTokenExpiresIn !== 'number' || !Number.isFinite(refreshTokenExpiresIn)) {
     await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_TOKEN_RESPONSE_INVALID', severity: 'ERROR', message: 'eBay returned an incomplete token response.' });
     return callbackPage('eBay returned an incomplete response', 'The account was not marked as connected. Please restart authorization.', false);
   }
@@ -316,8 +320,8 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
       encryptToken(tokenData.refresh_token, env.EBAY_TOKEN_ENCRYPTION_KEY),
     ]);
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + tokenData.expires_in * 1000).toISOString();
-    const refreshExpiresAt = new Date(now.getTime() + tokenData.refresh_token_expires_in * 1000).toISOString();
+    const expiresAt = new Date(now.getTime() + expiresIn * 1000).toISOString();
+    const refreshExpiresAt = new Date(now.getTime() + refreshTokenExpiresIn * 1000).toISOString();
 
     const { error: credentialError } = await service.from('marketplace_credentials').upsert({
       organization_id: state.organization_id,
