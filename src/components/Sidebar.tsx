@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -21,6 +21,8 @@ import {
   Settings,
   Boxes,
   Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { NavItem, User, SystemConfig } from '../types';
 
@@ -54,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingExceptionsCount,
 }) => {
   const currentPhase = config.activeReleasePhase;
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Effective permissions already combine role defaults with Super Admin's
   // user-specific GRANT/DENY overrides. Do not apply hard-coded role filters
@@ -139,6 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         { id: 'audit-log', label: 'Audit Log', icon: History, phase: 'P1', permission: 'audit.view' },
         { id: 'employee-access', label: 'Employees & Permissions', icon: Users, phase: 'P1', permission: 'users.manage', allowedRoles: ['SUPER_ADMIN'] },
+        { id: 'integration-management', label: 'Integrations & API Management', icon: Sliders, phase: 'P1', allowedRoles: ['SUPER_ADMIN'] },
         { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1', permission: 'settings.manage' },
       ],
     },
@@ -146,12 +150,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
+    <aside className={`${isCollapsed ? "w-16" : "w-64"} bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 min-h-[calc(100vh-4rem)] transition-[width] duration-200 ease-in-out overflow-hidden`}>
       <div className="p-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between border-b border-gray-200">
-        <span>Operations Menu</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono">
+        {!isCollapsed && <span>Operations Menu</span>}
+        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
+        {!isCollapsed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono">
           {currentUser.role === 'CLIENT_USER' ? '3PL Portal' : 'OriaFuture ERP'}
-        </span>
+        </span>}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5 text-xs">
@@ -161,9 +168,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           return (
             <div key={group.title}>
-              <div className="px-3 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+              {!isCollapsed && <div className="px-3 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                 {group.title}
-              </div>
+              </div>}
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
                   const isActive = activeTab === item.id;
@@ -174,7 +181,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       key={item.id}
                       onClick={() => onNavigate(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition font-medium ${
+                      title={isCollapsed ? item.label : undefined}
+                      className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between"} px-3 py-2 rounded-md transition font-medium ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-xs'
                           : 'text-gray-700 hover:bg-gray-200/70 hover:text-gray-900'
@@ -182,10 +190,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <div className="flex items-center space-x-2.5 truncate">
                         <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
-                        <span className="truncate">{item.label}</span>
+                        {!isCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
 
-                      <div className="flex items-center space-x-1 shrink-0">
+                      {!isCollapsed && <div className="flex items-center space-x-1 shrink-0">
                         {item.badge !== undefined && (
                           <span
                             className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
@@ -210,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {item.phase}
                           </span>
                         )}
-                      </div>
+                      </div>}
                     </button>
                   );
                 })}
@@ -222,13 +230,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Role and Isolation Footer */}
       <div className="p-3 border-t border-gray-200 bg-white/70 text-[11px] text-gray-500">
-        <div className="flex items-center space-x-1.5 font-medium text-gray-700">
+        <div className={`flex items-center ${isCollapsed ? "justify-center" : "space-x-1.5"} font-medium text-gray-700`} title={isCollapsed ? "Role Isolation Active" : undefined}>
           <Lock className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Role Isolation Active</span>
+          {!isCollapsed && <span>Role Isolation Active</span>}
         </div>
-        <p className="mt-0.5 text-[10px] text-gray-400">
+        {!isCollapsed && <p className="mt-0.5 text-[10px] text-gray-400">
           Enforced server-side. Append-only ledgers active.
-        </p>
+        </p>}
       </div>
     </aside>
   );
