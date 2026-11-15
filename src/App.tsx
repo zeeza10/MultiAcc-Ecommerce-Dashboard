@@ -48,6 +48,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tabFilterState, setTabFilterState] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -193,12 +194,13 @@ export default function App() {
         setGlobalSearch={setGlobalSearch}
         selectedStoreId={selectedStoreId}
         onStoreChange={setSelectedStoreId}
+        onOpenNavigation={() => setIsMobileSidebarOpen(true)}
       />
 
 
       {/* Global Search Results Overlay (FR-SRCH-01) */}
       {globalSearch.trim() && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-gray-200 z-50 p-4 max-h-[70vh] overflow-y-auto">
+        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-gray-200 z-50 p-4 max-h-[70vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
               Global Search Results for "{globalSearch}"
@@ -277,7 +279,7 @@ export default function App() {
       )}
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="relative flex-1 flex w-full max-w-none mx-auto">
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -287,10 +289,12 @@ export default function App() {
           config={config}
           unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
         {/* Center Main View */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="min-w-0 flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <DashboardView
               currentUser={currentUser}
