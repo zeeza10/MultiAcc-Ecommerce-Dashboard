@@ -29,6 +29,7 @@ export interface Env {
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
   INVITATION_RATE_LIMITER?: RateLimitBinding;
+  EBAY_INTEGRATION_RATE_LIMITER?: RateLimitBinding;
 }
 
 export interface ExecutionContext {
