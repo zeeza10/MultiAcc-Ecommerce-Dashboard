@@ -203,7 +203,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] text-slate-500">
-              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? item.clientIdMasked : 'not configured'}`).join(' · ') || 'Server encryption and Supabase service credentials must be configured first.'}
+              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? item.clientIdMasked : 'not configured'}`).join(' · ') || 'Server encryption and Supabase secret-key credentials must be configured first.'}
             </span>
             <button onClick={handleSaveCredentials} disabled={credentialSaving || !clientIdInput.trim() || !clientSecretInput.trim() || !ruNameInput.trim()} className="px-3 py-2 rounded-md bg-slate-900 text-white text-xs disabled:opacity-50">
               {credentialSaving ? 'Saving securely…' : 'Save Encrypted Credentials'}
