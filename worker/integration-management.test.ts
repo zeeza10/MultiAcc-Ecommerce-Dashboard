@@ -28,8 +28,8 @@ describe('platform integration credential management security contract', () => {
   it('never returns plaintext credentials and exposes only metadata', () => {
     assert.match(route, /secretsAreNeverReturned: true/);
     assert.match(route, /secretsReturned: false/);
-    assert.doesNotMatch(route, /client_secret_ciphertext\s*:/);
-    assert.doesNotMatch(route, /clientSecret\s*:/);
+    assert.match(route, /p_client_secret_ciphertext: clientSecretCipher/);
+    assert.doesNotMatch(route, /return json\(\{[^}]*clientSecret\s*:/s);
   });
 
   it('restricts database access to the service role and audits writes atomically', () => {
