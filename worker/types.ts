@@ -19,6 +19,7 @@ export type WorkerEnv = {
 
 export type AuthContext = {
   user: { id: string; email: string; name: string; role: string; clientId?: string };
+  assuranceLevel: 'aal1' | 'aal2';
   organizationId: string;
   permissions: Set<string>;
   repositoryContext: RepositoryContext;
