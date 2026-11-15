@@ -85,5 +85,7 @@ describe('platform integration credential vault migration', () => {
     assert.match(migration, /SET search_path = ''/);
     assert.match(migration, /auth\.jwt\(\) ->> 'role'/);
     assert.match(migration, /INSERT INTO public\.platform_integration_audit/);
+    assert.match(migration, /pg_advisory_xact_lock/);
+    assert.match(migration, /credential version conflict/);
   });
 });
