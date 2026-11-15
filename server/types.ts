@@ -35,11 +35,12 @@ export interface MarketplaceAccount {
   authStatus: 'CONNECTED' | 'EXPIRED' | 'DISCONNECTED' | 'ERROR';
   environment: 'SANDBOX' | 'PRODUCTION';
   lastSyncAt?: string;
-  lastSyncStatus: 'SUCCESS' | 'ERROR' | 'PARTIAL';
+  lastSyncStatus: 'SUCCESS' | 'ERROR' | 'PARTIAL' | 'NOT_SYNCED' | 'AUTH_REQUIRED' | 'RETRYING' | 'FAILED';
   lastSyncMessage?: string;
   tokenExpiresAt?: string;
   autoSyncIntervalMinutes: number;
   isDemo: boolean;
+  oauthReady?: boolean;
 }
 
 export interface SyncRun {
