@@ -1,13 +1,9 @@
 import {
-  basicAuthorization,
-  configFor,
   decryptToken,
   encryptToken,
   logEvent,
   refreshExpiringEbayTokens,
   serviceClient,
-  tokenEndpoint,
-  type EbayEnvironment,
   type WorkerEnv,
 } from './oauth';
 
@@ -361,11 +357,17 @@ export async function processDueEbaySyncJobs(env: WorkerEnv): Promise<void> {
   const now = Date.now();
   const { data: accounts } = await service.from('marketplace_accounts')
     .select('id,organization_id,auto_sync_interval_minutes,last_sync_at')
-    .eq('marketplace', 'EBAY_UK')
+    .in('marketplace', ['EBAY_UK','EBAY_US','EBAY_DE'])
     .eq('is_demo', false)
     .eq('auth_status', 'CONNECTED')
     .limit(100);
   for (const account of accounts || []) {
+    const { data: activeJobs } = await service.from('marketplace_sync_jobs')
+      .select('id')
+      .eq('marketplace_account_id', account.id)
+      .in('status', ['QUEUED','RUNNING','FAILED'])
+      .limit(1);
+    if (activeJobs?.length) continue;
     const interval = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes) || 30));
     const dueAt = account.last_sync_at ? new Date(account.last_sync_at).getTime() + interval * 60_000 : 0;
     if (dueAt > now) continue;
