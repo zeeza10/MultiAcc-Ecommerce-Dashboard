@@ -45,3 +45,34 @@ The exact binding names will be finalized in the OAuth implementation. Keep Sand
 - eBay Authorization and OAuth grant flows: https://developer.ebay.com/develop/guides/sell/authorization
 - eBay OAuth credentials and environment separation: https://developer.ebay.com/api-docs/static/oauth-credentials.html
 - eBay OAuth token types: https://developer.ebay.com/api-docs/static/oauth-token-types.html
+
+
+## Implemented secure foundation (no live credentials required yet)
+
+- The legacy simulated adapter and its Express connect/sync routes have been removed. The UI no longer presents mock connect or sync actions.
+- OAuth start is account-scoped and requires `marketplace.manage`. It refuses demo accounts and validates that the account belongs to the caller's active organization.
+- OAuth state is generated from 256 bits of cryptographic randomness, stored only as a SHA-256 hash, bound to the user, organization, account and environment, and expires after ten minutes. The callback atomically deletes the state row before exchanging the code, preventing replay.
+- The callback exchanges the one-time code server-side, encrypts both tokens using AES-256-GCM, and only then marks the account connected. Tokens and authorization codes are never returned to the browser or written to logs.
+- A Worker Cron runs every 15 minutes and refreshes access tokens nearing expiry. Invalid/revoked refresh tokens mark the account as requiring renewed authorization.
+- Server-only credentials, OAuth state, and sync job tables are not exposed to browser roles. Sanitized integration events are visible only to users with marketplace view permission.
+- eBay credentials and the 32-byte token-encryption key are intentionally not configured. The secure flow remains unavailable until these are supplied as Cloudflare Worker Secrets.
+
+## Required Cloudflare Worker Secrets (do not put these in wrangler.jsonc vars)
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `EBAY_SANDBOX_CLIENT_ID`
+- `EBAY_SANDBOX_CLIENT_SECRET`
+- `EBAY_SANDBOX_RUNAME`
+- `EBAY_PRODUCTION_CLIENT_ID`
+- `EBAY_PRODUCTION_CLIENT_SECRET`
+- `EBAY_PRODUCTION_RUNAME`
+- `EBAY_TOKEN_ENCRYPTION_KEY` (base64 encoding of exactly 32 random bytes)
+
+The eBay RuName's Auth Accepted URL must point to `https://<your-worker-host>/api/v1/ebay/oauth/callback`. Configure the Auth Declined URL to the same callback path so the state can be consumed and the declined grant recorded. The eBay developer portal creates the RuName; it is not an arbitrary URL.
+
+## Remaining before live order import
+
+- Implement and test the real Sell Fulfillment API importer, pagination, line-item mapping, database transaction and unique-key idempotency.
+- Add the user-facing real marketplace account creation/selection flow (current three rows are demo records and cannot be authorized).
+- Add a durable sync-job worker, bounded retries, dead-letter handling and automated polling/webhook ingestion.
+- Configure Sandbox app credentials and run a full seller-consent + order-import test before Production.
