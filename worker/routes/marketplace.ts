@@ -29,7 +29,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     return json({ account: {
       id: data.id, name: data.name, marketplace: data.marketplace, sellerUsername: data.seller_username || '',
       authStatus: data.auth_status, environment: data.environment, isDemo: data.is_demo,
-      autoSyncIntervalMinutes: data.auto_sync_interval_minutes,
+      lastSyncStatus: 'NOT_SYNCED', autoSyncIntervalMinutes: data.auto_sync_interval_minutes,
     } }, 201);
   }
 
