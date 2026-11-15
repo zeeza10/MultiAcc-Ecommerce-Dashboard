@@ -48,6 +48,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tabFilterState, setTabFilterState] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -193,6 +194,7 @@ export default function App() {
         setGlobalSearch={setGlobalSearch}
         selectedStoreId={selectedStoreId}
         onStoreChange={setSelectedStoreId}
+        onOpenNavigation={() => setIsMobileSidebarOpen(true)}
       />
 
 
@@ -287,6 +289,8 @@ export default function App() {
           config={config}
           unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
         {/* Center Main View */}
