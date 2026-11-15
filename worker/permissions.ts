@@ -1,7 +1,7 @@
 export const permissionByRoute = (method: string, path: string): string | null | undefined => {
   if (method === 'GET' && /^\/(auth\/me|me)\/?$/.test(path)) return null;
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
-  if (method === 'GET' && path === '/integrations/ebay/credentials') return 'marketplace.manage';
+  if (method === 'GET' && (path === '/integrations/ebay/credentials' || path === '/integrations/ebay/audit')) return 'marketplace.manage';
   if (method === 'PUT' && /^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
   if (method === 'POST' && path === '/ebay/accounts') return 'marketplace.manage';
