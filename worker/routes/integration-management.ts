@@ -77,6 +77,9 @@ export async function handleIntegrationManagementRoute(
     if (Object.keys(body).some(key => !['clientId', 'clientSecret', 'ruName'].includes(key))) {
       return json({ error: 'Unexpected credential fields were supplied.' }, 400);
     }
+    if (!Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+      return json({ error: 'A valid expected credential version is required. Refresh the page and try again.' }, 409);
+    }
     const clientId = cleanCredential(body.clientId, 256);
     const clientSecret = cleanCredential(body.clientSecret, 512);
     const ruName = cleanCredential(body.ruName, 256);
@@ -95,6 +98,7 @@ export async function handleIntegrationManagementRoute(
       const masked = `${clientId.slice(0, 3)}••••${clientId.slice(-4)}`;
       const { data, error } = await service.rpc('save_platform_integration_credentials', {
         p_environment: environment,
+        p_expected_version: Number(body.expectedVersion),
         p_client_id_ciphertext: clientIdCipher,
         p_client_secret_ciphertext: clientSecretCipher,
         p_ru_name_ciphertext: ruNameCipher,
