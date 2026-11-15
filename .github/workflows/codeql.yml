@@ -30,6 +30,8 @@ jobs:
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           category: "/language:javascript-typescript"
+          # Keep SARIF as a workflow artifact until GitHub code scanning is enabled for this repository.
+          upload: false
           output: codeql-results
 
       - name: Archive CodeQL SARIF for review
