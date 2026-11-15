@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
 import { json } from '../http';
+import { resolveEffectivePermissions } from '../permission-overrides';
 
 export type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
 
@@ -212,6 +213,47 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
   }
 
   const environment = state.environment as EbayEnvironment;
+  const [{ data: membership }, { data: account }] = await Promise.all([
+    service.from('organization_members')
+      .select('role_id,is_active,roles(code)')
+      .eq('organization_id', state.organization_id)
+      .eq('user_id', state.user_id)
+      .maybeSingle(),
+    service.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo')
+      .eq('id', state.marketplace_account_id)
+      .eq('organization_id', state.organization_id)
+      .maybeSingle(),
+  ]);
+  if (!membership?.is_active || !account || account.is_demo || account.environment !== environment || !['EBAY_UK','EBAY_US','EBAY_DE'].includes(account.marketplace)) {
+    await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CALLBACK_AUTHORIZATION_REVOKED', severity: 'WARNING', errorCode: 'MEMBERSHIP_OR_ACCOUNT_CHANGED', message: 'The user or marketplace account is no longer eligible to complete authorization.' });
+    return callbackPage('Authorization no longer permitted', 'Your workspace access or marketplace account changed while eBay authorization was open. Return to MultiAcc and ask an administrator to review access.', false);
+  }
+
+  const [roleRowsResult, overrideRowsResult] = await Promise.all([
+    service.from('role_permissions').select('permissions(code)').eq('role_id', membership.role_id),
+    service.from('organization_member_permission_overrides').select('effect,permissions(code)').eq('organization_id', state.organization_id).eq('user_id', state.user_id),
+  ]);
+  if (roleRowsResult.error || overrideRowsResult.error) {
+    return callbackPage('Authorization could not be verified', 'MultiAcc could not re-check your current workspace permissions. Restart the connection after the administrator verifies access.', false);
+  }
+  const roleCodeRelation = membership.roles;
+  const roleCode = Array.isArray(roleCodeRelation) ? roleCodeRelation[0]?.code : (roleCodeRelation as any)?.code;
+  const basePermissions = (roleRowsResult.data || []).map((row: any) => {
+    const relation = row.permissions;
+    return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+  }).filter((value: unknown): value is string => typeof value === 'string');
+  const overrides = (overrideRowsResult.data || []).map((row: any) => {
+    const relation = row.permissions;
+    const code = Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    return { effect: row.effect, code };
+  }).filter((row: any) => typeof row.code === 'string');
+  const currentPermissions = resolveEffectivePermissions(roleCode, basePermissions, overrides);
+  if (!currentPermissions.has('*') && !currentPermissions.has('marketplace.manage')) {
+    await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CALLBACK_PERMISSION_DENIED', severity: 'WARNING', errorCode: 'MARKETPLACE_MANAGE_REVOKED', message: 'Marketplace management permission was removed before OAuth callback.' });
+    return callbackPage('Marketplace permission was removed', 'Your current workspace role no longer permits connecting this eBay account.', false);
+  }
+
   const config = configFor(env, environment);
   if (!config) {
     await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CONFIGURATION_MISSING', severity: 'ERROR', message: 'The eBay application configuration is incomplete.' });
