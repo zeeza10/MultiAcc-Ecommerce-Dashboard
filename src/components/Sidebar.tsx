@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between border-b border-gray-200">
         <span>Operations Menu</span>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono">
-          {currentUser.role === 'CLIENT_USER' ? '3PL Portal' : 'Nexus ERP'}
+          {currentUser.role === 'CLIENT_USER' ? '3PL Portal' : 'OriaFuture ERP'}
         </span>
       </div>
 
