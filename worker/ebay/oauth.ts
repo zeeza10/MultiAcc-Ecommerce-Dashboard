@@ -12,18 +12,7 @@ export const REQUIRED_SCOPES = [
 
 export type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
 
-// Legacy Worker Secrets remain a controlled fallback during migration. New values
-// saved in the Super Admin vault always take precedence and are decrypted only in
-// the Worker process; plaintext is never returned to a browser response.
-export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | null {
-  const sandbox = environment === 'SANDBOX';
-  const clientId = sandbox ? env.EBAY_SANDBOX_CLIENT_ID : env.EBAY_PRODUCTION_CLIENT_ID;
-  const clientSecret = sandbox ? env.EBAY_SANDBOX_CLIENT_SECRET : env.EBAY_PRODUCTION_CLIENT_SECRET;
-  const ruName = sandbox ? env.EBAY_SANDBOX_RUNAME : env.EBAY_PRODUCTION_RUNAME;
-  if (!clientId || !clientSecret || !ruName) return null;
-  return { clientId, clientSecret, ruName, environment };
-}
-
+// Application credentials are resolved from the encrypted platform vault only.
 function credentialAad(environment: EbayEnvironment, field: string): string {
   return `platform:EBAY:${environment}:${field}:v1`;
 }
@@ -291,7 +280,7 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     return callbackPage('Marketplace permission was removed', 'Your current workspace role no longer permits connecting this eBay account.', false);
   }
 
-  const config = configFor(env, environment);
+  const config = await resolveEbayOAuthConfig(env, environment);
   if (!config) {
     await logEvent(service, { organizationId: state.organization_id, accountId: state.marketplace_account_id, eventType: 'OAUTH_CONFIGURATION_MISSING', severity: 'ERROR', message: 'The eBay application configuration is incomplete.' });
     return callbackPage('Authorization configuration is incomplete', 'The eBay application settings for this environment are missing.', false);
