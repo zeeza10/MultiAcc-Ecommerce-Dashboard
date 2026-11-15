@@ -39,6 +39,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [targetProductId, setTargetProductId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newMarketplace, setNewMarketplace] = useState<'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'>('EBAY_UK');
+  const [newEnvironment, setNewEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
 
   useEffect(() => {
     loadData();
@@ -68,29 +73,41 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     }
   };
 
+  const handleCreateAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCreatingAccount(true);
+    try {
+      await api.createEbayAccount({ name: newAccountName, marketplace: newMarketplace, environment: newEnvironment });
+      setNewAccountName('');
+      setShowAddAccount(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Could not create the marketplace account.');
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
+  const handleConnect = async (accountId: string) => {
+    try {
+      const result = await api.beginEbayAuthorization(accountId);
+      window.location.assign(result.authorizationUrl);
+    } catch (err: any) {
+      alert(err.message || 'Could not start eBay authorization.');
+    }
+  };
+
   const handleSync = async (accountId: string) => {
     setSyncingAccountId(accountId);
     setSyncFeedback(null);
     try {
-      const res = await api.syncEbayAccount(accountId);
-      setSyncFeedback(
-        `Sync completed: ${res.imported} new imported, ${res.skipped} skipped as duplicates (AT-01 idempotent), ${res.exceptions} exceptions raised.`
-      );
-      loadData();
+      const result = await api.syncEbayAccount(accountId, crypto.randomUUID());
+      setSyncFeedback(`Synchronization job queued. Reference: ${result.jobId || 'pending'}`);
+      await loadData();
     } catch (err: any) {
-      setSyncFeedback(`Sync failed: ${err.message}`);
+      setSyncFeedback(`Could not queue synchronization: ${err.message}`);
     } finally {
       setSyncingAccountId(null);
-    }
-  };
-
-  const handleReconnect = async (accountId: string) => {
-    try {
-      const res = await api.connectEbayAccount(accountId);
-      alert(res.message);
-      loadData();
-    } catch (err: any) {
-      alert(`OAuth connect failed: ${err.message}`);
     }
   };
 
@@ -121,8 +138,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          <button onClick={() => setShowAddAccount(v => !v)} className="px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
+            Add eBay account
+          </button>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 font-semibold">
-            Read-only mode — OAuth setup pending
+            {integrationReady ? 'Secure OAuth configured' : 'OAuth credentials pending'}
           </span>
         </div>
       </div>
@@ -133,6 +153,28 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           <p>{integrationMessage}</p>
           <p className="mt-1">Existing account statuses are database records only; they do not confirm a live eBay OAuth connection.</p>
         </div>
+      )}
+      {showAddAccount && (
+        <form onSubmit={handleCreateAccount} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+          <div className="font-semibold text-sm text-gray-900">Create a real eBay marketplace account</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input required minLength={2} maxLength={120} value={newAccountName} onChange={e => setNewAccountName(e.target.value)} placeholder="Account display name" className="border border-gray-300 rounded-md px-3 py-2 text-xs" />
+            <select value={newMarketplace} onChange={e => setNewMarketplace(e.target.value as any)} className="border border-gray-300 rounded-md px-3 py-2 text-xs">
+              <option value="EBAY_UK">eBay United Kingdom</option>
+              <option value="EBAY_US">eBay United States</option>
+              <option value="EBAY_DE">eBay Germany</option>
+            </select>
+            <select value={newEnvironment} onChange={e => setNewEnvironment(e.target.value as any)} className="border border-gray-300 rounded-md px-3 py-2 text-xs">
+              <option value="SANDBOX">Sandbox (testing)</option>
+              <option value="PRODUCTION">Production (live)</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setShowAddAccount(false)} className="px-3 py-2 text-xs text-gray-600 border rounded-md">Cancel</button>
+            <button type="submit" disabled={creatingAccount} className="px-3 py-2 text-xs text-white bg-indigo-600 rounded-md disabled:opacity-50">{creatingAccount ? 'Creating…' : 'Create account'}</button>
+          </div>
+          <p className="text-[11px] text-gray-500">This creates an unconnected account record. It does not claim that eBay authorization has been completed.</p>
+        </form>
       )}
 
       {syncFeedback && (
@@ -158,7 +200,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           }`}
         >
           <Store className="w-4 h-4" />
-          <span>Connected Seller Accounts ({accounts.length})</span>
+          <span>Marketplace Accounts ({accounts.length})</span>
         </button>
 
         <button
@@ -226,23 +268,13 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end space-x-2 pt-1">
-                    <button
-                      onClick={() => handleReconnect(acc.id)}
-                      disabled={!integrationReady}
-                      title={!integrationReady ? integrationMessage : undefined}
-                      className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Renew OAuth
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button onClick={() => handleConnect(acc.id)} disabled={!acc.oauthReady} title={acc.isDemo ? 'Demo accounts cannot be connected.' : !acc.oauthReady ? integrationMessage : undefined} className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                      {acc.authStatus === 'CONNECTED' ? 'Reconnect eBay' : 'Connect eBay'}
                     </button>
-
-                    <button
-                      onClick={() => handleSync(acc.id)}
-                      disabled={!integrationReady || isSyncing}
-                      className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <button onClick={() => handleSync(acc.id)} disabled={!acc.oauthReady || acc.isDemo || acc.authStatus !== 'CONNECTED' || isSyncing} className="px-3 py-1.5 text-xs text-white bg-indigo-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Polling...' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
+                      {isSyncing ? 'Queuing…' : 'Sync orders'}
                     </button>
                   </div>
                 </div>
