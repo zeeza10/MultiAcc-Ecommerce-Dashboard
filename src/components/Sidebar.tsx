@@ -34,6 +34,8 @@ interface SidebarProps {
   config: SystemConfig;
   unreadAlertCount: number;
   pendingExceptionsCount: number;
+  isMobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
 interface NavMenuItem {
@@ -54,6 +56,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   config,
   unreadAlertCount,
   pendingExceptionsCount,
+  isMobileOpen,
+  onCloseMobile,
 }) => {
   const currentPhase = config.activeReleasePhase;
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -150,15 +154,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className={`${isCollapsed ? "w-16" : "w-64"} bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 min-h-[calc(100vh-4rem)] transition-[width] duration-200 ease-in-out overflow-hidden`}>
-      <div className="p-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between border-b border-gray-200">
-        {!isCollapsed && <span>Operations Menu</span>}
+    <>
+      {isMobileOpen && <button type="button" aria-label="Close navigation overlay" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" />}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,320px)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out lg:sticky lg:top-0 lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16" : "lg:w-64"}`}>
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {!isCollapsed && <span>Navigation</span>}
+        <button type="button" onClick={onCloseMobile} aria-label="Close navigation" className="ml-auto rounded-md p-1.5 text-slate-500 hover:bg-slate-200 lg:hidden">✕</button>
         <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
-        {!isCollapsed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono">
-          {currentUser.role === 'CLIENT_USER' ? '3PL Portal' : 'OriaFuture ERP'}
-        </span>}
+        
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5 text-xs">
@@ -180,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onNavigate(item.id)}
+                      onClick={() => { onNavigate(item.id); onCloseMobile(); }}
                       title={isCollapsed ? item.label : undefined}
                       className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between"} px-3 py-2 rounded-md transition font-medium ${
                         isActive
@@ -238,6 +243,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Enforced server-side. Append-only ledgers active.
         </p>}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };
