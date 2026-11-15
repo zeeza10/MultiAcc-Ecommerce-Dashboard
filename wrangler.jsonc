@@ -11,6 +11,9 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "observability": {
     "enabled": true,
     "redact_query_string": true
@@ -35,6 +38,11 @@
       "name": "INVITATION_RATE_LIMITER",
       "namespace_id": "9011501003",
       "simple": { "limit": 5, "period": 60 }
+    },
+    {
+      "name": "EBAY_INTEGRATION_RATE_LIMITER",
+      "namespace_id": "9011501004",
+      "simple": { "limit": 10, "period": 60 }
     }
   ],
   "vars": {
