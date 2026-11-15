@@ -280,7 +280,7 @@ export const EmployeeAccessView: React.FC = () => {
               <label className="text-xs font-semibold text-slate-600">Assign role<select required value={inviteRole} onChange={e=>setInviteRole(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}{role.code==='SUPER_ADMIN'?' — full organization access (MFA required)':''}</option>)}</select></label>
               <div className="flex items-end"><button disabled={saving || !inviteRole} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"><Mail className="h-4 w-4" />{saving?'Sending…':'Send invitation'}</button></div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">The employee receives a secure Supabase invitation email. New accounts are linked to this organization and the selected role after invitation creation.</p>
+            <p className="mt-3 text-xs text-slate-500">The employee receives a secure Oria Future account invitation email. New accounts are linked to this organization and the selected role after invitation creation.</p>
           </form>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
