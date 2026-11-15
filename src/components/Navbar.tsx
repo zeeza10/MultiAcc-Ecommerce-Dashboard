@@ -156,7 +156,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-gray-900 text-lg tracking-tight">NexusOps</span>
+              <span className="font-bold text-gray-900 text-lg tracking-tight">OriaFuture</span>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                 v0.1
               </span>
