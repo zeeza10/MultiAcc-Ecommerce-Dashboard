@@ -85,6 +85,9 @@ export async function getPlatformCredentials(env: WorkerEnv, environment: EbayEn
 
 export function sanitizeEbayError(value: unknown): string {
   const message = value instanceof Error ? value.message : 'eBay request failed.';
-  return message.replace(/[\r
-\t]/g, ' ').slice(0, 240);
+  return message
+    .replaceAll(String.fromCharCode(13), ' ')
+    .replaceAll(String.fromCharCode(10), ' ')
+    .replaceAll(String.fromCharCode(9), ' ')
+    .slice(0, 240);
 }
