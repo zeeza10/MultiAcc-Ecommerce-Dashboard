@@ -2,6 +2,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && /^\/(auth\/me|me)\/?$/.test(path)) return null;
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
+  if (method === 'POST' && /^\\/ebay\\/accounts\\/[^/]+\\/connect$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/ebay/exceptions') return 'marketplace.view';
   if (method === 'POST' && /^\/ebay\/exceptions\/[^/]+\/resolve$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/system/config') return 'dashboard.view';
