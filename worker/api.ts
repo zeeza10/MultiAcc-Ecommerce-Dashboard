@@ -177,7 +177,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const limited = await enforceRateLimit(generalLimiter, auth.user.id, 'API request');
     if (limited) return limited;
   }
-  if ((path === '/integrations/ebay/credentials' || /^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/.test(path) || path === '/ebay/accounts' || new RegExp('^/ebay/accounts/[^/]+/(connect|sync)
+  if ((path === '/integrations/ebay/credentials' || path === '/integrations/ebay/audit' || /^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/.test(path) || path === '/ebay/accounts' || new RegExp('^/ebay/accounts/[^/]+/(connect|sync)
     const limited = await enforceRateLimit(env.EBAY_INTEGRATION_RATE_LIMITER, auth.user.id, 'eBay integration request');
     if (limited) return limited;
   }
