@@ -1,47 +1,103 @@
-# eBay OAuth Integration Readiness
+# eBay Integration — Implementation and Readiness
 
-## Current verified state
+## Current implementation status
 
-- The legacy `server/ebayAdapter.ts` is a simulation, not a real eBay integration. Its `connect()` method marks an account connected and invents a 30-day expiry; its order sync uses hard-coded sample orders.
-- The Cloudflare Worker currently exposes safe read-only marketplace account metadata and sync history. OAuth connect, token refresh and order sync remain intentionally unavailable (501) until a real implementation is ready.
-- The current Cloudflare Worker settings were inspected without reading or exposing secret values. Only `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `ASSETS` bindings were present. No eBay OAuth credentials or token-encryption key are configured.
+The fake adapter has been removed. `server/ebayAdapter.ts`, its simulated Express connect/sync routes, and the UI's simulated actions no longer exist.
 
-## Required credentials and bindings
+Implemented in the secure integration branch:
 
-Configure these as Cloudflare Worker **Secrets**, not plain-text variables and never in GitHub source or Vite/browser environment variables:
+- Real marketplace account creation for eBay UK, US, and Germany, with separate Sandbox/Production environment selection. Existing demo rows remain marked as demo and cannot be authorized or synchronized.
+- Account-scoped OAuth Authorization Code Grant start endpoint protected by the `marketplace.manage` permission.
+- 256-bit random OAuth state, stored only as a SHA-256 hash and bound to user, organization, account and environment.
+- Ten-minute state expiry and atomic delete-on-callback to prevent replay. The callback rechecks active organization membership and effective `marketplace.manage` permission before exchanging the code.
+- Server-side authorization-code exchange; authorization codes are never persisted.
+- AES-256-GCM encryption of access and refresh tokens before storage, with authenticated additional data binding each ciphertext to its organization, marketplace account, and token type. Tokens are never returned to the browser or logged.
+- Server-only service-role access for OAuth state, encrypted credentials and sync jobs. Browser roles have explicit deny policies and no table write grants.
+- A five-minute Worker Cron for token refresh and due sync jobs.
+- eBay Sell Fulfillment API order retrieval with pagination and a 90-day initial lookback, then a seven-day overlap on subsequent runs.
+- Organization/account-scoped SKU mapping. Only verified marketplace SKU mappings are used automatically; unmatched SKUs are imported with a review exception.
+- Atomic order + line-item import through a service-role-only database function.
+- Duplicate order prevention using the existing unique key on `(marketplace_account_id, external_order_id)`.
+- Durable sync jobs with atomic `SKIP LOCKED` claiming, bounded retries, exponential backoff, dead-letter status, and recovery of abandoned jobs after the 15-minute lease expires.
+- Sanitized integration audit events and sync-run counters.
+- Per-account UI readiness; demo accounts cannot be connected or synchronized.
 
-- Sandbox eBay Client ID
-- Sandbox eBay Client Secret
-- Sandbox RuName / redirect URI identifier
-- Production eBay Client ID
-- Production eBay Client Secret
-- Production RuName / redirect URI identifier
-- A strong token-encryption key with a documented key version and rotation plan
+## Additional database hardening
 
-The exact binding names will be finalized in the OAuth implementation. Keep Sandbox and Production credentials separate. Do not paste client secrets or seller tokens into chat or commit them to the repository.
+- Employee permission overrides are now read-only for browser roles. All writes must go through the audited `set_org_member_permission_overrides` RPC; direct table INSERT/UPDATE/DELETE grants and the broad write policy have been removed.
+- Marketplace credential, OAuth-state, event and sync-job foreign-key paths have supporting indexes.
 
-## Required implementation sequence
+## Not yet verified
 
-1. Create an account-scoped OAuth start endpoint that checks `marketplace.manage`, validates the account's environment and generates a cryptographically random, one-time state value.
-2. Store OAuth state server-side with a short expiry and bind it to the authenticated user, organization, marketplace account and environment. A callback must reject missing, expired, reused or mismatched state.
-3. Redirect the seller to eBay's consent page with the exact configured RuName and least-privilege scopes.
-4. Handle the callback without trusting browser-supplied organization/account identifiers; resolve them only from the stored one-time state.
-5. Exchange the one-time authorization code server-side. Never persist the authorization code.
-6. Encrypt access and refresh tokens before storing them in `marketplace_credentials`; store key version, scopes and token expiry. Never return token values to the browser or logs.
-7. Implement refresh-token rotation and revoked-token handling. Mark the marketplace account as expired/disconnected and require fresh consent if eBay revokes the refresh token.
-8. Add real eBay Sell Fulfillment API order sync with pagination, idempotency, SKU exception handling, sync-run records, retry limits and audit events. Remove simulated adapter behavior only after parity tests pass.
+No eBay Client ID, Client Secret, RuName, token-encryption key, or Supabase service-role secret has been configured. Therefore no real seller authorization or live API call has been performed yet.
 
-## Security and operational rules
+The following need a Sandbox end-to-end test before Production is enabled:
 
-- Use the Authorization Code Grant for seller-owned data. Application/client-credentials tokens are not a substitute for seller consent.
-- Validate OAuth `state` to mitigate CSRF.
-- Keep tokens and client secrets server-side only. Redact authorization codes, tokens and sensitive buyer data from logs.
-- Use the correct Sandbox or Production OAuth and API endpoints for each account; never mix environment tokens.
-- Do not mark an account CONNECTED until eBay returns valid token material and the token has been encrypted and persisted successfully.
-- Do not start production seller authorization until Sandbox flow and order import have passed end-to-end tests.
+1. Create a Sandbox developer application and RuName.
+2. Add the server-only Worker Secrets listed below.
+3. Create one real (non-demo) Sandbox account in MultiAcc.
+4. Complete seller consent and verify encrypted token storage.
+5. Fetch a real Sandbox order and confirm its line items and currency.
+6. Repeat the same sync and verify the second run counts the order as a duplicate rather than creating another order.
+7. Test expired/revoked refresh tokens, transient API failures, rate limits, and retry/dead-letter behavior.
+
+Current importer limitations to address after the first Sandbox pass:
+
+- Order status changes for already-imported orders are not yet reconciled; duplicates are skipped to protect existing business data.
+- Inventory quantity/listing updates and eBay notification webhooks are not yet implemented.
+- The current first import is limited to 100 pages per job; very large historical accounts need checkpointed pagination/backfill.
+- The buyer shipping address is stored for fulfilment, but buyer contact email is not imported.
+- Production OAuth and live order sync must remain disabled until Sandbox tests pass.
+
+## Required Cloudflare Worker Secrets
+
+Set these through Cloudflare Worker **Settings → Variables and Secrets** as encrypted Secrets, not in `wrangler.jsonc`, GitHub source, Vite variables, or browser storage:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `EBAY_SANDBOX_CLIENT_ID`
+- `EBAY_SANDBOX_CLIENT_SECRET`
+- `EBAY_SANDBOX_RUNAME`
+- `EBAY_PRODUCTION_CLIENT_ID`
+- `EBAY_PRODUCTION_CLIENT_SECRET`
+- `EBAY_PRODUCTION_RUNAME`
+- `EBAY_TOKEN_ENCRYPTION_KEY` — Base64 encoding of exactly 32 cryptographically random bytes.
+
+The service-role key bypasses Supabase RLS. It must exist only as a Cloudflare Worker Secret and be used only by the trusted Worker. Never place it in frontend code or share it in chat.
+
+The encryption key is independent of the eBay Client Secret. Keep a protected offline backup and define a key-rotation procedure before production use. Stored ciphertext includes a `v1` format marker and the database stores `encryption_key_version = v1`.
+
+## eBay Developer Program setup
+
+1. Open https://developer.ebay.com/ and sign in with the eBay account that will own the developer application.
+2. Complete Developer Program enrollment if prompted.
+3. Open **Your Account → Application Keys**.
+4. Use the Sandbox keys first. Record the App ID (Client ID) and Cert ID (Client Secret) privately.
+5. Open **User Tokens** beside the application keys and configure the Sandbox RuName.
+6. Set a display title and a valid privacy-policy URL for the application.
+7. Set both the Auth Accepted URL and Auth Declined URL to the Cloudflare callback:
+   `https://<your-worker-host>/api/v1/ebay/oauth/callback`
+8. Save the RuName generated by eBay. Store that exact value as `EBAY_SANDBOX_RUNAME`; it is not the callback URL itself.
+9. Repeat for Production only after Sandbox validation, using the Production Client ID, Client Secret and Production RuName separately.
+
+The OAuth scopes currently requested are:
+
+- `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly`
+- `https://api.ebay.com/oauth/api_scope/sell.inventory.readonly`
+
+The first is used for seller order access. The inventory scope is reserved for the planned listing/inventory read integration; reduce scopes if that capability is not needed for the initial approval.
+
+## Encryption key generation
+
+Generate the key locally on a trusted machine. For Node.js:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Copy the output directly into the Cloudflare Secret named `EBAY_TOKEN_ENCRYPTION_KEY`. Do not commit it or paste it into ChatGPT.
 
 ## Official references
 
 - eBay Authorization and OAuth grant flows: https://developer.ebay.com/develop/guides/sell/authorization
-- eBay OAuth credentials and environment separation: https://developer.ebay.com/api-docs/static/oauth-credentials.html
-- eBay OAuth token types: https://developer.ebay.com/api-docs/static/oauth-token-types.html
+- eBay token types: https://developer.ebay.com/api-docs/static/oauth-token-types.html
+- eBay refresh-token grant: https://developer.ebay.com/api-docs/static/oauth-refresh-token-request.html
