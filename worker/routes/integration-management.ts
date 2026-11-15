@@ -111,6 +111,9 @@ export async function handleIntegrationManagementRoute(
         p_client_id_masked: masked,
         p_actor_user_id: auth.user.id,
       });
+      if (error?.message?.includes('credential version conflict')) {
+        return json({ error: 'Credentials were changed by another administrator. Refresh the status and retry with the latest version.' }, 409);
+      }
       if (error || !data?.length) return json({ error: 'Encrypted credentials and their audit record could not be saved. No success was reported.' }, 500);
       const result = data[0];
       return json({
