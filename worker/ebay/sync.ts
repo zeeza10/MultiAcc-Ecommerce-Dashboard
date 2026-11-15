@@ -378,7 +378,7 @@ export async function processDueEbaySyncJobs(env: WorkerEnv): Promise<void> {
       .in('status', ['QUEUED','RUNNING','FAILED'])
       .limit(1);
     if (activeJobs?.length) continue;
-    const interval = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes) || 30));
+    const interval = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes) || 5));
     const dueAt = account.last_sync_at ? new Date(account.last_sync_at).getTime() + interval * 60_000 : 0;
     if (dueAt > now) continue;
     const slot = Math.floor(now / (interval * 60_000));
