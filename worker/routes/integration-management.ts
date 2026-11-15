@@ -22,6 +22,17 @@ export async function handleIntegrationManagementRoute(
   const encryptionKey = env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY;
   if (!encryptionKey) return json({ error: 'The integration credential encryption service is not configured.' }, 503);
 
+  if (path === '/integrations/ebay/audit' && request.method === 'GET') {
+    const { data, error } = await service.from('platform_integration_audit')
+      .select('environment,actor_user_id,action,credential_version,metadata,created_at')
+      .eq('provider', 'EBAY').order('created_at', { ascending: false }).limit(50);
+    if (error) return json({ error: 'Integration audit history could not be loaded.' }, 500);
+    return json({ events: (data || []).map((row: any) => ({
+      environment: row.environment, actorUserId: row.actor_user_id, action: row.action,
+      credentialVersion: row.credential_version, metadata: row.metadata, createdAt: row.created_at,
+    })) });
+  }
+
   if (path === '/integrations/ebay/credentials' && request.method === 'GET') {
     const { data, error } = await service.from('platform_integration_credentials')
       .select('environment,client_id_masked,credential_version,updated_at')
