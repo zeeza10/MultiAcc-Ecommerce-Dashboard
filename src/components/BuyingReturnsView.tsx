@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { exportReportCsv, exportReportPdf } from '../utils/reportExport';
 import {
   Truck,
   Boxes,
@@ -284,6 +285,16 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       : true
   );
 
+
+  const poReportColumns = [{ key: 'poNumber', label: 'PO Number' }, { key: 'supplier', label: 'Supplier' }, { key: 'status', label: 'Status' }, { key: 'date', label: 'Created Date' }, { key: 'expected', label: 'Expected Delivery' }, { key: 'items', label: 'Items / Quantities' }, { key: 'total', label: 'Total' }];
+  const poReportRows = purchaseOrders.map(po => ({ poNumber: po.poNumber, supplier: po.supplierName, status: po.status, date: po.createdAt || '', expected: po.expectedDate || '', items: (po.lines || []).map(line => line.sku + ': ' + line.receivedQty + '/' + line.orderedQty).join('; '), total: new Intl.NumberFormat('en-GB', { style: 'currency', currency: po.currency || config.baseCurrency }).format((po.totalMinor || 0) / 100) }));
+  const returnReportColumns = [{ key: 'returnNumber', label: 'Return Number' }, { key: 'orderNumber', label: 'Order Number' }, { key: 'customer', label: 'Customer' }, { key: 'reason', label: 'Reason' }, { key: 'status', label: 'Inspection Status' }, { key: 'disposition', label: 'Disposition' }, { key: 'refundStatus', label: 'Refund Status' }, { key: 'refund', label: 'Refund Amount' }];
+  const returnReportRows = returns.map(ret => ({ returnNumber: ret.returnNumber, orderNumber: ret.orderNumber, customer: ret.customerName, reason: ret.reasonCode || ret.lines?.[0]?.notes || 'Customer Return', status: ret.status, disposition: (ret.lines || []).map(line => line.disposition || 'Pending').join(', '), refundStatus: ret.refundStatus || 'Pending', refund: formatMoney(ret.refundAmountMinor ?? (ret as any).totalRefundMinor ?? 0, config.baseCurrency) }));
+  const supplierReportColumns = [{ key: 'name', label: 'Supplier Name' }, { key: 'code', label: 'Supplier Code' }, { key: 'contact', label: 'Contact Person' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'terms', label: 'Payment Terms (Days)' }, { key: 'currency', label: 'Currency' }, { key: 'leadTime', label: 'Lead Time (Days)' }];
+  const supplierReportRows = suppliers.map(s => ({ name: s.name, code: s.code, contact: s.contactName || '', email: s.email || '', phone: s.phone || '', terms: s.paymentTermsDays, currency: s.currency, leadTime: s.leadTimeDays }));
+  const customerReportColumns = [{ key: 'name', label: 'Customer Name' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'address', label: 'Shipping Address' }, { key: 'orders', label: 'Orders Placed' }, { key: 'spend', label: 'Lifetime Spend' }, { key: 'recent', label: 'Recent Activity' }];
+  const customerReportRows = customerList.map(c => ({ name: c.name, email: c.email, phone: c.phone, address: c.address, orders: c.orderCount, spend: formatMoney(c.totalSpendMinor, config.baseCurrency), recent: c.recentOrderDate + ' (' + c.recentStatus + ')' }));
+
   const poCurrency = suppliers.find(supplier => supplier.id === poSupplierId)?.currency || config.baseCurrency;
   const poSubtotalMinor = poLines.reduce((sum, line) =>
     sum + (Number.parseInt(line.quantity, 10) || 0) * Math.round((Number.parseFloat(line.unitCost) || 0) * 100), 0);
@@ -367,9 +378,13 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       {subTab === 'POS' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex-1">
               <h2 className="font-bold text-sm text-gray-900">Purchase Orders</h2>
               <p className="text-xs text-gray-500">Create a draft, approve it, then receive goods against the approved order.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => exportReportCsv('Purchase Orders Report', poReportColumns, poReportRows)} className="px-3 py-2 rounded-md border border-gray-300 text-xs font-semibold text-gray-700">Export CSV</button>
+              <button onClick={() => exportReportPdf('Purchase Orders Report', poReportColumns, poReportRows)} className="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-semibold">Export PDF</button>
             </div>
             <button
               onClick={openPoForm}
@@ -558,6 +573,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       {/* Tab: Customer Returns */}
       {subTab === 'RETURNS' && (
         <div className="space-y-4">
+          <div className="flex justify-end gap-2"><button onClick={() => exportReportCsv('Customer Returns Report', returnReportColumns, returnReportRows)} className="px-3 py-2 rounded-md border border-gray-300 text-xs font-semibold text-gray-700">Export CSV</button><button onClick={() => exportReportPdf('Customer Returns Report', returnReportColumns, returnReportRows)} className="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-semibold">Export PDF</button></div>
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -638,10 +654,11 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       {subTab === 'SUPPLIERS' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex-1">
               <h2 className="font-bold text-sm text-gray-900">Suppliers Directory</h2>
               <p className="text-xs text-gray-500">Manage suppliers used to create purchase orders.</p>
             </div>
+            <div className="flex gap-2"><button onClick={() => exportReportCsv('Suppliers Directory', supplierReportColumns, supplierReportRows)} className="px-3 py-2 rounded-md border border-gray-300 text-xs font-semibold text-gray-700">Export CSV</button><button onClick={() => exportReportPdf('Suppliers Directory', supplierReportColumns, supplierReportRows)} className="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-semibold">Export PDF</button></div>
             <button onClick={() => setShowSupplierForm(value => !value)} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">
               {showSupplierForm ? 'Close Form' : '+ Add Supplier'}
             </button>
@@ -738,6 +755,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
             <div className="text-xs text-gray-500">
               Showing <strong className="text-gray-900">{customerList.length}</strong> active buyer profiles
             </div>
+            <div className="flex gap-2"><button onClick={() => exportReportCsv('Customers Directory', customerReportColumns, customerReportRows)} className="px-3 py-2 rounded-md border border-gray-300 text-xs font-semibold text-gray-700">Export CSV</button><button onClick={() => exportReportPdf('Customers Directory', customerReportColumns, customerReportRows)} className="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-semibold">Export PDF</button></div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
