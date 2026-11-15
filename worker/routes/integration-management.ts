@@ -15,8 +15,13 @@ export async function handleIntegrationManagementRoute(
   path: string, request: Request, auth: AuthContext, env: WorkerEnv,
 ): Promise<Response | null> {
   if (!path.startsWith('/integrations/')) return null;
-  if (auth.user.role !== 'SUPER_ADMIN') return json({ error: 'Platform Super Admin access is required.' }, 403);
-  if (auth.assuranceLevel !== 'aal2') return json({ error: 'Complete an authenticator MFA verification before managing platform credentials.' }, 403);
+  // Organization-level SUPER_ADMIN is not automatically a platform owner.
+  // A separate deployment-controlled allowlist prevents tenant admins from
+  // reading or rotating the application's shared Developer credentials.
+  const platformAdmins = (env.PLATFORM_SUPER_ADMIN_USER_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+  if (auth.user.role !== 'SUPER_ADMIN' || !platformAdmins.includes(auth.user.id)) {
+    return json({ error: 'Platform owner authorization is required.' }, 403);
+  }
 
   const service = serviceClient(env);
   if (!service) return json({ error: 'Secure integration storage is unavailable.' }, 503);
@@ -55,6 +60,7 @@ export async function handleIntegrationManagementRoute(
 
   const match = path.match(/^\/integrations\/ebay\/credentials\/(SANDBOX|PRODUCTION)$/);
   if (match && request.method === 'PUT') {
+    if (auth.assuranceLevel !== 'aal2') return json({ error: 'Complete an authenticator MFA verification before managing platform credentials.' }, 403);
     const origin = request.headers.get('Origin');
     const requestOrigin = new URL(request.url).origin;
     if (!origin || (origin !== requestOrigin && origin !== env.ALLOWED_ORIGIN)) {
