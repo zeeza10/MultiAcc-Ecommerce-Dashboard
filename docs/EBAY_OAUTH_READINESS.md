@@ -82,9 +82,8 @@ The encryption key is independent of the eBay Client Secret. Keep a protected of
 The OAuth scopes currently requested are:
 
 - `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly`
-- `https://api.ebay.com/oauth/api_scope/sell.inventory.readonly`
 
-The first is used for seller order access. The inventory scope is reserved for the planned listing/inventory read integration; reduce scopes if that capability is not needed for the initial approval.
+This is the only scope requested for the first phase because the initial live integration imports seller orders. We will request the inventory read scope only when the inventory/listing integration is implemented and tested.
 
 ## Encryption key generation
 
