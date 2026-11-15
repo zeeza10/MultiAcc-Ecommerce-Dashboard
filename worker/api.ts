@@ -238,7 +238,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     if (accessResponse) return accessResponse;
     const dashboardResponse = await handleDashboardRoute(path, request, url, auth);
     if (dashboardResponse) return dashboardResponse;
-    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth, env);
+    const marketplaceResponse = await handleMarketplaceRoute(path, request, auth);
     if (marketplaceResponse) return marketplaceResponse;
     const systemResponse = await handleSystemRoute(path, request, auth);
     if (systemResponse) return systemResponse;
