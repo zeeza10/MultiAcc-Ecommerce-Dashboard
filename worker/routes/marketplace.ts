@@ -1,6 +1,6 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
-import { startEbayOAuth, isEbayOAuthConfigured } from '../ebay/oauth';
+import { startEbayOAuth } from '../ebay/oauth';
 import type { WorkerEnv } from '../types';
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
