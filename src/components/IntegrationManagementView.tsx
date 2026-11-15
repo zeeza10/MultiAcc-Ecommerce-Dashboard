@@ -68,6 +68,7 @@ export const IntegrationManagementView: React.FC = () => {
         clientId: form.clientId.trim(),
         clientSecret: form.clientSecret,
         ruName: form.ruName.trim(),
+        expectedVersion: current?.credentialVersion || 0,
       });
       setForm(emptyForm);
       setNotice(`${environment} credentials were encrypted and saved. Version ${result.credentialVersion}.`);
