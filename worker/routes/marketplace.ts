@@ -23,7 +23,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (sellerUsername.length > 120) return json({ error: 'Seller username is too long.' }, 400);
     const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').insert({
       organization_id: auth.organizationId, name, marketplace, seller_username: sellerUsername || null,
-      environment, auth_status: 'DISCONNECTED', is_demo: false, auto_sync_interval_minutes: 30,
+      environment, auth_status: 'DISCONNECTED', is_demo: false, auto_sync_interval_minutes: 5,
     }).select('id,name,marketplace,seller_username,auth_status,environment,is_demo,auto_sync_interval_minutes').single();
     if (error || !data) return json({ error: 'The real marketplace account could not be created.' }, 400);
     return json({ account: {
