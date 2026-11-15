@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { decryptToken, encryptToken, isEbayOAuthConfigured } from './oauth';
 
-const testKey = Buffer.from(new Uint8Array(32).fill(7)).toString('base64');
+const testKey = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
 
 describe('eBay OAuth token protection', () => {
   it('encrypts and decrypts tokens using AES-256-GCM', async () => {
@@ -20,7 +20,7 @@ describe('eBay OAuth token protection', () => {
 
   it('rejects decryption with the wrong key', async () => {
     const ciphertext = await encryptToken('seller-access-token', testKey);
-    const wrongKey = Buffer.from(new Uint8Array(32).fill(8)).toString('base64');
+    const wrongKey = btoa(String.fromCharCode(...new Uint8Array(32).fill(8)));
     await assert.rejects(() => decryptToken(ciphertext, wrongKey));
   });
 
