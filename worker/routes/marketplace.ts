@@ -1,7 +1,14 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
+import { startEbayOAuth, isEbayOAuthConfigured } from '../ebay/oauth';
+import type { WorkerEnv } from '../types';
 
-export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
+  const connectMatch = path.match(/^\\/ebay\\/accounts\\/([^/]+)\\/connect$/);
+  if (connectMatch && request.method === 'POST') {
+    return startEbayOAuth(decodeURIComponent(connectMatch[1]), auth, env);
+  }
+
   if (path === '/ebay/accounts' && request.method === 'GET') {
     const [accountsResult, syncResult] = await Promise.all([
       auth.repositoryContext.supabase.from('marketplace_accounts')
@@ -12,7 +19,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
     ]);
     if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
-    return json({ integrationReady: false, integrationMessage: 'Live eBay OAuth and order synchronization are not enabled yet. Account metadata is read-only until credentials and encrypted token storage are configured.', accounts: (accountsResult.data || []).map(row => ({
+    return json({ integrationReady: false, integrationMessage: 'Live eBay OAuth and order synchronization remain disabled until the complete server-side credentials and encryption configuration is installed and verified.', accounts: (accountsResult.data || []).map(row => ({
       id: row.id, name: row.name, marketplace: row.marketplace, sellerUsername: row.seller_username || '',
       authStatus: row.auth_status, environment: row.environment, lastSyncAt: row.last_sync_at || '',
       lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
