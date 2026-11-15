@@ -4,7 +4,7 @@ import { startEbayOAuth } from '../ebay/oauth';
 import type { WorkerEnv } from '../types';
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
-  const connectMatch = path.match(/^\\/ebay\\/accounts\\/([^/]+)\\/connect$/);
+  const connectMatch = path.match(new RegExp('^/ebay/accounts/([^/]+)/connect$'));
   if (connectMatch && request.method === 'POST') {
     return startEbayOAuth(decodeURIComponent(connectMatch[1]), auth, env);
   }
