@@ -33,6 +33,30 @@ jobs:
           output: codeql-results
           upload: false
 
+      - name: Add CodeQL findings to workflow summary
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const file = 'codeql-results/javascript.sarif';
+          if (!fs.existsSync(file)) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## CodeQL results\\n\\nSARIF output was not generated. Check the analysis logs.\\n');
+            process.exit(0);
+          }
+          const sarif = JSON.parse(fs.readFileSync(file, 'utf8'));
+          const results = (sarif.runs || []).flatMap(run => run.results || []);
+          const lines = ['## CodeQL findings', '', `Findings: **${results.length}**`, ''];
+          for (const finding of results) {
+            const location = finding.locations?.[0]?.physicalLocation;
+            const filePath = location?.artifactLocation?.uri || 'unknown file';
+            const line = location?.region?.startLine;
+            lines.push(`- **${finding.ruleId || 'unknown-rule'}** — ${filePath}${line ? `:${line}` : ''}: ${(finding.message?.text || 'No message').replace(/\\s+/g, ' ')}`);
+          }
+          if (results.length === 0) lines.push('No findings were reported by this CodeQL scan.');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\\n') + '\\n');
+          NODE
+
       - name: Archive CodeQL SARIF results for review (private repository fallback)
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
