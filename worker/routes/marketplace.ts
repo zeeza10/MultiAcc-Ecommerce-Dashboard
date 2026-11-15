@@ -78,14 +78,15 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     ]);
     if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
     const accountRows = accountsResult.data || [];
-    const integrationReady = accountRows.some(row => !row.is_demo && isEbayOAuthConfigured(env, row.environment));
+    const readiness = await Promise.all(accountRows.map(async row => !row.is_demo && await isEbayOAuthConfigured(env, row.environment)));
+    const integrationReady = readiness.some(Boolean);
     return json({ integrationReady, integrationMessage: integrationReady ? 'Secure eBay authorization is configured for at least one real account.' : 'Create a real eBay account and configure the server-only Sandbox or Production secrets before authorization. Demo records cannot be connected.', accounts: accountRows.map(row => ({
       id: row.id, name: row.name, marketplace: row.marketplace, sellerUsername: row.seller_username || '',
       authStatus: row.auth_status, environment: row.environment, lastSyncAt: row.last_sync_at || '',
       lastSyncStatus: row.last_sync_status || '', lastSyncMessage: row.last_sync_message || '',
       tokenExpiresAt: row.token_expires_at || '', autoSyncIntervalMinutes: row.auto_sync_interval_minutes,
       isDemo: row.is_demo,
-      oauthReady: !row.is_demo && isEbayOAuthConfigured(env, row.environment),
+      oauthReady: !row.is_demo && readiness[accountRows.indexOf(row)],
     })), recentSyncs: (syncResult.data || []).map(row => ({ id: row.id, accountId: row.marketplace_account_id, startedAt: row.started_at, completedAt: row.completed_at || '', status: row.status, ordersFetched: row.orders_fetched, ordersImported: row.orders_imported, ordersSkippedDuplicate: row.orders_skipped_duplicate, exceptionsRaised: row.exceptions_raised, logMessage: row.log_message || '' })) });
   }
 
