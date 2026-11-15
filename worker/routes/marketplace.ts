@@ -82,6 +82,125 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
   return json({ success: true, result: Array.isArray(data) ? data[0] : data });
 }
 
+
+function moneyMinor(value: unknown): number {
+  const parsed = typeof value === 'string' || typeof value === 'number' ? Number(value) : 0;
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+function orderStatus(orderStatusValue: unknown, paymentStatus: unknown): string {
+  const fulfillment = String(orderStatusValue || '').toUpperCase();
+  const payment = String(paymentStatus || '').toUpperCase();
+  if (fulfillment === 'CANCELLED' || fulfillment === 'IN_CANCELLATION') return 'Cancelled';
+  if (fulfillment === 'FULFILLED' || fulfillment === 'SHIPPED') return 'Shipped';
+  if (fulfillment === 'DELIVERED') return 'Delivered';
+  if (payment === 'PAID' || fulfillment === 'IN_PROGRESS' || fulfillment === 'COMPLETED') return 'Confirmed';
+  return 'New';
+}
+async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<string> {
+  const admin = createServiceClient(env);
+  const { data: credential, error } = await admin.from('marketplace_credentials').select('access_token_ciphertext,refresh_token_ciphertext,expires_at,refresh_token_expires_at,scopes,revoked_at').eq('marketplace_account_id', account.id).eq('organization_id', account.organization_id).maybeSingle();
+  if (error || !credential || credential.revoked_at || !credential.access_token_ciphertext) throw new Error('This eBay seller account has no active authorization. Reconnect it with eBay.');
+  if (new Date(credential.expires_at || 0).getTime() > Date.now() + 120000) return decryptEbayValue(credential.access_token_ciphertext, env);
+  if (!credential.refresh_token_ciphertext || (credential.refresh_token_expires_at && new Date(credential.refresh_token_expires_at).getTime() <= Date.now())) throw new Error('The eBay refresh token has expired. Reconnect this seller account.');
+  const platform = await getPlatformCredentials(env, account.environment);
+  if (!platform) throw new Error('The eBay application credentials are not configured.');
+  const lease = crypto.randomUUID(), now = new Date(), leaseUntil = new Date(now.getTime() + 180000).toISOString();
+  const { data: leased, error: leaseError } = await admin.from('marketplace_credentials').update({ refresh_lease_token: lease, refresh_lease_until: leaseUntil, updated_at: now.toISOString() }).eq('marketplace_account_id', account.id).or(`refresh_lease_until.is.null,refresh_lease_until.lt.${now.toISOString()}`).select('refresh_token_ciphertext,scopes').maybeSingle();
+  if (leaseError || !leased) throw new Error('An eBay token refresh is already in progress. Please retry shortly.');
+  try {
+    const refreshToken = await decryptEbayValue(leased.refresh_token_ciphertext, env);
+    const form = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, scope: (leased.scopes || OAUTH_SCOPES).join(' ') });
+    const response = await fetch(`${ebayBaseUrl(account.environment)}/identity/v1/oauth2/token`, { method: 'POST', headers: { Authorization: `Basic ${btoa(`${platform.clientId}:${platform.clientSecret}`)}`, 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body: form });
+    if (!response.ok) {
+      await admin.from('marketplace_credentials').update({ refresh_lease_token: null, refresh_lease_until: null, updated_at: new Date().toISOString() }).eq('marketplace_account_id', account.id).eq('refresh_lease_token', lease);
+      if (response.status === 400 || response.status === 401) {
+        await admin.from('marketplace_credentials').update({ revoked_at: new Date().toISOString() }).eq('marketplace_account_id', account.id);
+        await admin.from('marketplace_accounts').update({ auth_status: 'DISCONNECTED', last_sync_status: 'FAILED', last_sync_message: 'eBay authorization expired. Reconnect this seller account.' }).eq('id', account.id);
+        throw new Error('eBay authorization expired or was revoked. Reconnect this seller account.');
+      }
+      throw new Error('eBay token refresh failed. Retry the synchronization later.');
+    }
+    const refreshed = await response.json() as { access_token?: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number };
+    if (!refreshed.access_token || !Number.isFinite(refreshed.expires_in)) throw new Error('eBay returned an invalid refreshed token.');
+    const [accessCiphertext, refreshCiphertext] = await Promise.all([encryptEbayValue(refreshed.access_token, env), refreshed.refresh_token ? encryptEbayValue(refreshed.refresh_token, env) : Promise.resolve(leased.refresh_token_ciphertext)]);
+    const accessExpiry = new Date(Date.now() + Number(refreshed.expires_in) * 1000).toISOString();
+    const patch: Record<string, unknown> = { access_token_ciphertext: accessCiphertext, refresh_token_ciphertext: refreshCiphertext, expires_at: accessExpiry, last_refreshed_at: new Date().toISOString(), refresh_lease_token: null, refresh_lease_until: null, updated_at: new Date().toISOString() };
+    if (refreshed.refresh_token_expires_in) patch.refresh_token_expires_at = new Date(Date.now() + refreshed.refresh_token_expires_in * 1000).toISOString();
+    const { error: saveError } = await admin.from('marketplace_credentials').update(patch).eq('marketplace_account_id', account.id).eq('refresh_lease_token', lease);
+    if (saveError) throw new Error('The refreshed eBay token could not be stored securely.');
+    await admin.from('marketplace_accounts').update({ token_expires_at: accessExpiry, auth_status: 'CONNECTED' }).eq('id', account.id);
+    return refreshed.access_token;
+  } catch (error) {
+    await admin.from('marketplace_credentials').update({ refresh_lease_token: null, refresh_lease_until: null, updated_at: new Date().toISOString() }).eq('marketplace_account_id', account.id).eq('refresh_lease_token', lease);
+    throw error;
+  }
+}
+async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
+  const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const [mappingsResult, productsResult] = await Promise.all([
+    admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
+    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id),
+  ]);
+  if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
+  const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
+  const productById = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
+  const productBySku = new Map((productsResult.data || []).map((row: any) => [row.sku, row]));
+  let imported = 0, skipped = 0, exceptions = 0, fetched = 0;
+  const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING' }).select('id').single();
+  if (runError || !run) throw new Error('A marketplace sync run could not be started.');
+  try {
+    let offset = 0, total = 0;
+    do {
+      const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
+      endpoint.searchParams.set('limit', '100'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `creationdate:[${since}..]`);
+      const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`eBay order API returned HTTP ${response.status}.`);
+      const page = await response.json() as { orders?: any[]; total?: number };
+      const orders = Array.isArray(page.orders) ? page.orders : [];
+      total = Number(page.total || orders.length); fetched += orders.length;
+      for (const order of orders) {
+        const externalId = typeof order.orderId === 'string' ? order.orderId : '';
+        if (!externalId) continue;
+        const shipping = order.fulfillmentStartInstructions?.find((item: any) => item?.shippingStep?.shipTo)?.shippingStep?.shipTo;
+        const address = shipping?.contactAddress || {};
+        const items = (Array.isArray(order.lineItems) ? order.lineItems : []).map((line: any) => {
+          const sku = String(line.sku || line.legacyItemId || line.lineItemId || 'UNKNOWN').slice(0, 128);
+          const productId = mappingBySku.get(sku), product = (productId ? productById.get(productId) : null) || productBySku.get(sku) || null;
+          const quantity = Math.max(1, Math.trunc(Number(line.quantity || 1))), unit = moneyMinor(line.lineItemCost?.value);
+          return { product_id: product?.id || null, sku: product?.sku || sku, product_name: product?.name || String(line.title || 'eBay item').slice(0, 250), quantity, unit_price_minor: unit, tax_amount_minor: 0, total_price_minor: unit * quantity, raw_item: { lineItemId: line.lineItemId || null, sku, title: line.title || null, quantity, unitPrice: line.lineItemCost?.value || null } };
+        });
+        const totalMinor = moneyMinor(order.pricingSummary?.total?.value) || items.reduce((sum: number, item: any) => sum + item.total_price_minor, 0);
+        const payload = {
+          external_order_id: externalId, order_number: `EB-${account.id.slice(0, 6)}-${externalId}`,
+          customer_name: String(shipping?.fullName || order.buyer?.username || 'eBay buyer').slice(0, 160), customer_email: null,
+          shipping_address: { name: shipping?.fullName || null, addressLine1: address.addressLine1 || null, addressLine2: address.addressLine2 || null, city: address.city || null, stateOrProvince: address.stateOrProvince || null, postalCode: address.postalCode || null, countryCode: address.countryCode || null },
+          status: orderStatus(order.orderFulfillmentStatus, order.orderPaymentStatus),
+          payment_state: String(order.orderPaymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'PENDING',
+          total_minor: totalMinor, tax_minor: moneyMinor(order.pricingSummary?.tax?.value), shipping_charge_minor: moneyMinor(order.pricingSummary?.deliveryCost?.value),
+          currency: order.pricingSummary?.total?.currency || 'GBP', created_at: order.creationDate || new Date().toISOString(),
+          safe_payload: { orderId: externalId, creationDate: order.creationDate || null, orderPaymentStatus: order.orderPaymentStatus || null, orderFulfillmentStatus: order.orderFulfillmentStatus || null, lineItems: items.map((item: any) => item.raw_item) }, items,
+        };
+        const { data: result, error: importError } = await admin.rpc('import_marketplace_order', { p_organization_id: account.organization_id, p_marketplace_account_id: account.id, p_order: payload });
+        if (importError) throw new Error('An eBay order could not be imported into the workspace.');
+        const inserted = Array.isArray(result) ? result[0] : result;
+        if (inserted?.duplicate) skipped++;
+        else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
+      }
+      offset += orders.length;
+      if (!orders.length || offset >= total || offset >= 1000) break;
+    } while (true);
+    const finished = new Date().toISOString(), status = exceptions ? 'PARTIAL' : 'COMPLETED';
+    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`, attempt_count: 1, retryable: false }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    return { imported, skipped, exceptions, fetched };
+  } catch (error) {
+    await admin.from('marketplace_sync_runs').update({ completed_at: new Date().toISOString(), status: 'FAILED', last_error_code: 'EBAY_ORDER_SYNC_FAILED', last_error_message: 'eBay order synchronization failed.', retryable: true, attempt_count: 1 }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({ last_sync_status: 'FAILED', last_sync_message: 'eBay order synchronization failed. Check the integration events and try again.' }).eq('id', account.id);
+    throw error;
+  }
+}
+
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
   const configResponse = await handleIntegrationConfig(path, request, auth, env);
   if (configResponse) return configResponse;
@@ -143,6 +262,18 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       })),
       recentSyncs: (syncResult.data || []).map(row => ({ id: row.id, accountId: row.marketplace_account_id, startedAt: row.started_at, completedAt: row.completed_at || '', status: row.status, ordersFetched: row.orders_fetched, ordersImported: row.orders_imported, ordersSkippedDuplicate: row.orders_skipped_duplicate, exceptionsRaised: row.exceptions_raised, logMessage: row.log_message || '' })),
     });
+  }
+
+
+  const syncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync$/);
+  if (syncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').select('id,organization_id,environment,is_demo,auth_status,marketplace').eq('id', syncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.is_demo || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected eBay seller account can be synchronized.' }, 409);
+    if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
+    try { return json(await syncSellerOrders(account, env)); }
+    catch (error) { return json({ error: error instanceof Error ? error.message : 'eBay order synchronization failed.' }, 502); }
   }
 
   const connectMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/connect$/);
