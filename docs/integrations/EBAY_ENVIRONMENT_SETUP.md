@@ -83,3 +83,6 @@ Do not request write scopes until the application implements and needs those wri
 Encryption protects stored values and reduces risk from repository/source-code disclosure. It does not protect against a malicious Worker deployment, compromised Cloudflare account, compromised Worker runtime, stolen Super Admin session or stolen service-role key. Protect Cloudflare, GitHub and Supabase control planes with phishing-resistant MFA, least privilege, protected branches and reviewed deployments. For stronger separation from runtime compromise, use an external KMS/HSM with envelope encryption.
 
 The Dashboard credential page currently stores and rotates credentials; saving alone does not prove the eBay keyset is valid. A real Sandbox Seller OAuth test and provider API verification are still required before calling the integration ready.
+
+## One-time platform-owner setup
+Configure `PLATFORM_SUPER_ADMIN_USER_IDS` as a Cloudflare Worker Secret containing the platform owner's Supabase Auth UUID (the matching `profiles.id`). This is intentionally separate from an organization-level Super Admin role so tenant administrators cannot rotate application-wide eBay credentials. Credential writes require an AAL2 MFA session. See `docs/security/PLATFORM_INTEGRATION_CREDENTIALS.md` for the Windows key-generation command and security details.
