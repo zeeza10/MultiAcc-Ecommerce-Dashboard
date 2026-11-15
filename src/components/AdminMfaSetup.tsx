@@ -20,7 +20,9 @@ export const AdminMfaSetup: React.FC = () => {
     if (!qr) return '';
     // Supabase returns an SVG string. Keep an existing data URI intact.
     if (qr.startsWith('data:image/')) return qr;
-    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qr);
+    // Supabase returns the SVG payload, not a complete data URI.
+    // Its documented format is a UTF-8 SVG data URL with the raw SVG appended.
+    return 'data:image/svg+xml;utf-8,' + qr;
   }, [qr]);
 
   const refresh = async () => {
