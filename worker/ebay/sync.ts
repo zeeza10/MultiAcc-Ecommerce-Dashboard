@@ -4,8 +4,8 @@ import {
   logEvent,
   refreshExpiringEbayTokens,
   serviceClient,
-  type WorkerEnv,
 } from './oauth';
+import type { WorkerEnv } from '../types';
 
 const PAGE_SIZE = 100;
 const MAX_PAGES_PER_JOB = 100;
@@ -152,7 +152,7 @@ async function importOneOrder(
       ? line.taxes.reduce((sum: number, tax: any) => sum + moneyMinor(amountValue(tax.amount)), 0)
       : 0;
     const mappedId = mappings.get(sku);
-    const mappedProduct = mappedId ? productById.get(mappedId) : products.get(sku);
+    const mappedProduct = mappedId ? [...products.values()].find(product => product.id === mappedId) : products.get(sku);
     const mappedProductId = mappedProduct?.id || null;
     return {
       product_id: mappedProductId,
