@@ -131,7 +131,7 @@ export const api = {
   // the status endpoint deliberately returns metadata only.
   getIntegrationCredentials: () => request<{ provider: 'EBAY'; environments: { environment: 'SANDBOX' | 'PRODUCTION'; configured: boolean; clientIdMasked: string; credentialVersion: number; updatedAt: string | null; secretsAreNeverReturned: true }[] }>('/integrations/ebay/credentials'),
   getIntegrationAudit: () => request<{ events: { environment: 'SANDBOX' | 'PRODUCTION'; actorUserId: string | null; action: string; credentialVersion: number; metadata: Record<string, unknown>; createdAt: string }[] }>('/integrations/ebay/audit'),
-  saveIntegrationCredentials: (environment: 'SANDBOX' | 'PRODUCTION', payload: { clientId: string; clientSecret: string; ruName: string }) =>
+  saveIntegrationCredentials: (environment: 'SANDBOX' | 'PRODUCTION', payload: { clientId: string; clientSecret: string; ruName: string; expectedVersion: number }) =>
     request<{ saved: boolean; environment: 'SANDBOX' | 'PRODUCTION'; credentialVersion: number; updatedAt: string; secretsReturned: false }>(`/integrations/ebay/credentials/${environment}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
   // eBay Accounts & Sync
