@@ -1,5 +1,5 @@
 /**
- * Data Model Types for NexusOps Integrated Platform
+ * Data Model Types for OriaFuture Integrated Platform
  * Compliant with SRS v0.1 Sections 4, 7, 8, 10, 12, 15, 16
  */
 
