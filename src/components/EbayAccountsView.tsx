@@ -39,6 +39,16 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [targetProductId, setTargetProductId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
   const [loading, setLoading] = useState(true);
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newMarketplace, setNewMarketplace] = useState<'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'>('EBAY_UK');
+  const [newEnvironment, setNewEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [integrationConfig, setIntegrationConfig] = useState<any>(null);
+  const [credentialEnvironment, setCredentialEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
+  const [clientIdInput, setClientIdInput] = useState('');
+  const [clientSecretInput, setClientSecretInput] = useState('');
+  const [ruNameInput, setRuNameInput] = useState('');
+  const [credentialSaving, setCredentialSaving] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -55,6 +65,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       setAccounts(accRes.accounts);
       setIntegrationReady(accRes.integrationReady);
       setIntegrationMessage(accRes.integrationMessage);
+      if (currentUser.role === 'SUPER_ADMIN') {
+        try { setIntegrationConfig(await api.getEbayIntegrationConfig()); } catch { setIntegrationConfig(null); }
+      }
       setRecentSyncs(accRes.recentSyncs);
       setExceptions(excRes.exceptions);
       setProducts(prodRes.products);
@@ -87,8 +100,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const handleReconnect = async (accountId: string) => {
     try {
       const res = await api.connectEbayAccount(accountId);
-      alert(res.message);
-      loadData();
+      window.location.assign(res.authorizationUrl);
     } catch (err: any) {
       alert(`OAuth connect failed: ${err.message}`);
     }
@@ -104,6 +116,46 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       loadData();
     } catch (err: any) {
       alert(err.message || 'Resolution failed');
+    }
+  };
+
+
+  const handleCreateAccount = async () => {
+    if (!newAccountName.trim()) return;
+    setAccountSaving(true);
+    try {
+      await api.createEbayAccount({ name: newAccountName.trim(), marketplace: newMarketplace, environment: newEnvironment });
+      setNewAccountName('');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Could not add the eBay seller account.');
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!clientIdInput.trim() || !clientSecretInput.trim() || !ruNameInput.trim()) return;
+    const current = integrationConfig?.environments?.find((item: any) => item.environment === credentialEnvironment);
+    setCredentialSaving(true);
+    try {
+      await api.saveEbayIntegrationConfig({
+        environment: credentialEnvironment,
+        clientId: clientIdInput.trim(),
+        clientSecret: clientSecretInput.trim(),
+        ruName: ruNameInput.trim(),
+        expectedVersion: current?.credentialVersion || 0,
+      });
+      setClientIdInput('');
+      setClientSecretInput('');
+      setRuNameInput('');
+      setIntegrationConfig(await api.getEbayIntegrationConfig());
+      await loadData();
+      alert('eBay application credentials were encrypted and saved.');
+    } catch (err: any) {
+      alert(err.message || 'Could not save eBay credentials.');
+    } finally {
+      setCredentialSaving(false);
     }
   };
 
@@ -134,6 +186,46 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           <p className="mt-1">Existing account statuses are database records only; they do not confirm a live eBay OAuth connection.</p>
         </div>
       )}
+
+      {currentUser.role === 'SUPER_ADMIN' && (
+        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+          <div className="font-semibold text-sm text-slate-900">eBay Developer Application Credentials</div>
+          <p className="text-xs text-slate-600">Credentials are encrypted in the Worker before storage. They are never returned to the browser after saving. Do not paste these values into chat or GitHub.</p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <select value={credentialEnvironment} onChange={e => setCredentialEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
+              <option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
+            </select>
+            <input value={clientIdInput} onChange={e => setClientIdInput(e.target.value)} placeholder="App ID / Client ID" className="border rounded-md p-2 text-xs" autoComplete="off" />
+            <input value={clientSecretInput} onChange={e => setClientSecretInput(e.target.value)} placeholder="Cert ID / Client Secret" type="password" className="border rounded-md p-2 text-xs" autoComplete="new-password" />
+            <input value={ruNameInput} onChange={e => setRuNameInput(e.target.value)} placeholder="OAuth RuName" className="border rounded-md p-2 text-xs" autoComplete="off" />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-500">
+              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? item.clientIdMasked : 'not configured'}`).join(' · ') || 'Server encryption and Supabase service credentials must be configured first.'}
+            </span>
+            <button onClick={handleSaveCredentials} disabled={credentialSaving || !clientIdInput.trim() || !clientSecretInput.trim() || !ruNameInput.trim()} className="px-3 py-2 rounded-md bg-slate-900 text-white text-xs disabled:opacity-50">
+              {credentialSaving ? 'Saving securely…' : 'Save Encrypted Credentials'}
+            </button>
+          </div>
+          {integrationConfig && !integrationConfig.encryptionReady && <p className="text-xs text-rose-700">Worker encryption key is not configured. Add EBAY_TOKEN_ENCRYPTION_KEY in Cloudflare Worker Secrets before saving.</p>}
+          {integrationConfig && !integrationConfig.productionOAuthEnabled && <p className="text-xs text-amber-700">Production OAuth remains locked until eBay activates the Production keyset and Marketplace Account Deletion compliance is verified.</p>}
+        </div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div className="font-semibold text-sm text-slate-900">Add eBay Seller Account</div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input value={newAccountName} onChange={e => setNewAccountName(e.target.value)} placeholder="Account label (e.g. UK Store 1)" className="border rounded-md p-2 text-xs" maxLength={120} />
+          <select value={newMarketplace} onChange={e => setNewMarketplace(e.target.value as any)} className="border rounded-md p-2 text-xs">
+            <option value="EBAY_UK">eBay United Kingdom</option><option value="EBAY_US">eBay United States</option><option value="EBAY_DE">eBay Germany</option>
+          </select>
+          <select value={newEnvironment} onChange={e => setNewEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
+            <option value="SANDBOX">Sandbox (Testing)</option><option value="PRODUCTION">Production (Live)</option>
+          </select>
+          <button onClick={handleCreateAccount} disabled={accountSaving || !newAccountName.trim()} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs disabled:opacity-50">{accountSaving ? 'Adding…' : 'Add Seller Account'}</button>
+        </div>
+        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. Demo accounts cannot be OAuth-connected.</p>
+      </div>
 
       {syncFeedback && (
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-900 text-xs flex items-center justify-between">
