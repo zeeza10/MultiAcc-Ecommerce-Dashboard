@@ -94,11 +94,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer min-w-0" onClick={() => onNavigate('dashboard')}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label="Open navigation menu" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"><Menu className="h-5 w-5" /></button>
           <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            N
+            O
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-gray-900 text-lg tracking-tight">OriaFuture</span>
+              <span className="font-bold text-gray-900 text-lg tracking-tight">Oria Future</span>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                 v0.1
               </span>
