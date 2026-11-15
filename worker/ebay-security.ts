@@ -5,10 +5,10 @@ export type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
 export type EbayPlatformCredentials = { clientId: string; clientSecret: string; ruName: string; credentialVersion: number };
 
 export function createServiceClient(env: WorkerEnv) {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
     throw new Error('Server-side Supabase integration is not configured.');
   }
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
