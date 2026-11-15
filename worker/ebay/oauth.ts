@@ -2,16 +2,16 @@ import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
 import { json } from '../http';
 
-type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
+export type EbayEnvironment = 'SANDBOX' | 'PRODUCTION';
 
-const REQUIRED_SCOPES = [
+export const REQUIRED_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
 ];
 
-type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
+export type OAuthConfig = { clientId: string; clientSecret: string; ruName: string; environment: EbayEnvironment };
 
-function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | null {
+export function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | null {
   const sandbox = environment === 'SANDBOX';
   const clientId = sandbox ? env.EBAY_SANDBOX_CLIENT_ID : env.EBAY_PRODUCTION_CLIENT_ID;
   const clientSecret = sandbox ? env.EBAY_SANDBOX_CLIENT_SECRET : env.EBAY_PRODUCTION_CLIENT_SECRET;
@@ -20,7 +20,7 @@ function configFor(env: WorkerEnv, environment: EbayEnvironment): OAuthConfig | 
   return { clientId, clientSecret, ruName, environment };
 }
 
-function serviceClient(env: WorkerEnv) {
+export function serviceClient(env: WorkerEnv) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -53,7 +53,7 @@ async function sha256Hex(value: string): Promise<string> {
   return toHex(new Uint8Array(digest));
 }
 
-async function encryptToken(plaintext: string, encodedKey: string): Promise<string> {
+export async function encryptToken(plaintext: string, encodedKey: string): Promise<string> {
   const rawKey = fromBase64(encodedKey);
   if (rawKey.byteLength !== 32) throw new Error('Token encryption key must decode to exactly 32 bytes.');
   const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
@@ -62,7 +62,7 @@ async function encryptToken(plaintext: string, encodedKey: string): Promise<stri
   return `v1.${toBase64(iv)}.${toBase64(new Uint8Array(encrypted))}`;
 }
 
-async function decryptToken(ciphertext: string, encodedKey: string): Promise<string> {
+export async function decryptToken(ciphertext: string, encodedKey: string): Promise<string> {
   const [version, ivText, dataText] = ciphertext.split('.');
   if (version !== 'v1' || !ivText || !dataText) throw new Error('Unsupported encrypted token format.');
   const rawKey = fromBase64(encodedKey);
@@ -72,7 +72,7 @@ async function decryptToken(ciphertext: string, encodedKey: string): Promise<str
   return new TextDecoder().decode(decrypted);
 }
 
-function tokenEndpoint(environment: EbayEnvironment): string {
+export function tokenEndpoint(environment: EbayEnvironment): string {
   return environment === 'SANDBOX'
     ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
     : 'https://api.ebay.com/identity/v1/oauth2/token';
@@ -84,13 +84,13 @@ function authorizationEndpoint(environment: EbayEnvironment): string {
     : 'https://auth.ebay.com/oauth2/authorize';
 }
 
-function basicAuthorization(config: OAuthConfig): string {
+export function basicAuthorization(config: OAuthConfig): string {
   return `Basic ${btoa(`${config.clientId}:${config.clientSecret}`)}`;
 }
 
-async function logEvent(
+export async function logEvent(
   client: ReturnType<typeof createClient>,
-  input: { organizationId: string; accountId: string; eventType: string; severity: 'INFO' | 'WARNING' | 'ERROR'; errorCode?: string; message: string; metadata?: Record<string, unknown> },
+  input: { organizationId: string; accountId: string; eventType: string; severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'; errorCode?: string; message: string; metadata?: Record<string, unknown> },
 ): Promise<void> {
   await client.from('marketplace_integration_events').insert({
     organization_id: input.organizationId,
