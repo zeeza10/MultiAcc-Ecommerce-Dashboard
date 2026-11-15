@@ -127,7 +127,7 @@ Deno.serve(async (request: Request) => {
 
   const { data: invited, error: inviteUserError } = await admin.auth.admin.inviteUserByEmail(body.email, {
     redirectTo: invitationRedirect.toString(),
-    data: body.fullName ? { full_name: body.fullName } : {},
+    data: { company_name: 'Oria Future', product_name: 'Oria Future', ...(body.fullName ? { full_name: body.fullName } : {}) },
   });
   if (inviteUserError || !invited.user) {
     await admin.from("user_invitations").update({ revoked_at: new Date().toISOString() }).eq("id", invite.id);
