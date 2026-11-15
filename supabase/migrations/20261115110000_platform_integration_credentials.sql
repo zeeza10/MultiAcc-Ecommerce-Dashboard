@@ -58,7 +58,7 @@ BEGIN
   IF COALESCE(auth.jwt() ->> 'role', '') <> 'service_role' THEN
     RAISE EXCEPTION 'service role required';
   END IF;
-  IF p_environment NOT IN ('SANDBOX','PRODUCTION')
+  IF p_environment IS NULL OR p_environment NOT IN ('SANDBOX','PRODUCTION')
      OR p_client_id_ciphertext IS NULL OR p_client_id_ciphertext = ''
      OR p_client_secret_ciphertext IS NULL OR p_client_secret_ciphertext = ''
      OR p_ru_name_ciphertext IS NULL OR p_ru_name_ciphertext = ''
@@ -66,6 +66,7 @@ BEGIN
      OR p_actor_user_id IS NULL THEN
     RAISE EXCEPTION 'invalid credential input';
   END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('platform-integration-credentials:' || p_environment));
   SELECT c.credential_version INTO v_previous_version
   FROM public.platform_integration_credentials AS c
   WHERE c.provider = 'EBAY' AND c.environment = p_environment
