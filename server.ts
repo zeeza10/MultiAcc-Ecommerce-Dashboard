@@ -31,8 +31,10 @@ function createIpRateLimiter(maxRequests: number, windowMs: number) {
           if (record.resetAt <= now) clients.delete(ip);
         }
         if (clients.size >= maxTrackedClients) {
-          const oldestIp = clients.keys().next().value;
-          if (oldestIp) clients.delete(oldestIp);
+          res.setHeader('Retry-After', String(Math.ceil(windowMs / 1000)));
+          res.setHeader('Cache-Control', 'no-store');
+          res.status(503).json({ error: 'Rate limiter capacity is temporarily exhausted. Please retry shortly.' });
+          return;
         }
       }
       entry = { count: 0, resetAt: now + windowMs };
