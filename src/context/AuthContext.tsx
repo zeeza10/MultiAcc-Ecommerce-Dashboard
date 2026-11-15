@@ -297,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-8">
         <div className="mb-7">
-          <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">NexusOps</div>
+          <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">OriaFuture</div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">
             {inviteSetupActive ? 'Set up your account' : signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
           </h1>
