@@ -18,7 +18,13 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-function toArrayBuffer(value: Uint8Array): ArrayBuffer {\n  const copy = new Uint8Array(value.byteLength);\n  copy.set(value);\n  return copy.buffer;\n}\n\nfunction encodeBase64(value: Uint8Array): string {
+function toArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(value.byteLength);
+  copy.set(value);
+  return copy.buffer;
+}
+
+function encodeBase64(value: Uint8Array): string {
   let binary = '';
   for (const byte of value) binary += String.fromCharCode(byte);
   return btoa(binary);
@@ -79,5 +85,6 @@ export async function getPlatformCredentials(env: WorkerEnv, environment: EbayEn
 
 export function sanitizeEbayError(value: unknown): string {
   const message = value instanceof Error ? value.message : 'eBay request failed.';
-  return message.replace(/[\r\n\t]/g, ' ').slice(0, 240);
+  return message.replace(/[\r
+\t]/g, ' ').slice(0, 240);
 }
