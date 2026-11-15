@@ -40,6 +40,7 @@ CREATE INDEX IF NOT EXISTS platform_integration_audit_created_at_idx
 -- Credential write + audit are atomic. Only the Worker service role can call this.
 CREATE OR REPLACE FUNCTION public.save_platform_integration_credentials(
   p_environment text,
+  p_expected_version integer,
   p_client_id_ciphertext text,
   p_client_secret_ciphertext text,
   p_ru_name_ciphertext text,
@@ -59,6 +60,7 @@ BEGIN
     RAISE EXCEPTION 'service role required';
   END IF;
   IF p_environment IS NULL OR p_environment NOT IN ('SANDBOX','PRODUCTION')
+     OR p_expected_version IS NULL OR p_expected_version < 0
      OR p_client_id_ciphertext IS NULL OR p_client_id_ciphertext = ''
      OR p_client_secret_ciphertext IS NULL OR p_client_secret_ciphertext = ''
      OR p_ru_name_ciphertext IS NULL OR p_ru_name_ciphertext = ''
@@ -71,6 +73,9 @@ BEGIN
   FROM public.platform_integration_credentials AS c
   WHERE c.provider = 'EBAY' AND c.environment = p_environment
   FOR UPDATE;
+  IF COALESCE(v_previous_version, 0) <> p_expected_version THEN
+    RAISE EXCEPTION 'credential version conflict';
+  END IF;
   v_next_version := COALESCE(v_previous_version, 0) + 1;
   v_action := CASE WHEN v_previous_version IS NULL THEN 'CREDENTIALS_CREATED' ELSE 'CREDENTIALS_ROTATED' END;
   INSERT INTO public.platform_integration_credentials (
@@ -101,7 +106,7 @@ BEGIN
   RETURN QUERY SELECT v_next_version, v_action, v_saved_at;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.save_platform_integration_credentials(text, text, text, text, text, uuid)
+REVOKE ALL ON FUNCTION public.save_platform_integration_credentials(text, integer, text, text, text, text, uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.save_platform_integration_credentials(text, text, text, text, text, uuid)
   TO service_role;
