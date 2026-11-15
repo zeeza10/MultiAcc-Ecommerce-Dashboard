@@ -127,6 +127,12 @@ export const api = {
       body: JSON.stringify({ decision, approvalNote }),
     }),
 
+  // Platform-level integration credentials. Secret values are write-only and
+  // the status endpoint deliberately returns metadata only.
+  getIntegrationCredentials: () => request<{ provider: 'EBAY'; environments: { environment: 'SANDBOX' | 'PRODUCTION'; configured: boolean; clientIdMasked: string; credentialVersion: number; updatedAt: string | null; secretsAreNeverReturned: true }[] }>('/integrations/ebay/credentials'),
+  saveIntegrationCredentials: (environment: 'SANDBOX' | 'PRODUCTION', payload: { clientId: string; clientSecret: string; ruName: string }) =>
+    request<{ saved: boolean; environment: 'SANDBOX' | 'PRODUCTION'; credentialVersion: number; updatedAt: string; secretsReturned: false }>(`/integrations/ebay/credentials/${environment}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
   // eBay Accounts & Sync
   getEbayAccounts: () => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string }>('/ebay/accounts'),
   createEbayAccount: (payload: { name: string; marketplace: 'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'; environment: 'SANDBOX' | 'PRODUCTION'; sellerUsername?: string }) =>
