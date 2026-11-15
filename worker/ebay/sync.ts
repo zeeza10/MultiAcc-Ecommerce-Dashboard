@@ -90,7 +90,7 @@ async function loadAccessToken(env: WorkerEnv, account: any, service: any): Prom
     throw new Error('EBAY_REFRESH_TEMPORARY_FAILURE');
   }
   if (!env.EBAY_TOKEN_ENCRYPTION_KEY) throw new Error('TOKEN_ENCRYPTION_NOT_CONFIGURED');
-  return decryptToken(credential.access_token_ciphertext, env.EBAY_TOKEN_ENCRYPTION_KEY);
+  return decryptToken(credential.access_token_ciphertext, env.EBAY_TOKEN_ENCRYPTION_KEY, `${account.organization_id}:${account.id}:access`);
 }
 
 async function fetchEbayOrders(account: any, accessToken: string, since: string): Promise<any[]> {
