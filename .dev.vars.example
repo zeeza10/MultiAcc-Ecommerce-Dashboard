@@ -1,13 +1,27 @@
-# Local Wrangler runtime variables. Never commit the real .dev.vars file.
+# Local Wrangler runtime variables. Copy to .dev.vars for local development.
+# Never commit .dev.vars or put real secrets in this example file.
 API_ORIGIN=http://localhost:3000
 ALLOWED_ORIGIN=http://localhost:3000
 
-# Server-only eBay Sandbox credentials. Configure as Worker Secrets, not vars.
+# eBay Sandbox keyset (Developer Portal > Application Keys > Sandbox)
+# Store real values as Cloudflare Worker Secrets; these placeholders are documentation only.
 # EBAY_SANDBOX_CLIENT_ID=
 # EBAY_SANDBOX_CLIENT_SECRET=
 # EBAY_SANDBOX_RUNAME=
+
+# eBay Production keyset (Developer Portal > Application Keys > Production)
+# Keep separate from Sandbox. Configure only after eBay production approval/compliance.
 # EBAY_PRODUCTION_CLIENT_ID=
 # EBAY_PRODUCTION_CLIENT_SECRET=
 # EBAY_PRODUCTION_RUNAME=
-# EBAY_TOKEN_ENCRYPTION_KEY=base64-encoded-32-byte-key
+
+# Shared server-only encryption key: Base64 encoding of exactly 32 random bytes.
+# Generate once per deployment environment; never reuse between unrelated environments.
+# EBAY_TOKEN_ENCRYPTION_KEY=
+
+# Supabase service credential is also server-only and must be configured as a Worker Secret.
 # SUPABASE_SERVICE_ROLE_KEY=
+
+# Non-secret reference values (already configured in wrangler.jsonc where applicable):
+# SUPABASE_URL=https://<project-ref>.supabase.co
+# SUPABASE_PUBLISHABLE_KEY=<public-publishable-key>
