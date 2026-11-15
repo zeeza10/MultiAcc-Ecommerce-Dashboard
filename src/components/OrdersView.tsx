@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { exportReportCsv, exportReportPdf } from '../utils/reportExport';
 import {
   Search,
   Filter,
@@ -143,27 +144,20 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     }
   };
 
-  const exportCsv = () => {
-    const headers = ['Order #', 'Marketplace ID', 'Date', 'Customer', 'Status', 'Payment', 'Total', 'Carrier', 'Tracking'];
-    const rows = orders.map((o) => [
-      `"${o.orderNumber}"`,
-      `"${o.externalOrderId || ''}"`,
-      `"${o.createdAt.split('T')[0]}"`,
-      `"${o.customerName.replace(/"/g, '""')}"`,
-      `"${o.status}"`,
-      `"${o.paymentState}"`,
-      `"${(o.totalMinor / 100).toFixed(2)}"`,
-      `"${o.carrier || ''}"`,
-      `"${o.trackingNumber || ''}"`,
-    ]);
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Orders_Export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
+  const reportColumns = [
+    { key: 'orderNumber', label: 'Order Number' }, { key: 'marketplaceId', label: 'Marketplace ID' },
+    { key: 'date', label: 'Order Date (UTC)' }, { key: 'customer', label: 'Customer' },
+    { key: 'status', label: 'Status' }, { key: 'payment', label: 'Payment Status' },
+    { key: 'total', label: 'Total' }, { key: 'carrier', label: 'Carrier' }, { key: 'tracking', label: 'Tracking Number' },
+  ];
+  const reportRows = orders.map(order => ({
+    orderNumber: order.orderNumber, marketplaceId: order.externalOrderId || '',
+    date: order.createdAt, customer: order.customerName, status: order.status,
+    payment: order.paymentState, total: (order.totalMinor / 100).toFixed(2),
+    carrier: order.carrier || '', tracking: order.trackingNumber || '',
+  }));
+  const exportCsv = () => exportReportCsv('Orders Report', reportColumns, reportRows);
+  const exportPdf = () => exportReportPdf('Orders Report', reportColumns, reportRows);
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
@@ -202,13 +196,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
-          <button
-            onClick={exportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 shadow-2xs transition"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-500" />
-            <span>Export CSV</span>
-          </button>
+          <button onClick={exportCsv} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 shadow-2xs transition"><Download className="w-3.5 h-3.5" /><span>Export CSV</span></button>
+          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-800 rounded-md hover:bg-slate-900 shadow-2xs transition"><Download className="w-3.5 h-3.5" /><span>Export PDF</span></button>
 
           {currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER' && (
             <button
