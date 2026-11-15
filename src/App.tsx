@@ -127,22 +127,15 @@ export default function App() {
     setIsSyncing(true);
     try {
       const accRes = await api.getEbayAccounts();
-      if (!accRes.integrationReady) {
-        alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
+      const account = accRes.accounts.find((item) => !item.isDemo && item.oauthReady && item.authStatus === 'CONNECTED');
+      if (!account) {
+        alert('No real, authorized eBay account is ready for synchronization.');
         return;
       }
-      if (accRes.accounts.length > 0) await api.syncEbayAccount(accRes.accounts[0].id);
-      const [notifRes, excRes] = await Promise.all([
-        api.getNotifications(),
-        permissions.includes('*') || permissions.includes('marketplace.view')
-          ? api.getExceptions()
-          : Promise.resolve({ exceptions: [] }),
-      ]);
-      setNotifications(notifRes.notifications);
-      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-      alert('eBay order synchronization completed. Idempotent check verified.');
+      const result = await api.syncEbayAccount(account.id, crypto.randomUUID());
+      alert(`eBay synchronization job queued: ${result.jobId || 'pending'}`);
     } catch (err: any) {
-      alert(`Sync failed: ${err.message}`);
+      alert(`Could not queue eBay synchronization: ${err.message}`);
     } finally {
       setIsSyncing(false);
     }
