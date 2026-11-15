@@ -76,15 +76,18 @@ function currencyCode(order: any): string {
 async function loadAccessToken(env: WorkerEnv, account: any, service: any): Promise<string> {
   await refreshExpiringEbayTokens(env);
   const { data: credential, error } = await service.from('marketplace_credentials')
-    .select('access_token_ciphertext,expires_at,revoked_at')
+    .select('access_token_ciphertext,refresh_token_ciphertext,expires_at,refresh_token_expires_at,revoked_at')
     .eq('organization_id', account.organization_id)
     .eq('marketplace_account_id', account.id)
     .maybeSingle();
-  if (error || !credential || credential.revoked_at || !credential.access_token_ciphertext) {
+  if (error || !credential || credential.revoked_at || !credential.access_token_ciphertext || !credential.refresh_token_ciphertext) {
     throw new Error('EBAY_AUTH_REQUIRED');
   }
   if (!credential.expires_at || new Date(credential.expires_at).getTime() <= Date.now() + 30_000) {
-    throw new Error('EBAY_ACCESS_TOKEN_EXPIRED');
+    if (credential.refresh_token_expires_at && new Date(credential.refresh_token_expires_at).getTime() <= Date.now()) {
+      throw new Error('EBAY_AUTH_REQUIRED');
+    }
+    throw new Error('EBAY_REFRESH_TEMPORARY_FAILURE');
   }
   if (!env.EBAY_TOKEN_ENCRYPTION_KEY) throw new Error('TOKEN_ENCRYPTION_NOT_CONFIGURED');
   return decryptToken(credential.access_token_ciphertext, env.EBAY_TOKEN_ENCRYPTION_KEY);
@@ -104,13 +107,18 @@ async function fetchEbayOrders(account: any, accessToken: string, since: string)
     url.searchParams.set('limit', String(PAGE_SIZE));
     url.searchParams.set('offset', String(offset));
     url.searchParams.set('filter', `creationdate:[${since}..]`);
-    const response = await fetch(url, {
+    let response: Response;
+    try {
+      response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: 'application/json',
         'X-EBAY-C-MARKETPLACE-ID': account.marketplace === 'EBAY_UK' ? 'EBAY_GB' : account.marketplace,
       },
-    });
+      });
+    } catch {
+      throw new Error('EBAY_UNREACHABLE');
+    }
     if (!response.ok) {
       if (response.status === 401) throw new Error('EBAY_ACCESS_TOKEN_REJECTED');
       if (response.status === 429 || response.status >= 500) throw new Error(`EBAY_RETRYABLE_HTTP_${response.status}`);
@@ -304,8 +312,8 @@ async function processOneJob(env: WorkerEnv, service: any, job: any): Promise<vo
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'SYNC_FAILED';
-    const authRequired = code === 'EBAY_ACCESS_TOKEN_REJECTED' || code === 'EBAY_ACCESS_TOKEN_EXPIRED' || code === 'EBAY_AUTH_REQUIRED';
-    const retryable = code.includes('RETRYABLE') || code === 'EBAY_UNREACHABLE';
+    const authRequired = code === 'EBAY_ACCESS_TOKEN_REJECTED' || code === 'EBAY_AUTH_REQUIRED';
+    const retryable = code.includes('RETRYABLE') || code === 'EBAY_UNREACHABLE' || code === 'EBAY_REFRESH_TEMPORARY_FAILURE';
     const exhausted = Number(job.attempt_count || 1) >= Number(job.max_attempts || 5);
     const completedAt = new Date().toISOString();
     const nextRetryAt = new Date(Date.now() + Math.min(60, 2 ** Math.max(1, Number(job.attempt_count || 1))) * 60_000).toISOString();
