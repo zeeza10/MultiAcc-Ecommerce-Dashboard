@@ -121,10 +121,13 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
     ]);
     if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
-    const admin = createServiceClient(env);
-    const { data: credentials } = await admin.from('platform_integration_credentials')
-      .select('environment,client_id_masked,credential_version').eq('provider', 'EBAY');
-    const configured = new Set((credentials || []).map((row: any) => row.environment));
+    const configured = new Set<string>();
+    if (env.SUPABASE_SERVICE_ROLE_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY) {
+      const admin = createServiceClient(env);
+      const { data: credentials } = await admin.from('platform_integration_credentials')
+        .select('environment,client_id_masked,credential_version').eq('provider', 'EBAY');
+      for (const row of credentials || []) configured.add(row.environment);
+    }
     const integrationReady = Boolean(env.SUPABASE_SERVICE_ROLE_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.has('SANDBOX'));
     return json({
       integrationReady,
