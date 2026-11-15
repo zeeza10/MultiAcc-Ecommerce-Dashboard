@@ -11,6 +11,9 @@ ALLOWED_ORIGIN=http://localhost:3000
 # Used by the Super Admin module to encrypt eBay App ID, Cert ID and RuName before database storage.
 # INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=
 
+# Comma-separated Supabase Auth user UUIDs authorized as platform owners (not tenant Super Admins).
+# PLATFORM_SUPER_ADMIN_USER_IDS=
+
 # Supabase service credential is also server-only and must be configured as a Worker Secret.
 # SUPABASE_SERVICE_ROLE_KEY=
 
