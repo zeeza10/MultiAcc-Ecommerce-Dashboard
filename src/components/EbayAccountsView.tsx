@@ -30,6 +30,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
   const [recentSyncs, setRecentSyncs] = useState<any[]>([]);
   const [integrationReady, setIntegrationReady] = useState(false);
+  const [productionOAuthEnabled, setProductionOAuthEnabled] = useState(false);
   const [integrationMessage, setIntegrationMessage] = useState('Live eBay OAuth and order synchronization are not enabled yet.');
   const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,6 +65,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       ]);
       setAccounts(accRes.accounts);
       setIntegrationReady(accRes.integrationReady);
+      setProductionOAuthEnabled(accRes.productionOAuthEnabled);
       setIntegrationMessage(accRes.integrationMessage);
       if (currentUser.role === 'SUPER_ADMIN') {
         try { setIntegrationConfig(await api.getEbayIntegrationConfig()); } catch { setIntegrationConfig(null); }
@@ -321,8 +323,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                   <div className="flex items-center justify-end space-x-2 pt-1">
                     <button
                       onClick={() => handleReconnect(acc.id)}
-                      disabled={!integrationReady}
-                      title={!integrationReady ? integrationMessage : undefined}
+                      disabled={!integrationReady || (acc.environment === 'PRODUCTION' && !productionOAuthEnabled)}
+                      title={!integrationReady ? integrationMessage : acc.environment === 'PRODUCTION' && !productionOAuthEnabled ? 'Production keyset is not yet activated by eBay.' : undefined}
                       className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Renew OAuth
@@ -330,11 +332,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
                     <button
                       onClick={() => handleSync(acc.id)}
-                      disabled={!integrationReady || isSyncing}
+                      disabled={!integrationReady || acc.authStatus !== 'CONNECTED' || isSyncing}
                       className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Polling...' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
+                      <span>{isSyncing ? 'Syncing...' : acc.authStatus !== 'CONNECTED' ? 'Connect first' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
                     </button>
                   </div>
                 </div>
