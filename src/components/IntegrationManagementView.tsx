@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, EyeOff, KeyRound, LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react';
 import { api } from '../services/api';
+import { AdminMfaSetup } from './AdminMfaSetup';
 import { useAuth } from '../context/AuthContext';
 
 type Environment = 'SANDBOX' | 'PRODUCTION';
@@ -98,6 +99,8 @@ export const IntegrationManagementView: React.FC = () => {
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh status
         </button>
       </header>
+
+      <AdminMfaSetup />
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {(['SANDBOX', 'PRODUCTION'] as Environment[]).map(env => {
