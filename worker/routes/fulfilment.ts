@@ -33,6 +33,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
     const body = await request.json() as Record<string, unknown>;
     const clientId = String(body.clientId || '');
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     let orderId: string | null = null;
     if (body.orderNumber) {
       const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
@@ -97,6 +99,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
     const body = await request.json() as { clientId?: string };
     const clientId = String(body.clientId || '');
     if (!clientId) return json({ error: 'Select a 3PL client.' }, 400);
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     if (auth.user.role === 'CLIENT_USER' && clientId !== auth.repositoryContext.client3plId) return json({ error: 'You cannot view another client billing preview.' }, 403);
     const { data: client, error: clientError } = await auth.repositoryContext.supabase.from('clients_3pl')
       .select('id,company_name,code,billing_period,rate_card_id').eq('organization_id', auth.organizationId).eq('id', clientId).maybeSingle();
