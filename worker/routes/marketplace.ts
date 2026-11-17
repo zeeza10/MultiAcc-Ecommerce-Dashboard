@@ -138,9 +138,10 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
 async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
-    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).or('external_id.is.null,external_id.not.like.demo:%'),
+    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
   ]);
   if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
