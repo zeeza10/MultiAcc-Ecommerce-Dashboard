@@ -1,6 +1,25 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
+async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (auth.user.role === 'CLIENT_USER' && auth.repositoryContext.client3plId) {
+    const { data, error } = await auth.repositoryContext.supabase.from('clients_3pl')
+      .select('data_environment').eq('id', auth.repositoryContext.client3plId)
+      .eq('organization_id', auth.organizationId).maybeSingle();
+    if (error) throw error;
+    if (data?.data_environment) return data.data_environment;
+  }
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/finance/allocations' && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('finance.manage')) return json({ error: 'Finance management permission is required.' }, 403);
@@ -90,12 +109,13 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/invoices' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     let invoicesQuery = auth.repositoryContext.supabase.from('invoices')
       .select('id,invoice_number,invoice_type,recipient_type,recipient_id,recipient_name,issue_date,due_date,subtotal_minor,vat_rate_percent,vat_amount_minor,total_minor,paid_amount_minor,currency,status,void_reason,is_immutable,created_at')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('created_at', { ascending: false });
     if (auth.user.role === 'CLIENT_USER') {
       if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
-      invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId);
+      invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId).eq('data_environment', dataEnvironment);
     } else {
       const accountId = url.searchParams.get('accountId');
       if (accountId && accountId !== 'ALL') {
@@ -113,7 +133,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const { data: items, error: itemError } = ids.length
       ? await auth.repositoryContext.supabase.from('invoice_items')
           .select('id,invoice_id,description,quantity,unit_price_minor,total_minor')
-          .eq('organization_id', auth.organizationId).in('invoice_id', ids)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('invoice_id', ids)
       : { data: [], error: null };
     if (itemError) throw itemError;
     const linesByInvoice = new Map<string, any[]>();
@@ -148,6 +168,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/payments' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     let clientInvoiceIds: string[] | null = null;
     let storeInvoiceIds: string[] | null = null;
     let storePaymentAmounts = new Map<string, number>();
@@ -170,8 +191,8 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const clientPaymentIds = clientInvoiceIds ? [...new Set((clientAllocations || []).map(row => row.payment_id))] : null;
     if (clientPaymentIds && clientPaymentIds.length === 0) return json({ payments: [] });
     let paymentsQuery = auth.repositoryContext.supabase.from('payments')
-      .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at')
-      .eq('organization_id', auth.organizationId).order('payment_date', { ascending: false });
+      .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at,data_environment')
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('payment_date', { ascending: false });
     if (clientPaymentIds) paymentsQuery = paymentsQuery.in('id', clientPaymentIds);
     else {
       const accountId = url.searchParams.get('accountId');
@@ -193,7 +214,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     if (error) throw error;
     const paymentIds = (payments || []).map(row => row.id);
     let allocationsQuery = auth.repositoryContext.supabase.from('payment_allocations')
-      .select('id,payment_id,invoice_id,amount_minor').eq('organization_id', auth.organizationId);
+      .select('id,payment_id,invoice_id,amount_minor').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
     if (paymentIds.length) allocationsQuery = allocationsQuery.in('payment_id', paymentIds);
     else allocationsQuery = allocationsQuery.in('payment_id', ['00000000-0000-0000-0000-000000000000']);
     if (clientInvoiceIds) allocationsQuery = allocationsQuery.in('invoice_id', clientInvoiceIds);
