@@ -10,7 +10,7 @@ import { SupabaseWarehouseRepository } from '../../server/repositories/warehouse
 export async function handleInventoryRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/warehouses' && request.method === 'GET') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot view the workspace-wide warehouse layout.' }, 403);
-    const layout = await new SupabaseWarehouseRepository(auth.repositoryContext).getLayout();
+    const layout = await new SupabaseWarehouseRepository(auth.repositoryContext).getLayout(url.searchParams.get('accountId') || undefined);
     return json(layout);
   }
 
