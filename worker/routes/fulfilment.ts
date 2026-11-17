@@ -146,13 +146,6 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
     let ratesQuery = auth.repositoryContext.supabase.from('rate_cards')
       .select('id,name,pick_fee_minor,pack_fee_minor,extra_item_fee_minor,storage_pallet_per_month_minor,storage_shelf_per_month_minor,storage_bin_per_month_minor,minimum_monthly_charge_minor,currency,external_id')
       .eq('organization_id', auth.organizationId);
-    const accountId = url.searchParams.get('accountId');
-    let includeDemo = false;
-    if (accountId && accountId !== 'ALL') {
-      const { data: account } = await auth.repositoryContext.supabase.from('marketplace_accounts')
-        .select('is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
-      includeDemo = Boolean(account?.is_demo);
-    }
     ratesQuery = ratesQuery.eq('data_environment', await getDataEnvironment(auth, url));
     const [clientsResult, ratesResult] = await Promise.all([
       auth.repositoryContext.supabase.from('clients_3pl')
