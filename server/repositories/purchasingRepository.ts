@@ -29,17 +29,18 @@ type ReceiptItemRow = {
 
 const PAGE_SIZE = 500;
 
-async function isDemoAccount(context: RepositoryContext, accountId?: string): Promise<boolean> {
-  if (!accountId || accountId === 'ALL') return false;
+async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
   const { data, error } = await context.supabase
     .from('marketplace_accounts')
-    .select('is_demo')
+    .select('is_demo,environment')
     .eq('id', accountId)
     .eq('organization_id', context.organizationId)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
-  return Boolean(data.is_demo);
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
 }
 
 async function readAll<T>(load: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -58,15 +59,13 @@ export class SupabasePurchasingRepository {
   constructor(private readonly context: RepositoryContext) {}
 
   async listSuppliers(accountId?: string): Promise<Supplier[]> {
-    const includeDemo = await isDemoAccount(this.context, accountId);
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
     const rows = await readAll<SupplierRow>((from, to) => {
       let query = this.context.supabase
         .from('suppliers')
         .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
         .eq('organization_id', this.context.organizationId);
-      query = includeDemo
-        ? query.like('external_id', 'demo:%')
-        : query.or('external_id.is.null,external_id.not.like.demo:%');
+      query = query.eq('data_environment', dataEnvironment);
       return query.order('name', { ascending: true }).range(from, to);
     });
     return rows.map(row => ({
@@ -91,9 +90,7 @@ export class SupabasePurchasingRepository {
           .from('purchase_orders')
           .select('id,po_number,supplier_id,status,subtotal_minor,tax_minor,total_minor,currency,notes,expected_date,created_at,approved_by,updated_at,external_id')
           .eq('organization_id', this.context.organizationId);
-        query = includeDemo
-          ? query.like('external_id', 'demo:%')
-          : query.or('external_id.is.null,external_id.not.like.demo:%');
+        query = query.eq('data_environment', dataEnvironment);
         return query.order('created_at', { ascending: false }).range(from, to);
       }),
       this.listSuppliers(accountId),
