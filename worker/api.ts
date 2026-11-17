@@ -30,7 +30,7 @@ async function authenticate(request: Request, env: WorkerEnv, createSupabaseClie
   if (!token) return json({ error: 'A valid Supabase bearer token is required.' }, 401);
   if (!url || !key) return json({ error: 'Supabase API configuration is missing.' }, 503);
 
-  let client: ReturnType<typeof createClient>;
+  let client: ReturnType<typeof createClient<any>>;
   try {
     client = createSupabaseClient(url, key, {
     global: { headers: { Authorization: `Bearer ${token}` } },
