@@ -113,7 +113,12 @@ UPDATE public.shipping_jobs j SET data_environment = c.data_environment
 FROM public.clients_3pl c WHERE j.client_3pl_id = c.id;
 UPDATE public.storage_snapshots s SET data_environment = c.data_environment
 FROM public.clients_3pl c WHERE s.client_3pl_id = c.id;
-UPDATE public.stock_ledger l SET data_environment = a.data_environment
+UPDATE public.stock_ledger l
+SET data_environment = CASE
+  WHEN a.is_demo THEN 'DEMO'::public.data_environment
+  WHEN a.environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+  ELSE 'SANDBOX'::public.data_environment
+END
 FROM public.marketplace_accounts a WHERE l.marketplace_account_id = a.id;
 UPDATE public.stock_ledger l SET data_environment = p.data_environment
 FROM public.products p WHERE l.marketplace_account_id IS NULL AND l.product_id = p.id;
