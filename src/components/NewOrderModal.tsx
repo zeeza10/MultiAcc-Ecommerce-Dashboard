@@ -97,7 +97,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
         },
         lines: payloadLines,
         notes,
-      });
+      }, selectedStoreId);
 
       onSuccess();
       onClose();
