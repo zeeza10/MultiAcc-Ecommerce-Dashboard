@@ -85,7 +85,11 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
   report=result(id,{movements:data.length},['Timestamp','SKU','Product','Delta','State','Source','Reference','Note'],data);
  }else if(id==='R-06'){
-  const [adjustments,products]=await Promise.all([rows(auth,'stock_adjustments','id,adjustment_number,product_id,quantity_delta,reason_code,status,note,created_at','created_at',url),rows(auth,'products','id,sku')]);
+  let [adjustments,products]=await Promise.all([rows(auth,'stock_adjustments','id,adjustment_number,product_id,quantity_delta,reason_code,status,note,created_at','created_at',url),rows(auth,'products','id,sku,external_id')]);
+  const includeDemo = await isDemoAccount(auth, accountId);
+  products=products.filter((x:any)=>matchesDemoScope(x.external_id,includeDemo));
+  const visibleProductIds=new Set(products.map((x:any)=>x.id));
+  adjustments=adjustments.filter((x:any)=>visibleProductIds.has(x.product_id));
   const pmap=new Map<string, string>(products.map((x:any)=>[String(x.id),String(x.sku)] as [string,string]));
   const data=adjustments.map((x:any)=>({adjustment:x.adjustment_number,sku:pmap.get(x.product_id)||'—',delta:x.quantity_delta,reason:x.reason_code,status:x.status,note:x.note||'',date:x.created_at}));
   report=result(id,{adjustments:data.length,pending:data.filter((x:any)=>x.status==='PENDING_APPROVAL').length},['Adjustment','SKU','Delta','Reason','Status','Note','Date'],data);
@@ -161,7 +165,16 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=orders.map((o:any)=>{const lines=items.filter((x:any)=>x.order_id===o.id);const cogs=lines.reduce((s:number,l:any)=>s+Number(l.quantity||0)*Number(pmap.get(l.product_id)?.cost_price_minor||0),0);const shipping=Number(o.shipping_cost_minor||0);const fees=0;return {order:o.order_number,revenue:money(o.total_minor,o.currency||'GBP'),cogs:money(cogs,o.currency||'GBP'),fees:money(fees,o.currency||'GBP'),shipping:money(shipping,o.currency||'GBP'),grossProfit:money(Number(o.total_minor)-cogs-fees-shipping,o.currency||'GBP')};});
   report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(allocatedExpenseTotal)},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
  }else if(id==='R-14'){
-  const [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at')]);
+  let [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at,marketplace_account_id')]);
+  if(accountId&&accountId!=='ALL'){
+   const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_finance_allocations')
+    .select('source_id').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId).eq('source_type','JOURNAL_ENTRY');
+   if(error)throw new Error('Store journal allocations could not be loaded.');
+   const entryIds=new Set((allocations||[]).map((x:any)=>x.source_id));
+   entries=entries.filter((x:any)=>entryIds.has(x.id));
+   lines=lines.filter((x:any)=>entryIds.has(x.journal_entry_id));
+   recs=recs.filter((x:any)=>x.marketplace_account_id===accountId);
+  }
   const data=accounts.map((a:any)=>{const own=lines.filter((x:any)=>x.account_id===a.id);return {account:a.account_code+' '+a.account_name,debits:money(own.reduce((s:number,x:any)=>s+Number(x.debit_minor||0),0)),credits:money(own.reduce((s:number,x:any)=>s+Number(x.credit_minor||0),0))};});
   const debit=lines.reduce((s:number,x:any)=>s+Number(x.debit_minor||0),0),credit=lines.reduce((s:number,x:any)=>s+Number(x.credit_minor||0),0);
   report=result(id,{journalEntries:entries.length,totalDebits:money(debit),totalCredits:money(credit),variance:money(debit-credit),reconciliations:recs.length},['Account','Debits','Credits'],data);
