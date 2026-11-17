@@ -400,6 +400,7 @@ export default function App() {
             <WarehouseLocationsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultTab={activeTab === 'locations' ? 'LOCATIONS' : 'WAREHOUSES'}
             />
           )}
@@ -407,13 +408,14 @@ export default function App() {
           {/* Phase 3 Modules */}
           {/* Phase 3 Warehouse Services & 3PL Modules */}
           {activeTab === 'warehouse-services' && (
-            <WarehouseServicesView currentUser={currentUser} />
+            <WarehouseServicesView currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
           {(activeTab === '3pl-clients' || activeTab === 'fulfilment' || activeTab === 'shipping' || activeTab === 'storage') && (
             <Clients3PLView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultSubTab={
                 activeTab === 'fulfilment'
                   ? 'FULFILMENT'
