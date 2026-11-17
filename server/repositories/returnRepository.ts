@@ -43,13 +43,14 @@ export class SupabaseReturnRepository {
       if (accountError) throw accountError;
       if (!account) throw new Error('The selected marketplace account was not found in this workspace.');
 
-      scopedOrderIds = await readAll<{ id: string }>((from, to) => this.context.supabase
+      const accountOrderIds = await readAll<{ id: string }>((from, to) => this.context.supabase
         .from('orders')
         .select('id')
         .eq('organization_id', this.context.organizationId)
         .eq('marketplace_account_id', accountId)
         .range(from, to)).then(rows => rows.map(row => row.id));
-      if (scopedOrderIds.length === 0) return [];
+      scopedOrderIds = accountOrderIds;
+      if (accountOrderIds.length === 0) return [];
     }
 
     const returns = await readAll<ReturnRow>((from, to) => {
