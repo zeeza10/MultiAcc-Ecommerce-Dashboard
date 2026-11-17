@@ -339,7 +339,7 @@ export default function App() {
           )}
 
           {activeTab === 'dropshipping' && (
-            <DropshippingCalculatorView currentUser={currentUser} />
+            <DropshippingCalculatorView currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
 
@@ -460,6 +460,7 @@ export default function App() {
             <ReportsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               initialReportId={tabFilterState?.reportId || 'R-01'}
             />
           )}
