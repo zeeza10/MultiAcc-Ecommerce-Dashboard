@@ -1,6 +1,18 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
+async function resolveDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 
 import { SupabaseProductRepository } from '../../server/repositories/productRepository';
 import { SupabaseInventoryRepository } from '../../server/repositories/inventoryRepository';
@@ -16,10 +28,12 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
 
   if (path === '/warehouses' && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const warehouse = await new SupabaseWarehouseRepository(auth.repositoryContext).createWarehouse({
       name: String(body.name || ''),
       code: String(body.code || ''),
       address: typeof body.address === 'string' ? body.address : undefined,
+      dataEnvironment,
     });
     return json({ warehouse }, 201);
   }
@@ -27,6 +41,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
   const locationCreateMatch = path.match(/^\/warehouses\/([^/]+)\/locations$/);
   if (locationCreateMatch && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const location = await new SupabaseWarehouseRepository(auth.repositoryContext).createLocation({
       warehouseId: locationCreateMatch[1],
       locationCode: String(body.locationCode || ''),
@@ -36,6 +51,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
       shelf: typeof body.shelf === 'string' ? body.shelf : undefined,
       bin: typeof body.bin === 'string' ? body.bin : undefined,
       capacityUnits: body.capacityUnits == null ? undefined : Number(body.capacityUnits),
+      dataEnvironment,
     });
     return json({ location }, 201);
   }
@@ -105,6 +121,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
   if (path === '/products' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace products.' }, 403);
     const body = await request.json() as Record<string, unknown>;
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const repository = new SupabaseProductRepository(auth.repositoryContext);
     const product = await repository.createForOrganization({
       sku: String(body.sku || ''),
@@ -119,6 +136,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
       category: String(body.category || 'General'),
       ownerType: (body.ownerType === 'CLIENT' ? 'CLIENT' : 'OPERATOR') as any,
       ownerId: typeof body.ownerId === 'string' ? body.ownerId : undefined,
+      dataEnvironment,
     });
     return json({ product }, 201);
   }
