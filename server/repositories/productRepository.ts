@@ -47,13 +47,14 @@ type ProductRow = {
   category_name: string | null;
   created_at: string;
   updated_at: string;
+  external_id: string | null;
 };
 
 const PRODUCT_COLUMNS = [
   'id', 'organization_id', 'sku', 'name', 'barcode', 'dimensions_cm',
   'weight_kg', 'owner_type', 'client_3pl_id', 'status', 'cost_price_minor',
   'selling_price_minor', 'currency', 'low_stock_threshold', 'reorder_level',
-  'category_name', 'created_at', 'updated_at',
+  'category_name', 'created_at', 'updated_at', 'external_id',
 ].join(',');
 
 const PAGE_SIZE = 1000;
@@ -95,7 +96,7 @@ export class SupabaseProductRepository implements ProductRepository {
   private get client() { return this.context.supabase; }
   private get organizationId() { return this.context.organizationId; }
 
-  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<Product[]> {
+  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean; includeDemo?: boolean } = {}): Promise<Product[]> {
     const scopedClientId = this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined);
     if (options.onlyClientProducts && !scopedClientId) return [];
 
@@ -108,6 +109,9 @@ export class SupabaseProductRepository implements ProductRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
+      query = options.includeDemo
+        ? query.like('external_id', 'demo:%')
+        : query.or('external_id.is.null,external_id.not.like.demo:%');
       if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId).eq('owner_type', 'CLIENT');
 
       const { data, error } = await query;
