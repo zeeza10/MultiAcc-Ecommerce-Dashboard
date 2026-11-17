@@ -368,22 +368,22 @@ apiRouter.get('/products', async (req: Request, res: Response) => {
     const repository = new SupabaseProductRepository(context);
     const isClientUser = user.role === 'CLIENT_USER';
     const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
-    let includeDemo = false;
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
     if (accountId && accountId !== 'ALL') {
       const { data: account, error: accountError } = await context.supabase
-        .from('marketplace_accounts').select('id,is_demo')
+        .from('marketplace_accounts').select('id,is_demo,environment')
         .eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
       if (accountError) throw accountError;
       if (!account) {
         res.status(404).json({ error: 'The selected marketplace account was not found in this workspace.' });
         return;
       }
-      includeDemo = Boolean(account.is_demo);
+      dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
     }
     const products = await repository.listForOrganization({
       client3plId: user.clientId,
       onlyClientProducts: isClientUser,
-      includeDemo,
+      dataEnvironment,
     });
 
     const balances = new Map<string, { onHand: number; reserved: number; incoming: number; damaged: number }>();
