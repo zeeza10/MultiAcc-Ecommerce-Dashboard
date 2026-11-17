@@ -14,6 +14,7 @@ export interface ProductCreateInput {
   category: string;
   ownerType: OwnerType;
   ownerId?: string;
+  dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
 }
 
 export interface StockLedgerQuantityRow {
@@ -158,12 +159,13 @@ export class SupabaseProductRepository implements ProductRepository {
       if (!input.ownerId) throw new Error('Select a valid 3PL client for this product.');
       const { data: client, error: clientError } = await this.client
         .from('clients_3pl')
-        .select('id')
+        .select('id,data_environment')
         .eq('id', input.ownerId)
         .eq('organization_id', this.organizationId)
         .maybeSingle();
       if (clientError) throw clientError;
       if (!client) throw new Error('The selected 3PL client does not belong to this workspace.');
+      if (input.dataEnvironment && client.data_environment !== input.dataEnvironment) throw new Error('The selected 3PL client belongs to a different data environment.');
       client3plId = client.id;
     }
 
