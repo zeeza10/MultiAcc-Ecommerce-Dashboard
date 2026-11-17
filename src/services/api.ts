@@ -248,10 +248,10 @@ export const api = {
   },
 
   // Warehouse layout
-  getWarehouseLayout: () => request<{
+  getWarehouseLayout: (accountId?: string) => request<{
     warehouses: Array<{ id: string; name: string; code: string; address: string; isActive: boolean; totalCapacity: number; occupiedQty: number; zones: Array<{ name: string; aisles: string; type: string; capacity: number; locationCount: number }> }>;
     locations: Array<{ id: string; warehouseId: string; warehouseName: string; zone: string; aisle: string; shelf: string; bin: string; locationCode: string; locationType: string; capacityUnits: number; currentQty: number; occupiedQty: number; skuCount: number; isActive: boolean }>;
-  }>('/warehouses'),
+  }>(`/warehouses${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   createWarehouse: (payload: { name: string; code: string; address?: string }) =>
     request<{ warehouse: unknown }>('/warehouses', { method: 'POST', body: JSON.stringify(payload) }),
   createWarehouseLocation: (warehouseId: string, payload: { locationCode: string; locationType: string; zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number }) =>
