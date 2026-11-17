@@ -81,7 +81,7 @@ export default function App() {
         const canViewOrders = permissions.includes('*') || permissions.includes('orders.view');
         const canViewProducts = permissions.includes('*') || permissions.includes('products.view');
         const [ordRes, prodRes] = await Promise.all([
-          canViewOrders ? api.getOrders({ search: globalSearch }) : Promise.resolve({ orders: [] }),
+          canViewOrders ? api.getOrders({ search: globalSearch, accountId: selectedStoreId }) : Promise.resolve({ orders: [] }),
           canViewProducts ? api.getProducts() : Promise.resolve({ products: [] }),
         ]);
         const s = globalSearch.toLowerCase();
@@ -98,7 +98,7 @@ export default function App() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [globalSearch, permissions]);
+  }, [globalSearch, permissions, selectedStoreId]);
 
   const initApp = async () => {
     setLoading(true);
@@ -114,8 +114,16 @@ export default function App() {
       setInitError('');
       setNotifications(notifRes.notifications);
       setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-      setMarketplaceAccounts(accountsRes.accounts || []);
+      const accounts = accountsRes.accounts || [];
+      setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
+      setSelectedStoreId((current) => {
+        if (current !== 'ALL' || accounts.length === 0) return current;
+        const preferredAccount = accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
+          || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION')
+          || accounts.find((account) => account.isDemo);
+        return preferredAccount?.id || current;
+      });
     } catch (err: any) {
       console.error('Failed to initialize app:', err);
       setInitError(err.message || 'Workspace data could not be loaded.');
@@ -133,7 +141,20 @@ export default function App() {
         alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
         return;
       }
-      if (accRes.accounts.length > 0) await api.syncEbayAccount(accRes.accounts[0].id);
+      const selectedAccount = accRes.accounts.find((account) => account.id === selectedStoreId);
+      if (!selectedAccount) {
+        alert('Select one seller account before synchronizing.');
+        return;
+      }
+      if (selectedAccount.isDemo) {
+        alert('Demo accounts are presentation-only and cannot be synchronized.');
+        return;
+      }
+      if (selectedAccount.authStatus !== 'CONNECTED') {
+        alert('The selected seller account is not connected. Connect it before synchronizing.');
+        return;
+      }
+      await api.syncEbayAccount(selectedAccount.id);
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
         permissions.includes('*') || permissions.includes('marketplace.view')
@@ -360,6 +381,7 @@ export default function App() {
             <BuyingReturnsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultSubTab={
                 activeTab === 'returns'
                   ? 'RETURNS'
