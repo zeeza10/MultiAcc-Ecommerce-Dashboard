@@ -28,9 +28,10 @@ import { api } from '../services/api';
 
 interface WarehouseServicesViewProps {
   currentUser: User;
+  selectedStoreId: string;
 }
 
-export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
+export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser, selectedStoreId }) => {
   const canManageFulfilment = currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER';
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
   const [summary, setSummary] = useState<any>(null);
@@ -77,8 +78,8 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
     setLoading(true);
     try {
       const [sumRes, pkgRes, shpRes, clientRes, storageRes, productRes, balanceRes, ledgerRes, invoiceRes, configRes] = await Promise.all([
-        api.getWarehouseServicesSummary(), api.getPackagingJobs(), api.getShippingJobs(), api.get3PLClients(),
-        api.getStorageSnapshots(), api.getProducts(), api.getBalances(), api.getStockLedger(), api.getInvoices(), api.getConfig(),
+        api.getWarehouseServicesSummary(selectedStoreId), api.getPackagingJobs(selectedStoreId), api.getShippingJobs(selectedStoreId), api.get3PLClients(selectedStoreId),
+        api.getStorageSnapshots(selectedStoreId), api.getProducts(selectedStoreId), api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId), api.getInvoices(selectedStoreId), api.getConfig(),
       ]);
       setSummary(sumRes.summary || sumRes);
       setPackagingJobs(pkgRes.packagingJobs || []);
