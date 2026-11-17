@@ -214,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(nextSession);
         if (!nextSession) {
           void loadAccount(null);
-        } else if (!completedAccountLoadKey.current) {
+        } else if (!completedAccountLoadKey.current?.startsWith(`${nextSession.user.id}:`)) {
           // Do not call Supabase data APIs while the auth callback holds its lock.
           const eventGeneration = authEventGeneration.current;
           window.setTimeout(() => {
