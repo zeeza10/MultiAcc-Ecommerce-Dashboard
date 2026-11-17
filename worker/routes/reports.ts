@@ -38,6 +38,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
  const id=match[1];
  if(!DEFINITIONS[id]) return json({error:'Report not found.'},404);
  const accountId=url.searchParams.get('accountId');
+ const dataEnvironment = await getDataEnvironment(auth, accountId);
  const skuFilter=url.searchParams.get('sku')?.trim().toUpperCase();
  let report:any;
 
@@ -80,7 +81,6 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   let [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id,data_environment','created_at',url),rows(auth,'products','id,sku,name,data_environment')]);
   ledger=ledger.filter((x:any)=>x.data_environment===dataEnvironment);
   if(accountId&&accountId!=='ALL')ledger=ledger.filter((x:any)=>x.marketplace_account_id===accountId);
-  const includeDemoProducts = await isDemoAccount(auth, accountId);
   products=products.filter((x:any)=>x.data_environment===dataEnvironment);
   const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
@@ -124,7 +124,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{clients:data.length,serviceCharges:money([...packaging,...shipping].reduce((n:number,x:any)=>n+Number(x.total_charge_minor||0),0))},['Client','Code','Orders','Packaging Jobs','Packed Units','Shipping Jobs','Service Charges'],data);
  }else if(id==='R-11'){
   let [snapshots,clients]=await Promise.all([rows(auth,'storage_snapshots','client_3pl_id,snapshot_date,occupied_pallets,occupied_shelves,occupied_bins,estimated_cost_minor,data_environment','snapshot_date',url),rows(auth,'clients_3pl','id,company_name,data_environment')]);
-  clients=clients.filter((x:any)=>x.external_id.data_environment===dataEnvironment);
+  clients=clients.filter((x:any)=>x.data_environment===dataEnvironment);
   const visibleClientIds=new Set(clients.map((x:any)=>x.id));
   snapshots=snapshots.filter((x:any)=>x.data_environment===dataEnvironment && visibleClientIds.has(x.client_3pl_id));
   const cmap=new Map<string, string>(clients.map((x:any)=>[String(x.id),String(x.company_name)] as [string,string]));
