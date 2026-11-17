@@ -124,7 +124,7 @@ CREATE OR REPLACE FUNCTION public.set_order_data_environment()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
-AS $
+AS $$
 DECLARE
   account_is_demo boolean;
   account_environment text;
@@ -156,7 +156,7 @@ BEGIN
   END;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_orders_set_data_environment ON public.orders;
 CREATE TRIGGER trg_orders_set_data_environment
@@ -231,7 +231,7 @@ CREATE OR REPLACE FUNCTION public.inherit_data_environment_from_parent()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
-AS $
+AS $$
 DECLARE
   parent_environment public.data_environment;
 BEGIN
@@ -336,9 +336,9 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
-DO $
+DO $$
 DECLARE
   target_table text;
 BEGIN
@@ -355,7 +355,7 @@ BEGIN
       target_table, target_table
     );
   END LOOP;
-END $;
+END $$;
 
 -- Account/environment filters are used on every high-volume list and report query.
 CREATE INDEX IF NOT EXISTS idx_orders_org_environment_account
