@@ -28,13 +28,14 @@ type LedgerRow = {
 
 const PAGE_SIZE = 500;
 
-async function isDemoAccount(context: RepositoryContext, accountId?: string): Promise<boolean> {
-  if (!accountId || accountId === 'ALL') return false;
+async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
   const { data, error } = await context.supabase.from('marketplace_accounts')
-    .select('is_demo').eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
+    .select('is_demo,environment').eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
-  return Boolean(data.is_demo);
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
 }
 
 async function readAll<T>(
@@ -68,14 +69,12 @@ export class SupabaseWarehouseRepository {
       occupiedQty: number; skuCount: number; isActive: boolean;
     }>;
   }> {
-    const includeDemo = await isDemoAccount(this.context, accountId);
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
     const warehouses = await readAll<WarehouseRow>((from, to) => {
       let query = this.context.supabase.from('warehouses')
         .select('id,name,code,address,is_active')
         .eq('organization_id', this.context.organizationId);
-      query = includeDemo
-        ? query.like('external_id', 'demo:%')
-        : query.or('external_id.is.null,external_id.not.like.demo:%');
+      query = query.eq('data_environment', dataEnvironment);
       return query.order('code', { ascending: true }).range(from, to);
     });
     const warehouseIds = warehouses.map(row => row.id);
