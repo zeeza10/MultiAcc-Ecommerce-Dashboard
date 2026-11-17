@@ -99,7 +99,12 @@ DECLARE
   account_environment text;
 BEGIN
   IF NEW.marketplace_account_id IS NULL THEN
-    NEW.data_environment := COALESCE(NEW.data_environment, 'SANDBOX'::public.data_environment);
+    account_environment := current_setting('app.data_environment', true);
+    IF account_environment IN ('DEMO', 'SANDBOX', 'PRODUCTION') THEN
+      NEW.data_environment := account_environment::public.data_environment;
+    ELSE
+      NEW.data_environment := COALESCE(NEW.data_environment, 'SANDBOX'::public.data_environment);
+    END IF;
     RETURN NEW;
   END IF;
 
@@ -128,6 +133,22 @@ BEFORE INSERT OR UPDATE OF marketplace_account_id, organization_id
 ON public.orders
 FOR EACH ROW EXECUTE FUNCTION public.set_order_data_environment();
 
+CREATE OR REPLACE FUNCTION public.create_workspace_order(p_organization_id uuid, p_order jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path TO 'public', 'private', 'pg_temp'
+AS $function$
+DECLARE
+  requested_environment text := upper(coalesce(p_order->>'dataEnvironment', 'SANDBOX'));
+BEGIN
+  IF requested_environment NOT IN ('DEMO', 'SANDBOX', 'PRODUCTION') THEN
+    RAISE EXCEPTION 'Invalid order data environment.' USING ERRCODE = '22023';
+  END IF;
+  PERFORM set_config('app.data_environment', requested_environment, true);
+  RETURN private.create_workspace_order(p_organization_id, p_order);
+END;
+$function$;
+
 -- Child records inherit the partition of their owning parent record.
 CREATE OR REPLACE FUNCTION public.inherit_data_environment_from_parent()
 RETURNS trigger
@@ -141,6 +162,12 @@ BEGIN
   CASE TG_TABLE_NAME
     WHEN 'order_items' THEN
       SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+      IF parent_environment IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM public.products p WHERE p.id = NEW.product_id
+          AND p.organization_id = NEW.organization_id AND p.data_environment = parent_environment
+      ) THEN
+        RAISE EXCEPTION 'Order item product belongs to a different data environment';
+      END IF;
     WHEN 'returns' THEN
       SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
     WHEN 'return_items' THEN
