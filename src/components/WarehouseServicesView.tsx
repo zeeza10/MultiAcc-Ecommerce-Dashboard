@@ -163,7 +163,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         orderNumber: pkgOrderNumber || undefined,
         notes: pkgNotes,
         performedBy: currentUser.name,
-      });
+      }, selectedStoreId);
       setShowPkgModal(false);
       loadData();
     } catch (err: any) {
@@ -199,7 +199,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         totalChargeMinor: carCostMinor + srvChargeMinor,
         destination: shpDestination,
         orderNumber: shpOrderNumber,
-      });
+      }, selectedStoreId);
       setShowShpModal(false);
       loadData();
     } catch (err: any) {
