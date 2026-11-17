@@ -63,7 +63,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
   const loadProducts = async () => {
     try {
-      const res = await api.getProducts();
+      const res = await api.getProducts(selectedStoreId);
       setProducts(res.products);
     } catch (e) {
       console.warn('Failed to load products for editing', e);
