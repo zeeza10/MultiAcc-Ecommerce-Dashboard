@@ -388,7 +388,7 @@ export default function App() {
         />
 
         {/* Center Main View */}
-        <main className="relative flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
+        <main aria-busy={pendingApiRequests > 0} className="relative flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
           {pendingApiRequests > 0 && (
             <div className="workspace-loading-overlay" role="status" aria-live="polite" aria-atomic="true">
               <div className="workspace-loading-card">
