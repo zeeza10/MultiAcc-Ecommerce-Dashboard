@@ -1,7 +1,19 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
-const COLUMNS = 'id,organization_id,product_id,sku,product_name,supplier_name,purchase_cost_minor,supplier_cost_minor,shipping_cost_minor,packaging_cost_minor,additional_expenses_minor,selling_price_minor,marketplace_fee_percent,marketplace_fee_minor,other_costs_minor,shipping_option,shipping_charged_to_customer_minor,total_cost_minor,gross_profit_minor,margin_percent,net_profit_minor,currency,updated_by,updated_at';
+async function resolveDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
+const COLUMNS = 'id,organization_id,product_id,data_environment,sku,product_name,supplier_name,purchase_cost_minor,supplier_cost_minor,shipping_cost_minor,packaging_cost_minor,additional_expenses_minor,selling_price_minor,marketplace_fee_percent,marketplace_fee_minor,other_costs_minor,shipping_option,shipping_charged_to_customer_minor,total_cost_minor,gross_profit_minor,margin_percent,net_profit_minor,currency,updated_by,updated_at';
 
 const mapCalculation = (row: any) => ({
   id: row.id, sku: row.sku, productName: row.product_name, supplierName: row.supplier_name,
@@ -16,11 +28,12 @@ const mapCalculation = (row: any) => ({
   currency: row.currency, updatedBy: row.updated_by || '', updatedAt: row.updated_at,
 });
 
-export async function handleDropshippingRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+export async function handleDropshippingRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/dropshipping/calculations' && request.method === 'GET') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client-scoped dropshipping simulations are not enabled.' }, 403);
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const { data, error } = await auth.repositoryContext.supabase.from('dropshipping_calculations')
-      .select(COLUMNS).eq('organization_id', auth.organizationId)
+      .select(COLUMNS).eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment)
       .order('updated_at', { ascending: false }).limit(500);
     if (error) throw new Error('Dropshipping calculations could not be loaded.');
     return json({ calculations: (data || []).map(mapCalculation) });
@@ -29,6 +42,7 @@ export async function handleDropshippingRoute(path: string, request: Request, au
   if (path === '/dropshipping/calculations' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot save workspace simulations.' }, 403);
     const body = await request.json() as Record<string, unknown>;
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const sku = String(body.sku || '').trim().toUpperCase();
     const productName = String(body.productName || '').trim();
     const supplierName = String(body.supplierName || '').trim();
@@ -57,10 +71,10 @@ export async function handleDropshippingRoute(path: string, request: Request, au
     const netProfit = grossProfit - feeMinor - other;
     const marginPercent = revenue > 0 ? Number((grossProfit / revenue * 100).toFixed(2)) : 0;
     const { data: product, error: productError } = await auth.repositoryContext.supabase.from('products')
-      .select('id').eq('organization_id', auth.organizationId).eq('sku', sku).maybeSingle();
+      .select('id,data_environment').eq('organization_id', auth.organizationId).eq('sku', sku).eq('data_environment', dataEnvironment).maybeSingle();
     if (productError) throw new Error('Product reference could not be verified.');
     const { data, error } = await auth.repositoryContext.supabase.from('dropshipping_calculations').insert({
-      organization_id: auth.organizationId, product_id: product?.id || null, sku, product_name: productName,
+      organization_id: auth.organizationId, product_id: product?.id || null, data_environment: dataEnvironment, sku, product_name: productName,
       supplier_name: supplierName, purchase_cost_minor: purchase, supplier_cost_minor: purchase,
       shipping_cost_minor: shipping, packaging_cost_minor: packaging, additional_expenses_minor: additional,
       selling_price_minor: selling, marketplace_fee_percent: feePercent, marketplace_fee_minor: feeMinor,
