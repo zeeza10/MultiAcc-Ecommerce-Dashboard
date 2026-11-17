@@ -144,6 +144,22 @@ BEGIN
   IF requested_environment NOT IN ('DEMO', 'SANDBOX', 'PRODUCTION') THEN
     RAISE EXCEPTION 'Invalid order data environment.' USING ERRCODE = '22023';
   END IF;
+  IF requested_environment = 'DEMO' AND NOT EXISTS (
+    SELECT 1 FROM public.marketplace_accounts
+    WHERE organization_id = p_organization_id AND is_demo = true
+  ) THEN
+    RAISE EXCEPTION 'Demo environment is not enabled for this workspace.' USING ERRCODE = '42501';
+  ELSIF requested_environment = 'SANDBOX' AND NOT EXISTS (
+    SELECT 1 FROM public.marketplace_accounts
+    WHERE organization_id = p_organization_id AND is_demo = false AND environment = 'SANDBOX'
+  ) THEN
+    RAISE EXCEPTION 'Sandbox environment is not enabled for this workspace.' USING ERRCODE = '42501';
+  ELSIF requested_environment = 'PRODUCTION' AND NOT EXISTS (
+    SELECT 1 FROM public.marketplace_accounts
+    WHERE organization_id = p_organization_id AND is_demo = false AND environment = 'PRODUCTION'
+  ) THEN
+    RAISE EXCEPTION 'Production environment is not enabled for this workspace.' USING ERRCODE = '42501';
+  END IF;
   PERFORM set_config('app.data_environment', requested_environment, true);
   RETURN private.create_workspace_order(p_organization_id, p_order);
 END;
