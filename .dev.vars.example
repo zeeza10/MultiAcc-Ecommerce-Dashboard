@@ -1,3 +1,4 @@
 # Local Wrangler runtime variables. Never commit the real .dev.vars file.
 API_ORIGIN=http://localhost:3000
 ALLOWED_ORIGIN=http://localhost:3000
+\n# Comma-separated Supabase Auth user UUIDs allowed to manage shared platform eBay credentials.\n# This is separate from workspace SUPER_ADMIN roles and fails closed when unset.\nPLATFORM_SUPER_ADMIN_USER_IDS=\n
