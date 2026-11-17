@@ -128,6 +128,83 @@ BEFORE INSERT OR UPDATE OF marketplace_account_id, organization_id
 ON public.orders
 FOR EACH ROW EXECUTE FUNCTION public.set_order_data_environment();
 
+-- Child records inherit the partition of their owning parent record.
+CREATE OR REPLACE FUNCTION public.inherit_data_environment_from_parent()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $
+DECLARE
+  parent_environment public.data_environment;
+BEGIN
+  parent_environment := NULL;
+  CASE TG_TABLE_NAME
+    WHEN 'order_items' THEN
+      SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+    WHEN 'returns' THEN
+      SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+    WHEN 'return_items' THEN
+      SELECT data_environment INTO parent_environment FROM public.returns WHERE id = NEW.return_id AND organization_id = NEW.organization_id;
+    WHEN 'purchase_orders' THEN
+      SELECT data_environment INTO parent_environment FROM public.suppliers WHERE id = NEW.supplier_id AND organization_id = NEW.organization_id;
+    WHEN 'warehouse_locations' THEN
+      SELECT data_environment INTO parent_environment FROM public.warehouses WHERE id = NEW.warehouse_id AND organization_id = NEW.organization_id;
+    WHEN 'stock_adjustments' THEN
+      SELECT data_environment INTO parent_environment FROM public.products WHERE id = NEW.product_id AND organization_id = NEW.organization_id;
+    WHEN 'goods_receipts' THEN
+      SELECT data_environment INTO parent_environment FROM public.purchase_orders WHERE id = NEW.purchase_order_id AND organization_id = NEW.organization_id;
+    WHEN 'goods_receipt_items' THEN
+      SELECT data_environment INTO parent_environment FROM public.goods_receipts WHERE id = NEW.goods_receipt_id AND organization_id = NEW.organization_id;
+    WHEN 'packaging_jobs' THEN
+      SELECT data_environment INTO parent_environment FROM public.clients_3pl WHERE id = NEW.client_3pl_id AND organization_id = NEW.organization_id;
+    WHEN 'shipping_jobs' THEN
+      SELECT data_environment INTO parent_environment FROM public.clients_3pl WHERE id = NEW.client_3pl_id AND organization_id = NEW.organization_id;
+    WHEN 'storage_snapshots' THEN
+      SELECT data_environment INTO parent_environment FROM public.clients_3pl WHERE id = NEW.client_3pl_id AND organization_id = NEW.organization_id;
+    WHEN 'journal_entry_lines' THEN
+      SELECT data_environment INTO parent_environment FROM public.journal_entries WHERE id = NEW.journal_entry_id AND organization_id = NEW.organization_id;
+    WHEN 'stock_ledger' THEN
+      IF NEW.marketplace_account_id IS NOT NULL THEN
+        SELECT CASE WHEN is_demo THEN 'DEMO'::public.data_environment
+                    WHEN environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+                    ELSE 'SANDBOX'::public.data_environment END
+          INTO parent_environment
+        FROM public.marketplace_accounts
+        WHERE id = NEW.marketplace_account_id AND organization_id = NEW.organization_id;
+      ELSIF NEW.location_id IS NOT NULL THEN
+        SELECT w.data_environment INTO parent_environment
+        FROM public.warehouse_locations l
+        JOIN public.warehouses w ON w.id = l.warehouse_id
+        WHERE l.id = NEW.location_id AND l.organization_id = NEW.organization_id;
+      ELSE
+        SELECT data_environment INTO parent_environment FROM public.products WHERE id = NEW.product_id AND organization_id = NEW.organization_id;
+      END IF;
+  END CASE;
+
+  IF parent_environment IS NOT NULL THEN
+    NEW.data_environment := parent_environment;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DO $
+DECLARE
+  target_table text;
+BEGIN
+  FOREACH target_table IN ARRAY ARRAY[
+    'order_items','returns','return_items','purchase_orders','warehouse_locations',
+    'stock_adjustments','goods_receipts','goods_receipt_items','packaging_jobs',
+    'shipping_jobs','storage_snapshots','journal_entry_lines','stock_ledger'
+  ] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS trg_%I_inherit_data_environment ON public.%I', target_table, target_table);
+    EXECUTE format(
+      'CREATE TRIGGER trg_%I_inherit_data_environment BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.inherit_data_environment_from_parent()',
+      target_table, target_table
+    );
+  END LOOP;
+END $;
+
 -- Account/environment filters are used on every high-volume list and report query.
 CREATE INDEX IF NOT EXISTS idx_orders_org_environment_account
   ON public.orders (organization_id, data_environment, marketplace_account_id);
