@@ -273,10 +273,10 @@ export const api = {
     }),
 
   // Phase 1: Dropshipping Calculator
-  getDropshippingCalculations: () =>
-    request<{ calculations: DropshippingCalculation[] }>('/dropshipping/calculations'),
-  saveDropshippingCalculation: (payload: Partial<DropshippingCalculation>) =>
-    request<{ calculation: DropshippingCalculation }>('/dropshipping/calculations', {
+  getDropshippingCalculations: (accountId?: string) =>
+    request<{ calculations: DropshippingCalculation[] }>(`/dropshipping/calculations${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  saveDropshippingCalculation: (payload: Partial<DropshippingCalculation>, accountId?: string) =>
+    request<{ calculation: DropshippingCalculation }>(`/dropshipping/calculations${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
