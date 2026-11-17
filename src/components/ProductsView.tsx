@@ -98,7 +98,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         reorderLevel: reorder,
         ownerType: currentUser.role === 'CLIENT_USER' ? 'CLIENT' : 'OPERATOR',
         ownerId: currentUser.role === 'CLIENT_USER' ? currentUser.clientId : 'operator',
-      });
+      }, selectedStoreId);
 
       setShowAddModal(false);
       // Reset form
