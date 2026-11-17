@@ -56,7 +56,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
    report=result(id,{orders:orders.length,statuses:grouped.size},['Status','Orders','Gross Value'],data);
   }
  }else if(['R-03','R-05','R-07'].includes(id)){
-  let [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level,external_id'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
+  let [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level,data_environment'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
   const balances=new Map<string,any>();
   if(accountId&&accountId!=='ALL'){
    const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_inventory_allocations')
@@ -86,7 +86,6 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{movements:data.length},['Timestamp','SKU','Product','Delta','State','Source','Reference','Note'],data);
  }else if(id==='R-06'){
   let [adjustments,products]=await Promise.all([rows(auth,'stock_adjustments','id,adjustment_number,product_id,quantity_delta,reason_code,status,note,created_at,data_environment','created_at',url),rows(auth,'products','id,sku,data_environment')]);
-  const dataEnvironment = await getDataEnvironment(auth, accountId);
   products=products.filter((x:any)=>x.data_environment===dataEnvironment);
   const visibleProductIds=new Set(products.map((x:any)=>x.id));
   adjustments=adjustments.filter((x:any)=>x.data_environment===dataEnvironment && visibleProductIds.has(x.product_id));
@@ -103,7 +102,8 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=pos.map((p:any)=>{const lines=items.filter((x:any)=>x.purchase_order_id===p.id);return {po:p.po_number,supplier:smap.get(p.supplier_id)||'—',status:p.status,ordered:lines.reduce((s:number,x:any)=>s+Number(x.ordered_qty),0),received:lines.reduce((s:number,x:any)=>s+Number(x.received_qty),0),total:money(p.total_minor),expected:p.expected_date||'—'};});
   report=result(id,{purchaseOrders:data.length,totalValue:money(pos.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0))},['PO','Supplier','Status','Ordered Units','Received Units','Total','Expected Date'],data);
  }else if(id==='R-09'){
-  let [returns,items,orders]=await Promise.all([rows(auth,'returns','id,return_number,order_id,reason_code,status,refund_amount_minor,refund_status,created_at','created_at',url),rows(auth,'return_items','return_id,sku,quantity,disposition'),rows(auth,'orders','id,marketplace_account_id')]);
+  let [returns,items,orders]=await Promise.all([rows(auth,'returns','id,return_number,order_id,reason_code,status,refund_amount_minor,refund_status,created_at,data_environment','created_at',url),rows(auth,'return_items','return_id,sku,quantity,disposition'),rows(auth,'orders','id,marketplace_account_id,data_environment')]);
+  returns=returns.filter((x:any)=>x.data_environment===dataEnvironment);
   if(accountId&&accountId!=='ALL'){
    const visibleOrderIds=new Set(orders.filter((x:any)=>x.marketplace_account_id===accountId).map((x:any)=>x.id));
    returns=returns.filter((x:any)=>visibleOrderIds.has(x.order_id));
@@ -146,6 +146,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   let [orders,items,products,expenses]=await Promise.all([rows(auth,'orders','id,order_number,total_minor,currency,shipping_cost_minor,created_at,marketplace_account_id,data_environment','created_at',url),rows(auth,'order_items','order_id,product_id,quantity,data_environment'),rows(auth,'products','id,cost_price_minor,sku,data_environment'),rows(auth,'expenses','id,category,amount_minor,expense_date,data_environment','expense_date',url)]);
   products=products.filter((x:any)=>x.data_environment===dataEnvironment);
   expenses=expenses.filter((x:any)=>x.data_environment===dataEnvironment);
+  orders=orders.filter((x:any)=>x.data_environment===dataEnvironment);
   let allocatedExpenseTotal=0;
   if(accountId&&accountId!=='ALL'){
    orders=orders.filter((o:any)=>o.marketplace_account_id===accountId);
@@ -162,7 +163,10 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=orders.map((o:any)=>{const lines=items.filter((x:any)=>x.order_id===o.id);const cogs=lines.reduce((s:number,l:any)=>s+Number(l.quantity||0)*Number(pmap.get(l.product_id)?.cost_price_minor||0),0);const shipping=Number(o.shipping_cost_minor||0);const fees=0;return {order:o.order_number,revenue:money(o.total_minor,o.currency||'GBP'),cogs:money(cogs,o.currency||'GBP'),fees:money(fees,o.currency||'GBP'),shipping:money(shipping,o.currency||'GBP'),grossProfit:money(Number(o.total_minor)-cogs-fees-shipping,o.currency||'GBP')};});
   report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(allocatedExpenseTotal)},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
  }else if(id==='R-14'){
-  let [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at,marketplace_account_id')]);
+  let [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor,data_environment'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status,data_environment'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at,marketplace_account_id')]);
+  entries=entries.filter((x:any)=>x.data_environment===dataEnvironment);
+  const visibleEntryIds=new Set(entries.map((x:any)=>x.id));
+  lines=lines.filter((x:any)=>x.data_environment===dataEnvironment && visibleEntryIds.has(x.journal_entry_id));
   if(accountId&&accountId!=='ALL'){
    const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_finance_allocations')
     .select('source_id').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId).eq('source_type','JOURNAL_ENTRY');
