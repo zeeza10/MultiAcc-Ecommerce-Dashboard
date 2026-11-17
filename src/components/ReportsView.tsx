@@ -16,6 +16,7 @@ import { User, SystemConfig } from '../types';
 interface ReportsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   initialReportId?: string;
 }
 
@@ -39,6 +40,7 @@ const ALL_REPORTS = [
 export const ReportsView: React.FC<ReportsViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   initialReportId = 'R-01',
 }) => {
   const [selectedReportId, setSelectedReportId] = useState(initialReportId);
@@ -47,12 +49,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   useEffect(() => {
     loadReport(selectedReportId);
-  }, [selectedReportId, currentUser.id]);
+  }, [selectedReportId, currentUser.id, selectedStoreId]);
 
   const loadReport = async (id: string) => {
     setLoading(true);
     try {
-      const data = await api.getReport(id);
+      const data = await api.getReport(id, { accountId: selectedStoreId });
       setReportData(data);
     } catch (err) {
       console.error('Failed to run report:', err);
@@ -64,7 +66,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const exportCurrentReport = async () => {
     if (!reportData) return;
     try {
-      const blob = await api.exportReport(selectedReportId);
+      const blob = await api.exportReport(selectedReportId, { accountId: selectedStoreId });
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
