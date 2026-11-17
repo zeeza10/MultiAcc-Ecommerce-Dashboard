@@ -50,13 +50,13 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [prodRes, calcRes, configRes] = await Promise.all([
-        api.getProducts(),
+        api.getProducts(selectedStoreId),
         api.getDropshippingCalculations(),
         api.getConfig(),
       ]);
