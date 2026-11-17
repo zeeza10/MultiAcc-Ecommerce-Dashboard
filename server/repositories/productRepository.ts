@@ -96,7 +96,7 @@ export class SupabaseProductRepository implements ProductRepository {
   private get client() { return this.context.supabase; }
   private get organizationId() { return this.context.organizationId; }
 
-  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean; includeDemo?: boolean } = {}): Promise<Product[]> {
+  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}): Promise<Product[]> {
     const scopedClientId = this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined);
     if (options.onlyClientProducts && !scopedClientId) return [];
 
@@ -109,9 +109,7 @@ export class SupabaseProductRepository implements ProductRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
-      query = options.includeDemo
-        ? query.like('external_id', 'demo:%')
-        : query.or('external_id.is.null,external_id.not.like.demo:%');
+      query = query.eq('data_environment', options.dataEnvironment || 'SANDBOX');
       if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId).eq('owner_type', 'CLIENT');
 
       const { data, error } = await query;
