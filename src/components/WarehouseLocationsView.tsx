@@ -59,7 +59,9 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       setLocations(result.locations || []);
       setLocationForm(current => ({
         ...current,
-        warehouseId: current.warehouseId || result.warehouses?.[0]?.id || '',
+        warehouseId: result.warehouses?.some((warehouse) => warehouse.id === current.warehouseId)
+          ? current.warehouseId
+          : (result.warehouses?.[0]?.id || ''),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Warehouse data could not be loaded.');
