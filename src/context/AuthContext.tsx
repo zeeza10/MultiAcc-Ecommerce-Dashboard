@@ -207,13 +207,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // event as the single bootstrap source avoids racing getSession() against the
     // listener's INITIAL_SESSION callback.
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      const eventGeneration = ++authEventGeneration.current;
-      if (event === 'PASSWORD_RECOVERY') {
-        setRecoveryActive(true);
-        setMode('reset');
-      }
-
       if (event === 'TOKEN_REFRESHED') {
+        authEventGeneration.current += 1;
         // The verified identity and membership have not changed. Keep the current
         // workspace mounted and update only the session used by API requests.
         setSession(nextSession);
@@ -223,11 +218,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'SIGNED_OUT') {
+        authEventGeneration.current += 1;
         setRecoveryActive(false);
         setInviteSetupActive(false);
         setMode('login');
         void loadAccount(null);
         return;
+      }
+
+      // Ignore events that do not change the identity or account authorization.
+      if (event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN'
+        && event !== 'USER_UPDATED' && event !== 'PASSWORD_RECOVERY') return;
+
+      const eventGeneration = ++authEventGeneration.current;
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryActive(true);
+        setMode('reset');
       }
 
       // Supabase advises keeping auth callbacks synchronous; defer database reads
