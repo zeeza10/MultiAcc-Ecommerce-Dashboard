@@ -20,9 +20,10 @@ import { api } from '../services/api';
 
 interface DropshippingCalculatorViewProps {
   currentUser: User;
+  selectedStoreId: string;
 }
 
-export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProps> = ({ currentUser }) => {
+export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProps> = ({ currentUser, selectedStoreId }) => {
   const [calculationOption, setCalculationOption] = useState<'SHIPPING_INCLUDED' | 'SHIPPING_EXCLUDED'>('SHIPPING_INCLUDED');
   const [currency, setCurrency] = useState<'GBP' | 'USD' | 'EUR'>('GBP');
   const [products, setProducts] = useState<Product[]>([]);
