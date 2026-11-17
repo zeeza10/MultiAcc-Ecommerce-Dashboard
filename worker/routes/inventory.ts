@@ -44,22 +44,22 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
     const repository = new SupabaseProductRepository(auth.repositoryContext);
     const isClientUser = auth.user.role === 'CLIENT_USER';
     const accountId = url.searchParams.get('accountId');
-    let includeDemo = false;
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
     if (accountId && accountId !== 'ALL') {
       const { data: account, error: accountError } = await auth.repositoryContext.supabase
         .from('marketplace_accounts')
-        .select('id,is_demo')
+        .select('id,is_demo,environment')
         .eq('id', accountId)
         .eq('organization_id', auth.organizationId)
         .maybeSingle();
       if (accountError) throw accountError;
       if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
-      includeDemo = Boolean(account.is_demo);
+      dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
     }
     let products = await repository.listForOrganization({
       client3plId: auth.user.clientId,
       onlyClientProducts: isClientUser,
-      includeDemo,
+      dataEnvironment,
     });
     let balances = await new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
       client3plId: auth.user.clientId,
