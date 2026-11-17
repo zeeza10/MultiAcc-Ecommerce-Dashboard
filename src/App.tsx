@@ -319,6 +319,7 @@ export default function App() {
         <main className="flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
           {activeTab === 'dashboard' && (
             <DashboardView
+              key={`dashboard:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -330,6 +331,7 @@ export default function App() {
 
           {activeTab === 'orders' && (
             <OrdersView
+              key={`orders:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -339,12 +341,13 @@ export default function App() {
           )}
 
           {activeTab === 'dropshipping' && (
-            <DropshippingCalculatorView currentUser={currentUser} selectedStoreId={selectedStoreId} />
+            <DropshippingCalculatorView key={`dropshipping:${selectedStoreId}`} currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
 
           {activeTab === 'ebay-accounts' && (
             <EbayAccountsView
+              key={`ebay-accounts:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -354,6 +357,7 @@ export default function App() {
 
           {activeTab === 'products' && (
             <ProductsView
+              key={`products:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -363,6 +367,7 @@ export default function App() {
 
           {activeTab === 'inventory' && (
             <InventoryView
+              key={`inventory:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -381,6 +386,7 @@ export default function App() {
           {/* Phase 2 Modules */}
           {(activeTab === 'suppliers' || activeTab === 'purchase-orders' || activeTab === 'returns' || activeTab === 'customers') && (
             <BuyingReturnsView
+              key={`buying-returns:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -398,6 +404,7 @@ export default function App() {
 
           {(activeTab === 'warehouse' || activeTab === 'locations') && (
             <WarehouseLocationsView
+              key={`warehouse:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -408,11 +415,12 @@ export default function App() {
           {/* Phase 3 Modules */}
           {/* Phase 3 Warehouse Services & 3PL Modules */}
           {activeTab === 'warehouse-services' && (
-            <WarehouseServicesView currentUser={currentUser} selectedStoreId={selectedStoreId} />
+            <WarehouseServicesView key={`warehouse-services:${selectedStoreId}`} currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
           {(activeTab === '3pl-clients' || activeTab === 'fulfilment' || activeTab === 'shipping' || activeTab === 'storage') && (
             <Clients3PLView
+              key={`3pl:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -431,6 +439,7 @@ export default function App() {
           {/* Phase 4 Payouts & Finance Modules */}
           {(activeTab === 'payouts' || activeTab === 'reconciliation') && (permissions.includes('*') || permissions.includes('finance.manage')) && (
             <EbayPayoutsView
+              key={`payouts:${selectedStoreId}`}
               currentUser={currentUser}
               selectedStoreId={selectedStoreId}
               onStoreChange={setSelectedStoreId}
@@ -439,6 +448,7 @@ export default function App() {
 
           {(activeTab === 'invoices' || activeTab === 'payments' || activeTab === 'expenses' || activeTab === 'profitability') && (
             <FinanceView
+              key={`finance:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
@@ -458,6 +468,7 @@ export default function App() {
           {/* Phase 1 & 5 System Modules */}
           {activeTab === 'reports' && (
             <ReportsView
+              key={`reports:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
