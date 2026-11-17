@@ -11,6 +11,8 @@ import {
   CheckCircle,
   ExternalLink,
   Menu,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { User, NotificationItem, SystemConfig } from '../types';
 
@@ -37,6 +39,8 @@ interface NavbarProps {
   selectedStoreId?: string;
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
+  isDarkTheme: boolean;
+  onToggleTheme: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -62,6 +66,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedStoreId = 'ALL',
   onStoreChange,
   onOpenNavigation,
+  isDarkTheme,
+  onToggleTheme,
 }) => {
 
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -155,7 +161,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
         {/* Action Controls & Role Switcher */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={isDarkTheme}
+            title={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-slate-600 transition hover:bg-slate-100 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            {isDarkTheme ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+          </button>
           {/* Quick Actions */}
           {canSyncEbay && <button
             onClick={onTriggerSync}
