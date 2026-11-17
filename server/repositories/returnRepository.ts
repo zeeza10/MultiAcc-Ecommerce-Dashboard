@@ -31,13 +31,36 @@ async function readAll<T>(
 export class SupabaseReturnRepository {
   constructor(private readonly context: RepositoryContext) {}
 
-  async listReturns(): Promise<ReturnOrder[]> {
-    const returns = await readAll<ReturnRow>((from, to) => this.context.supabase
+  async listReturns(accountId?: string): Promise<ReturnOrder[]> {
+    let scopedOrderIds: string[] | undefined;
+    if (accountId && accountId !== 'ALL') {
+      const { data: account, error: accountError } = await this.context.supabase
+        .from('marketplace_accounts')
+        .select('id')
+        .eq('id', accountId)
+        .eq('organization_id', this.context.organizationId)
+        .maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) throw new Error('The selected marketplace account was not found in this workspace.');
+
+      const accountOrderIds = await readAll<{ id: string }>((from, to) => this.context.supabase
+        .from('orders')
+        .select('id')
+        .eq('organization_id', this.context.organizationId)
+        .eq('marketplace_account_id', accountId)
+        .range(from, to)).then(rows => rows.map(row => row.id));
+      scopedOrderIds = accountOrderIds;
+      if (accountOrderIds.length === 0) return [];
+    }
+
+    const returns = await readAll<ReturnRow>((from, to) => {
+      let query = this.context.supabase
       .from('returns')
       .select('id,return_number,order_id,reason_code,status,refund_amount_minor,refund_status,created_at,inspected_at')
-      .eq('organization_id', this.context.organizationId)
-      .order('created_at', { ascending: false })
-      .range(from, to));
+      .eq('organization_id', this.context.organizationId);
+      if (scopedOrderIds) query = query.in('order_id', scopedOrderIds);
+      return query.order('created_at', { ascending: false }).range(from, to);
+    });
     if (returns.length === 0) return [];
 
     const returnIds = returns.map(row => row.id);

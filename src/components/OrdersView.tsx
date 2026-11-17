@@ -57,13 +57,18 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [copiedRaw, setCopiedRaw] = useState(false);
 
   useEffect(() => {
+    setSelectedOrder(null);
+    setOrderHistories([]);
+    setShowDetailModal(false);
+    setShowDispatchModal(false);
+    setShowEditModal(false);
     loadOrders();
     loadProducts();
   }, [statusFilter, currentUser.id, selectedStoreId]);
 
   const loadProducts = async () => {
     try {
-      const res = await api.getProducts();
+      const res = await api.getProducts(selectedStoreId);
       setProducts(res.products);
     } catch (e) {
       console.warn('Failed to load products for editing', e);

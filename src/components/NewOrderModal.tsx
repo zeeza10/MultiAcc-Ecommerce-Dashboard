@@ -8,6 +8,7 @@ interface NewOrderModalProps {
   onClose: () => void;
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onSuccess: () => void;
 }
 
@@ -16,6 +17,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   onClose,
   currentUser,
   config,
+  selectedStoreId,
   onSuccess,
 }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,11 +35,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     if (isOpen) {
       loadProducts();
     }
-  }, [isOpen]);
+  }, [isOpen, selectedStoreId]);
 
   const loadProducts = async () => {
     try {
-      const res = await api.getProducts();
+      const res = await api.getProducts(selectedStoreId);
       setProducts(res.products);
       if (res.products.length > 0 && lines.length === 0) {
         setLines([{ productId: res.products[0].id, quantity: 1 }]);
@@ -95,7 +97,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
         },
         lines: payloadLines,
         notes,
-      });
+      }, selectedStoreId);
 
       onSuccess();
       onClose();

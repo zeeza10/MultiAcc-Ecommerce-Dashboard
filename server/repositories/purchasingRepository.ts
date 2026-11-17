@@ -29,6 +29,20 @@ type ReceiptItemRow = {
 
 const PAGE_SIZE = 500;
 
+async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await context.supabase
+    .from('marketplace_accounts')
+    .select('is_demo,environment')
+    .eq('id', accountId)
+    .eq('organization_id', context.organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 async function readAll<T>(load: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
   const rows: T[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -44,13 +58,16 @@ async function readAll<T>(load: (from: number, to: number) => PromiseLike<{ data
 export class SupabasePurchasingRepository {
   constructor(private readonly context: RepositoryContext) {}
 
-  async listSuppliers(): Promise<Supplier[]> {
-    const rows = await readAll<SupplierRow>((from, to) => this.context.supabase
-      .from('suppliers')
-      .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
-      .eq('organization_id', this.context.organizationId)
-      .order('name', { ascending: true })
-      .range(from, to));
+  async listSuppliers(accountId?: string): Promise<Supplier[]> {
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
+    const rows = await readAll<SupplierRow>((from, to) => {
+      let query = this.context.supabase
+        .from('suppliers')
+        .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
+        .eq('organization_id', this.context.organizationId);
+      query = query.eq('data_environment', dataEnvironment);
+      return query.order('name', { ascending: true }).range(from, to);
+    });
     return rows.map(row => ({
       id: row.id,
       name: row.name,
@@ -65,15 +82,18 @@ export class SupabasePurchasingRepository {
     }));
   }
 
-  async listPurchaseOrders(): Promise<PurchaseOrder[]> {
+  async listPurchaseOrders(accountId?: string): Promise<PurchaseOrder[]> {
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
     const [orders, suppliers] = await Promise.all([
-      readAll<PurchaseOrderRow>((from, to) => this.context.supabase
-        .from('purchase_orders')
-        .select('id,po_number,supplier_id,status,subtotal_minor,tax_minor,total_minor,currency,notes,expected_date,created_at,approved_by,updated_at')
-        .eq('organization_id', this.context.organizationId)
-        .order('created_at', { ascending: false })
-        .range(from, to)),
-      this.listSuppliers(),
+      readAll<PurchaseOrderRow>((from, to) => {
+        let query = this.context.supabase
+          .from('purchase_orders')
+          .select('id,po_number,supplier_id,status,subtotal_minor,tax_minor,total_minor,currency,notes,expected_date,created_at,approved_by,updated_at,external_id')
+          .eq('organization_id', this.context.organizationId);
+        query = query.eq('data_environment', dataEnvironment);
+        return query.order('created_at', { ascending: false }).range(from, to);
+      }),
+      this.listSuppliers(accountId),
     ]);
     if (orders.length === 0) return [];
     const orderIds = orders.map(order => order.id);
@@ -124,20 +144,25 @@ export class SupabasePurchasingRepository {
     }));
   }
 
-  async listGoodsReceipts(): Promise<GoodsReceipt[]> {
-    const [receipts, orders] = await Promise.all([
-      readAll<ReceiptRow>((from, to) => this.context.supabase
-        .from('goods_receipts')
-        .select('id,receipt_number,purchase_order_id,received_by,received_at,discrepancy_note')
-        .eq('organization_id', this.context.organizationId)
-        .order('received_at', { ascending: false })
-        .range(from, to)),
-      readAll<Pick<PurchaseOrderRow, 'id' | 'po_number'>>((from, to) => this.context.supabase
+  async listGoodsReceipts(accountId?: string): Promise<GoodsReceipt[]> {
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
+    const orders = await readAll<Pick<PurchaseOrderRow, 'id' | 'po_number'>>((from, to) => {
+      let query = this.context.supabase
         .from('purchase_orders')
-        .select('id,po_number')
+        .select('id,po_number,data_environment')
         .eq('organization_id', this.context.organizationId)
-        .range(from, to)),
-    ]);
+        .eq('data_environment', dataEnvironment);
+      return query.range(from, to);
+    });
+    const visiblePoIds = orders.map(order => order.id);
+    if (visiblePoIds.length === 0) return [];
+    const receipts = await readAll<ReceiptRow>((from, to) => this.context.supabase
+      .from('goods_receipts')
+      .select('id,receipt_number,purchase_order_id,received_by,received_at,discrepancy_note')
+      .eq('organization_id', this.context.organizationId)
+      .in('purchase_order_id', visiblePoIds)
+      .order('received_at', { ascending: false })
+      .range(from, to));
     if (receipts.length === 0) return [];
     const receiptIds = receipts.map(receipt => receipt.id);
     const items: ReceiptItemRow[] = [];
@@ -226,6 +251,7 @@ export class SupabasePurchasingRepository {
   async createSupplier(input: {
     name: string; code: string; contactName?: string; email?: string; phone?: string;
     paymentTermsDays: number; currency: string; leadTimeDays: number;
+    dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   }): Promise<Supplier> {
     const name = input.name.trim();
     const code = input.code.trim().toUpperCase();
@@ -253,6 +279,7 @@ export class SupabasePurchasingRepository {
         currency,
         lead_time_days: input.leadTimeDays,
         is_active: true,
+        data_environment: input.dataEnvironment || 'SANDBOX',
       })
       .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
       .single();

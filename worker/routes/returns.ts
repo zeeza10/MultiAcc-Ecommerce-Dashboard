@@ -4,9 +4,9 @@ import { json } from '../http';
 import { SupabaseReturnRepository } from '../../server/repositories/returnRepository';
 
 
-export async function handleReturnRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+export async function handleReturnRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/returns' && request.method === 'GET') {
-    const returns = await new SupabaseReturnRepository(auth.repositoryContext).listReturns();
+    const returns = await new SupabaseReturnRepository(auth.repositoryContext).listReturns(url.searchParams.get('accountId') || undefined);
     return json({ returns });
   }
 

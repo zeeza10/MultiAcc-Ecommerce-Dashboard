@@ -28,9 +28,10 @@ import { api } from '../services/api';
 
 interface WarehouseServicesViewProps {
   currentUser: User;
+  selectedStoreId: string;
 }
 
-export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser }) => {
+export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ currentUser, selectedStoreId }) => {
   const canManageFulfilment = currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER';
   const [activeTab, setActiveTab] = useState<'storage' | 'packaging' | 'shipping' | 'billing'>('storage');
   const [summary, setSummary] = useState<any>(null);
@@ -71,21 +72,21 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [sumRes, pkgRes, shpRes, clientRes, storageRes, productRes, balanceRes, ledgerRes, invoiceRes, configRes] = await Promise.all([
-        api.getWarehouseServicesSummary(), api.getPackagingJobs(), api.getShippingJobs(), api.get3PLClients(),
-        api.getStorageSnapshots(), api.getProducts(), api.getBalances(), api.getStockLedger(), api.getInvoices(), api.getConfig(),
+        api.getWarehouseServicesSummary(selectedStoreId), api.getPackagingJobs(selectedStoreId), api.getShippingJobs(selectedStoreId), api.get3PLClients(selectedStoreId),
+        api.getStorageSnapshots(selectedStoreId), api.getProducts(selectedStoreId), api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId), api.getInvoices(selectedStoreId), api.getConfig(),
       ]);
       setSummary(sumRes.summary || sumRes);
       setPackagingJobs(pkgRes.packagingJobs || []);
       setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
-      if (!pkgClientId && clientRes.clients?.length) setPkgClientId(clientRes.clients[0].id);
-      if (!shpClientId && clientRes.clients?.length) setShpClientId(clientRes.clients[0].id);
+      setPkgClientId((current) => clientRes.clients.some((client) => client.id === current) ? current : (clientRes.clients[0]?.id || ''));
+      setShpClientId((current) => clientRes.clients.some((client) => client.id === current) ? current : (clientRes.clients[0]?.id || ''));
       setRateCards(clientRes.rateCards || []);
       setStorageSnapshots(storageRes.snapshots || []);
       setProducts(productRes.products || []);
@@ -162,7 +163,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         orderNumber: pkgOrderNumber || undefined,
         notes: pkgNotes,
         performedBy: currentUser.name,
-      });
+      }, selectedStoreId);
       setShowPkgModal(false);
       loadData();
     } catch (err: any) {
@@ -198,7 +199,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
         totalChargeMinor: carCostMinor + srvChargeMinor,
         destination: shpDestination,
         orderNumber: shpOrderNumber,
-      });
+      }, selectedStoreId);
       setShowShpModal(false);
       loadData();
     } catch (err: any) {

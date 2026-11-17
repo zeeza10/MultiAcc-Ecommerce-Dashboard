@@ -57,7 +57,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     try {
       const [res, clientRes] = await Promise.all([
         api.getProducts(selectedStoreId),
-        api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
+        api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setProducts(res.products || []);
       setClients(clientRes.clients || []);
@@ -98,7 +98,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         reorderLevel: reorder,
         ownerType: currentUser.role === 'CLIENT_USER' ? 'CLIENT' : 'OPERATOR',
         ownerId: currentUser.role === 'CLIENT_USER' ? currentUser.clientId : 'operator',
-      });
+      }, selectedStoreId);
 
       setShowAddModal(false);
       // Reset form

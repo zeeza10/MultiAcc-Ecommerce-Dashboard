@@ -1,6 +1,25 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
+async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (auth.user.role === 'CLIENT_USER' && auth.repositoryContext.client3plId) {
+    const { data, error } = await auth.repositoryContext.supabase.from('clients_3pl')
+      .select('data_environment').eq('id', auth.repositoryContext.client3plId)
+      .eq('organization_id', auth.organizationId).maybeSingle();
+    if (error) throw error;
+    if (data?.data_environment) return data.data_environment;
+  }
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 export async function handleFinanceRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/finance/allocations' && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('finance.manage')) return json({ error: 'Finance management permission is required.' }, 403);
@@ -90,12 +109,13 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/invoices' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     let invoicesQuery = auth.repositoryContext.supabase.from('invoices')
       .select('id,invoice_number,invoice_type,recipient_type,recipient_id,recipient_name,issue_date,due_date,subtotal_minor,vat_rate_percent,vat_amount_minor,total_minor,paid_amount_minor,currency,status,void_reason,is_immutable,created_at')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('created_at', { ascending: false });
     if (auth.user.role === 'CLIENT_USER') {
       if (!auth.repositoryContext.client3plId) return json({ error: 'Client account is not linked.' }, 403);
-      invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId);
+      invoicesQuery = invoicesQuery.eq('recipient_type', 'CLIENT').eq('recipient_id', auth.repositoryContext.client3plId).eq('data_environment', dataEnvironment);
     } else {
       const accountId = url.searchParams.get('accountId');
       if (accountId && accountId !== 'ALL') {
@@ -113,7 +133,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const { data: items, error: itemError } = ids.length
       ? await auth.repositoryContext.supabase.from('invoice_items')
           .select('id,invoice_id,description,quantity,unit_price_minor,total_minor')
-          .eq('organization_id', auth.organizationId).in('invoice_id', ids)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('invoice_id', ids)
       : { data: [], error: null };
     if (itemError) throw itemError;
     const linesByInvoice = new Map<string, any[]>();
@@ -148,6 +168,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/payments' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     let clientInvoiceIds: string[] | null = null;
     let storeInvoiceIds: string[] | null = null;
     let storePaymentAmounts = new Map<string, number>();
@@ -170,8 +191,8 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const clientPaymentIds = clientInvoiceIds ? [...new Set((clientAllocations || []).map(row => row.payment_id))] : null;
     if (clientPaymentIds && clientPaymentIds.length === 0) return json({ payments: [] });
     let paymentsQuery = auth.repositoryContext.supabase.from('payments')
-      .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at')
-      .eq('organization_id', auth.organizationId).order('payment_date', { ascending: false });
+      .select('id,payment_number,amount_minor,currency,payment_method,payment_date,reference,payer_name,unallocated_credit_minor,recorded_by,created_at,data_environment')
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('payment_date', { ascending: false });
     if (clientPaymentIds) paymentsQuery = paymentsQuery.in('id', clientPaymentIds);
     else {
       const accountId = url.searchParams.get('accountId');
@@ -193,7 +214,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     if (error) throw error;
     const paymentIds = (payments || []).map(row => row.id);
     let allocationsQuery = auth.repositoryContext.supabase.from('payment_allocations')
-      .select('id,payment_id,invoice_id,amount_minor').eq('organization_id', auth.organizationId);
+      .select('id,payment_id,invoice_id,amount_minor').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
     if (paymentIds.length) allocationsQuery = allocationsQuery.in('payment_id', paymentIds);
     else allocationsQuery = allocationsQuery.in('payment_id', ['00000000-0000-0000-0000-000000000000']);
     if (clientInvoiceIds) allocationsQuery = allocationsQuery.in('invoice_id', clientInvoiceIds);
@@ -222,11 +243,12 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/expenses' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace expense records are not available to client users.' }, 403);
     let query = auth.repositoryContext.supabase
       .from('expenses')
       .select('id,expense_number,category,supplier_name,expense_date,amount_minor,vat_minor,currency,allocated_to,status,approved_by,note')
-      .eq('organization_id', auth.organizationId)
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment)
       .order('expense_date', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') {
@@ -248,12 +270,13 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/ledger' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace general ledger is not available to client users.' }, 403);
     let query = auth.repositoryContext.supabase
       .from('journal_entries')
       .select('id,source_type,source_id,description,created_at,status')
       .eq('organization_id', auth.organizationId)
-      .eq('status', 'POSTED')
+      .eq('status', 'POSTED').eq('data_environment', dataEnvironment)
       .order('created_at', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') {
@@ -271,7 +294,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const { data: lines, error: lineError } = entryIds.length
       ? await auth.repositoryContext.supabase.from('journal_entry_lines')
           .select('id,journal_entry_id,account_id,debit_minor,credit_minor,description')
-          .eq('organization_id', auth.organizationId).in('journal_entry_id', entryIds)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('journal_entry_id', entryIds)
       : { data: [], error: null };
     if (lineError) throw lineError;
     const accountIds = [...new Set((lines || []).map(row => row.account_id))];
@@ -295,13 +318,14 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/payouts' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view')) {
       return json({ error: 'Marketplace account access is required to view payout account details.' }, 403);
     }
     let query = auth.repositoryContext.supabase
       .from('marketplace_payouts')
       .select('id,payout_reference,marketplace_account_id,total_sales_minor,total_fees_minor,refunds_minor,shipping_adjustments_minor,other_adjustments_minor,net_payout_minor,currency,payout_date,status,transaction_id,bank_deposit_status,bank_reference,notes')
-      .eq('organization_id', auth.organizationId).order('payout_date', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('payout_date', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') query = query.eq('marketplace_account_id', accountId);
     const { data: payouts, error } = await query;
@@ -315,7 +339,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const payoutIds = (payouts || []).map(row => row.id);
     const { data: payoutOrders, error: orderError } = payoutIds.length
       ? await auth.repositoryContext.supabase.from('payout_orders').select('payout_id,order_id')
-          .eq('organization_id', auth.organizationId).in('payout_id', payoutIds)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('payout_id', payoutIds)
       : { data: [], error: null };
     if (orderError) throw orderError;
     const accountNames = new Map((accounts || []).map(row => [row.id, row.name]));
@@ -344,13 +368,14 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/reconciliation' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view')) {
       return json({ error: 'Marketplace account access is required to view reconciliation account details.' }, 403);
     }
     let query = auth.repositoryContext.supabase
       .from('financial_reconciliations')
       .select('id,period,marketplace_account_id,expected_payout_minor,actual_payout_minor,difference_minor,unmatched_transactions_count,status,last_reconciled_at,reconciled_by,audit_notes,breakdown')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('created_at', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') query = query.eq('marketplace_account_id', accountId);
     const { data: reconciliations, error } = await query;

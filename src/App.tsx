@@ -81,8 +81,8 @@ export default function App() {
         const canViewOrders = permissions.includes('*') || permissions.includes('orders.view');
         const canViewProducts = permissions.includes('*') || permissions.includes('products.view');
         const [ordRes, prodRes] = await Promise.all([
-          canViewOrders ? api.getOrders({ search: globalSearch }) : Promise.resolve({ orders: [] }),
-          canViewProducts ? api.getProducts() : Promise.resolve({ products: [] }),
+          canViewOrders ? api.getOrders({ search: globalSearch, accountId: selectedStoreId }) : Promise.resolve({ orders: [] }),
+          canViewProducts ? api.getProducts(selectedStoreId) : Promise.resolve({ products: [] }),
         ]);
         const s = globalSearch.toLowerCase();
         const matchedProds = prodRes.products.filter(
@@ -98,24 +98,33 @@ export default function App() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [globalSearch, permissions]);
+  }, [globalSearch, permissions, selectedStoreId]);
 
   const initApp = async () => {
     setLoading(true);
     try {
       const canViewMarketplace = permissions.includes('*') || permissions.includes('marketplace.view');
-      const [cfgRes, notifRes, excRes, accountsRes] = await Promise.all([
-        api.getConfig(), api.getNotifications(),
-        canViewMarketplace ? api.getExceptions() : Promise.resolve({ exceptions: [] }),
+      const [cfgRes, notifRes, accountsRes] = await Promise.all([
+        api.getConfig(),
+        api.getNotifications(),
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
+      const accounts = accountsRes.accounts || [];
+      const preferredAccount = accounts.find((account) => account.isDemo)
+        || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
+        || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
+      const activeAccountId = selectedStoreId !== 'ALL' ? selectedStoreId : preferredAccount?.id;
       setConfig(cfgRes.config);
       setConfigLoaded(true);
       setInitError('');
       setNotifications(notifRes.notifications);
-      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-      setMarketplaceAccounts(accountsRes.accounts || []);
+      setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
+      if (selectedStoreId === 'ALL' && preferredAccount) setSelectedStoreId(preferredAccount.id);
+      const excRes = canViewMarketplace && activeAccountId
+        ? await api.getExceptions(activeAccountId)
+        : { exceptions: [] };
+      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
     } catch (err: any) {
       console.error('Failed to initialize app:', err);
       setInitError(err.message || 'Workspace data could not be loaded.');
@@ -133,11 +142,24 @@ export default function App() {
         alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
         return;
       }
-      if (accRes.accounts.length > 0) await api.syncEbayAccount(accRes.accounts[0].id);
+      const selectedAccount = accRes.accounts.find((account) => account.id === selectedStoreId);
+      if (!selectedAccount) {
+        alert('Select one seller account before synchronizing.');
+        return;
+      }
+      if (selectedAccount.isDemo) {
+        alert('Demo accounts are presentation-only and cannot be synchronized.');
+        return;
+      }
+      if (selectedAccount.authStatus !== 'CONNECTED') {
+        alert('The selected seller account is not connected. Connect it before synchronizing.');
+        return;
+      }
+      await api.syncEbayAccount(selectedAccount.id);
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
         permissions.includes('*') || permissions.includes('marketplace.view')
-          ? api.getExceptions()
+          ? api.getExceptions(selectedAccount.id)
           : Promise.resolve({ exceptions: [] }),
       ]);
       setNotifications(notifRes.notifications);
@@ -317,7 +339,7 @@ export default function App() {
           )}
 
           {activeTab === 'dropshipping' && (
-            <DropshippingCalculatorView currentUser={currentUser} />
+            <DropshippingCalculatorView currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
 
@@ -325,6 +347,7 @@ export default function App() {
             <EbayAccountsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
             />
           )}
@@ -360,6 +383,7 @@ export default function App() {
             <BuyingReturnsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultSubTab={
                 activeTab === 'returns'
                   ? 'RETURNS'
@@ -376,6 +400,7 @@ export default function App() {
             <WarehouseLocationsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultTab={activeTab === 'locations' ? 'LOCATIONS' : 'WAREHOUSES'}
             />
           )}
@@ -383,13 +408,14 @@ export default function App() {
           {/* Phase 3 Modules */}
           {/* Phase 3 Warehouse Services & 3PL Modules */}
           {activeTab === 'warehouse-services' && (
-            <WarehouseServicesView currentUser={currentUser} />
+            <WarehouseServicesView currentUser={currentUser} selectedStoreId={selectedStoreId} />
           )}
 
           {(activeTab === '3pl-clients' || activeTab === 'fulfilment' || activeTab === 'shipping' || activeTab === 'storage') && (
             <Clients3PLView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               defaultSubTab={
                 activeTab === 'fulfilment'
                   ? 'FULFILMENT'
@@ -434,6 +460,7 @@ export default function App() {
             <ReportsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               initialReportId={tabFilterState?.reportId || 'R-01'}
             />
           )}
@@ -472,6 +499,7 @@ export default function App() {
         onClose={() => setShowNewAdjustmentModal(false)}
         currentUser={currentUser}
         config={config}
+        selectedStoreId={selectedStoreId}
         onSuccess={() => {
           if (activeTab === 'adjustments' || activeTab === 'inventory') {
             window.location.reload();
@@ -484,6 +512,7 @@ export default function App() {
         onClose={() => setShowNewOrderModal(false)}
         currentUser={currentUser}
         config={config}
+        selectedStoreId={selectedStoreId}
         onSuccess={() => {
           if (activeTab === 'orders') {
             window.location.reload();

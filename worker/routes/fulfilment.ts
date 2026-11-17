@@ -1,11 +1,38 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
-export async function handleFulfilmentRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
+async function getVisibleClientIds(auth: AuthContext, url: URL): Promise<string[]> {
+  let query = auth.repositoryContext.supabase.from('clients_3pl')
+    .select('id').eq('organization_id', auth.organizationId)
+    .eq('data_environment', await getDataEnvironment(auth, url));
+  if (auth.user.role === 'CLIENT_USER') {
+    if (!auth.repositoryContext.client3plId) return [];
+    query = query.eq('id', auth.repositoryContext.client3plId);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(row => row.id);
+}
+
+export async function handleFulfilmentRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
   if (path === '/warehouse-services/packaging' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
     const body = await request.json() as Record<string, unknown>;
     const clientId = String(body.clientId || '');
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     let orderId: string | null = null;
     if (body.orderNumber) {
       const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
@@ -37,6 +64,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
     const body = await request.json() as Record<string, unknown>;
     const clientId = String(body.clientId || '');
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     let orderId: string | null = null;
     if (body.orderNumber) {
       const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
@@ -70,6 +99,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
     const body = await request.json() as { clientId?: string };
     const clientId = String(body.clientId || '');
     if (!clientId) return json({ error: 'Select a 3PL client.' }, 400);
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     if (auth.user.role === 'CLIENT_USER' && clientId !== auth.repositoryContext.client3plId) return json({ error: 'You cannot view another client billing preview.' }, 403);
     const { data: client, error: clientError } = await auth.repositoryContext.supabase.from('clients_3pl')
       .select('id,company_name,code,billing_period,rate_card_id').eq('organization_id', auth.organizationId).eq('id', clientId).maybeSingle();
@@ -110,15 +141,18 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/3pl/clients' && request.method === 'GET') {
-    let clientsQuery = auth.repositoryContext.supabase.from('clients_3pl')
-      .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
-      .eq('organization_id', auth.organizationId).order('company_name', { ascending: true });
-    if (auth.user.role === 'CLIENT_USER') clientsQuery = clientsQuery.eq('id', auth.repositoryContext.client3plId);
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ clients: [], rateCards: [] });
+    let ratesQuery = auth.repositoryContext.supabase.from('rate_cards')
+      .select('id,name,pick_fee_minor,pack_fee_minor,extra_item_fee_minor,storage_pallet_per_month_minor,storage_shelf_per_month_minor,storage_bin_per_month_minor,minimum_monthly_charge_minor,currency,external_id')
+      .eq('organization_id', auth.organizationId);
+    ratesQuery = ratesQuery.eq('data_environment', await getDataEnvironment(auth, url));
     const [clientsResult, ratesResult] = await Promise.all([
-      clientsQuery,
-      auth.repositoryContext.supabase.from('rate_cards')
-        .select('id,name,pick_fee_minor,pack_fee_minor,extra_item_fee_minor,storage_pallet_per_month_minor,storage_shelf_per_month_minor,storage_bin_per_month_minor,minimum_monthly_charge_minor,currency')
-        .eq('organization_id', auth.organizationId).order('name', { ascending: true }),
+      auth.repositoryContext.supabase.from('clients_3pl')
+        .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
+        .eq('organization_id', auth.organizationId).in('id', visibleClientIds)
+        .order('company_name', { ascending: true }),
+      ratesQuery.order('name', { ascending: true }),
     ]);
     if (clientsResult.error) throw clientsResult.error;
     if (ratesResult.error) throw ratesResult.error;
@@ -137,10 +171,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/3pl/storage-snapshots' && request.method === 'GET') {
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ snapshots: [] });
     let snapshotsQuery = auth.repositoryContext.supabase.from('storage_snapshots')
       .select('id,client_3pl_id,snapshot_date,occupied_pallets,occupied_shelves,occupied_bins,estimated_cost_minor,currency')
-      .eq('organization_id', auth.organizationId).order('snapshot_date', { ascending: false });
-    if (auth.user.role === 'CLIENT_USER') snapshotsQuery = snapshotsQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+      .eq('organization_id', auth.organizationId).in('client_3pl_id', visibleClientIds).order('snapshot_date', { ascending: false });
     const { data: snapshots, error } = await snapshotsQuery;
     if (error) throw error;
     const clientIds = [...new Set((snapshots || []).map(row => row.client_3pl_id))];
@@ -159,10 +194,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/packaging' && request.method === 'GET') {
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ packagingJobs: [] });
     let packagingQuery = auth.repositoryContext.supabase.from('packaging_jobs')
       .select('id,job_number,client_3pl_id,job_date,packaging_type,quantity,material_cost_minor,service_charge_minor,total_charge_minor,status,invoice_id,order_id,performed_by,notes')
-      .eq('organization_id', auth.organizationId).order('job_date', { ascending: false });
-    if (auth.user.role === 'CLIENT_USER') packagingQuery = packagingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+      .eq('organization_id', auth.organizationId).in('client_3pl_id', visibleClientIds).order('job_date', { ascending: false });
     const { data: jobs, error } = await packagingQuery;
     if (error) throw error;
     const clientIds = [...new Set((jobs || []).map(row => row.client_3pl_id))];
@@ -185,10 +221,11 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/shipping' && request.method === 'GET') {
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ shippingJobs: [] });
     let shippingQuery = auth.repositoryContext.supabase.from('shipping_jobs')
       .select('id,dispatch_id,client_3pl_id,job_date,carrier,tracking_number,service_level,parcel_weight_kg,carrier_cost_minor,service_charge_minor,total_charge_minor,status,invoice_id,order_id,destination')
-      .eq('organization_id', auth.organizationId).order('job_date', { ascending: false });
-    if (auth.user.role === 'CLIENT_USER') shippingQuery = shippingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
+      .eq('organization_id', auth.organizationId).in('client_3pl_id', visibleClientIds).order('job_date', { ascending: false });
     const { data: jobs, error } = await shippingQuery;
     if (error) throw error;
     const clientIds = [...new Set((jobs || []).map(row => row.client_3pl_id))];
@@ -212,14 +249,14 @@ export async function handleFulfilmentRoute(path: string, request: Request, auth
   }
 
   if (path === '/warehouse-services/summary' && request.method === 'GET') {
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ summary: { packagingJobs: 0, shippingJobs: 0, storageSnapshots: 0, packagingChargesMinor: 0, shippingChargesMinor: 0, storageEstimatedCostMinor: 0 } });
     let packagingQuery = auth.repositoryContext.supabase.from('packaging_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId);
     let shippingQuery = auth.repositoryContext.supabase.from('shipping_jobs').select('id,status,total_charge_minor').eq('organization_id', auth.organizationId);
     let storageQuery = auth.repositoryContext.supabase.from('storage_snapshots').select('id,estimated_cost_minor').eq('organization_id', auth.organizationId);
-    if (auth.user.role === 'CLIENT_USER') {
-      packagingQuery = packagingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
-      shippingQuery = shippingQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
-      storageQuery = storageQuery.eq('client_3pl_id', auth.repositoryContext.client3plId);
-    }
+    packagingQuery = packagingQuery.in('client_3pl_id', visibleClientIds);
+    shippingQuery = shippingQuery.in('client_3pl_id', visibleClientIds);
+    storageQuery = storageQuery.in('client_3pl_id', visibleClientIds);
     const [packaging, shipping, storage] = await Promise.all([packagingQuery, shippingQuery, storageQuery]);
     if (packaging.error) throw packaging.error;
     if (shipping.error) throw shipping.error;

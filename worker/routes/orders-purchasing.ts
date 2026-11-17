@@ -3,6 +3,18 @@ import { json } from '../http';
 import { SupabaseOrderRepository } from '../../server/repositories/orderRepository';
 import { SupabasePurchasingRepository } from '../../server/repositories/purchasingRepository';
 
+async function resolveDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 
 
 export async function handleOrderPurchasingRoute(path: string, request: Request, url: URL, auth: AuthContext): Promise<Response | null> {
@@ -45,6 +57,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   if (path === '/orders' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace orders.' }, 403);
     const body = await request.json() as Record<string, unknown>;
+    body.dataEnvironment = await resolveDataEnvironment(auth, url);
     const order = await new SupabaseOrderRepository(auth.repositoryContext).createOrder(body);
     return json({ order }, 201);
   }
@@ -69,12 +82,13 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   }
 
   if (path === '/suppliers' && request.method === 'GET') {
-    const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers();
+    const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers(url.searchParams.get('accountId') || undefined);
     return json({ suppliers });
   }
 
   if (path === '/suppliers' && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
     const supplier = await new SupabasePurchasingRepository(auth.repositoryContext).createSupplier({
       name: String(body.name || ''),
       code: String(body.code || ''),
@@ -84,6 +98,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
       paymentTermsDays: Number(body.paymentTermsDays),
       currency: String(body.currency || ''),
       leadTimeDays: Number(body.leadTimeDays),
+      dataEnvironment,
     });
     return json({ supplier }, 201);
   }
@@ -93,6 +108,12 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
     if (typeof body.idempotencyKey !== 'string' || !body.idempotencyKey.trim()) {
       return json({ error: 'An idempotency key is required to create a purchase order.' }, 400);
     }
+    const dataEnvironment = await resolveDataEnvironment(auth, url);
+    const supplierId = typeof body.supplierId === 'string' ? body.supplierId : '';
+    const { data: supplier, error: supplierError } = await auth.repositoryContext.supabase.from('suppliers')
+      .select('id,data_environment').eq('id', supplierId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (supplierError) throw supplierError;
+    if (!supplier || supplier.data_environment !== dataEnvironment) return json({ error: 'The selected supplier belongs to a different data environment.' }, 400);
     const purchaseOrder = await new SupabasePurchasingRepository(auth.repositoryContext).createPurchaseOrder(body, body.idempotencyKey);
     return json({ purchaseOrder }, 201);
   }
@@ -120,8 +141,8 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   if (path === '/purchase-orders' && request.method === 'GET') {
     const repository = new SupabasePurchasingRepository(auth.repositoryContext);
     const [purchaseOrders, receipts] = await Promise.all([
-      repository.listPurchaseOrders(),
-      repository.listGoodsReceipts(),
+      repository.listPurchaseOrders(url.searchParams.get('accountId') || undefined),
+      repository.listGoodsReceipts(url.searchParams.get('accountId') || undefined),
     ]);
     return json({ purchaseOrders, receipts });
   }

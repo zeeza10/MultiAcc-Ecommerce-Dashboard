@@ -14,6 +14,7 @@ export interface ProductCreateInput {
   category: string;
   ownerType: OwnerType;
   ownerId?: string;
+  dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
 }
 
 export interface StockLedgerQuantityRow {
@@ -23,7 +24,7 @@ export interface StockLedgerQuantityRow {
 }
 
 export interface ProductRepository {
-  listForOrganization(options?: { client3plId?: string; onlyClientProducts?: boolean }): Promise<Product[]>;
+  listForOrganization(options?: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' }): Promise<Product[]>;
   listStockLedgerQuantities(productIds: string[], client3plId?: string): Promise<StockLedgerQuantityRow[]>;
   createForOrganization(input: ProductCreateInput): Promise<Product>;
 }
@@ -47,13 +48,14 @@ type ProductRow = {
   category_name: string | null;
   created_at: string;
   updated_at: string;
+  external_id: string | null;
 };
 
 const PRODUCT_COLUMNS = [
   'id', 'organization_id', 'sku', 'name', 'barcode', 'dimensions_cm',
   'weight_kg', 'owner_type', 'client_3pl_id', 'status', 'cost_price_minor',
   'selling_price_minor', 'currency', 'low_stock_threshold', 'reorder_level',
-  'category_name', 'created_at', 'updated_at',
+  'category_name', 'created_at', 'updated_at', 'external_id',
 ].join(',');
 
 const PAGE_SIZE = 1000;
@@ -95,7 +97,7 @@ export class SupabaseProductRepository implements ProductRepository {
   private get client() { return this.context.supabase; }
   private get organizationId() { return this.context.organizationId; }
 
-  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<Product[]> {
+  async listForOrganization(options: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}): Promise<Product[]> {
     const scopedClientId = this.context.client3plId || (options.onlyClientProducts ? options.client3plId : undefined);
     if (options.onlyClientProducts && !scopedClientId) return [];
 
@@ -108,6 +110,7 @@ export class SupabaseProductRepository implements ProductRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
+      query = query.eq('data_environment', options.dataEnvironment || 'SANDBOX');
       if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId).eq('owner_type', 'CLIENT');
 
       const { data, error } = await query;
@@ -156,12 +159,13 @@ export class SupabaseProductRepository implements ProductRepository {
       if (!input.ownerId) throw new Error('Select a valid 3PL client for this product.');
       const { data: client, error: clientError } = await this.client
         .from('clients_3pl')
-        .select('id')
+        .select('id,data_environment')
         .eq('id', input.ownerId)
         .eq('organization_id', this.organizationId)
         .maybeSingle();
       if (clientError) throw clientError;
       if (!client) throw new Error('The selected 3PL client does not belong to this workspace.');
+      if (input.dataEnvironment && client.data_environment !== input.dataEnvironment) throw new Error('The selected 3PL client belongs to a different data environment.');
       client3plId = client.id;
     }
 

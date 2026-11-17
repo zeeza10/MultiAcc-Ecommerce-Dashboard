@@ -28,6 +28,16 @@ type LedgerRow = {
 
 const PAGE_SIZE = 500;
 
+async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await context.supabase.from('marketplace_accounts')
+    .select('is_demo,environment').eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
+
 async function readAll<T>(
   load: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
 ): Promise<T[]> {
@@ -45,7 +55,7 @@ async function readAll<T>(
 export class SupabaseWarehouseRepository {
   constructor(private readonly context: RepositoryContext) {}
 
-  async getLayout(): Promise<{
+  async getLayout(accountId?: string): Promise<{
     warehouses: Array<{
       id: string; name: string; code: string; address: string; isActive: boolean;
       totalCapacity: number; occupiedQty: number; zones: Array<{
@@ -59,25 +69,30 @@ export class SupabaseWarehouseRepository {
       occupiedQty: number; skuCount: number; isActive: boolean;
     }>;
   }> {
-    const [warehouses, locations, ledger] = await Promise.all([
-      readAll<WarehouseRow>((from, to) => this.context.supabase
-        .from('warehouses')
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
+    const warehouses = await readAll<WarehouseRow>((from, to) => {
+      let query = this.context.supabase.from('warehouses')
         .select('id,name,code,address,is_active')
-        .eq('organization_id', this.context.organizationId)
-        .order('code', { ascending: true })
-        .range(from, to)),
-      readAll<LocationRow>((from, to) => this.context.supabase
-        .from('warehouse_locations')
-        .select('id,warehouse_id,zone,aisle,shelf,bin,location_code,location_type,capacity_units,is_active')
-        .eq('organization_id', this.context.organizationId)
-        .order('location_code', { ascending: true })
-        .range(from, to)),
-      readAll<LedgerRow>((from, to) => this.context.supabase
-        .from('stock_ledger')
-        .select('location_id,product_id,quantity_delta,stock_state')
-        .eq('organization_id', this.context.organizationId)
-        .range(from, to)),
-    ]);
+        .eq('organization_id', this.context.organizationId);
+      query = query.eq('data_environment', dataEnvironment);
+      return query.order('code', { ascending: true }).range(from, to);
+    });
+    const warehouseIds = warehouses.map(row => row.id);
+    if (warehouseIds.length === 0) return { warehouses: [], locations: [] };
+    const locations = await readAll<LocationRow>((from, to) => this.context.supabase
+      .from('warehouse_locations')
+      .select('id,warehouse_id,zone,aisle,shelf,bin,location_code,location_type,capacity_units,is_active')
+      .eq('organization_id', this.context.organizationId)
+      .in('warehouse_id', warehouseIds)
+      .order('location_code', { ascending: true })
+      .range(from, to));
+    const locationIds = locations.map(row => row.id);
+    const ledger = locationIds.length === 0 ? [] : await readAll<LedgerRow>((from, to) => this.context.supabase
+      .from('stock_ledger')
+      .select('location_id,product_id,quantity_delta,stock_state')
+      .eq('organization_id', this.context.organizationId)
+      .in('location_id', locationIds)
+      .range(from, to));
 
     const warehouseById = new Map(warehouses.map(row => [row.id, row] as const));
     const onHandByLocation = new Map<string, number>();
@@ -154,7 +169,7 @@ export class SupabaseWarehouseRepository {
     };
   }
 
-  async createWarehouse(input: { name: string; code: string; address?: string }) {
+  async createWarehouse(input: { name: string; code: string; address?: string; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' }) {
     const name = input.name.trim();
     const code = input.code.trim().toUpperCase();
     const address = (input.address || '').trim();
@@ -170,6 +185,7 @@ export class SupabaseWarehouseRepository {
         code,
         address: address ? { formatted: address } : {},
         is_active: true,
+        data_environment: input.dataEnvironment || 'SANDBOX',
       })
       .select('id,name,code,address,is_active')
       .single();
@@ -178,7 +194,7 @@ export class SupabaseWarehouseRepository {
   }
 
   async createLocation(input: {
-    warehouseId: string; locationCode: string; locationType: string;
+    warehouseId: string; locationCode: string; locationType: string; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
     zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number;
   }) {
     const locationCode = input.locationCode.trim().toUpperCase();
@@ -192,13 +208,14 @@ export class SupabaseWarehouseRepository {
 
     const { data: warehouse, error: warehouseError } = await this.context.supabase
       .from('warehouses')
-      .select('id')
+      .select('id,data_environment')
       .eq('id', input.warehouseId)
       .eq('organization_id', this.context.organizationId)
       .eq('is_active', true)
       .maybeSingle();
     if (warehouseError) throw new Error(warehouseError.message);
     if (!warehouse) throw new Error('The selected warehouse is not active in this workspace.');
+    if (input.dataEnvironment && warehouse.data_environment !== input.dataEnvironment) throw new Error('The selected warehouse belongs to a different data environment.');
 
     const { data, error } = await this.context.supabase
       .from('warehouse_locations')

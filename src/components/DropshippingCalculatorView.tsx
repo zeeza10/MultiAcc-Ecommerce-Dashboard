@@ -20,9 +20,10 @@ import { api } from '../services/api';
 
 interface DropshippingCalculatorViewProps {
   currentUser: User;
+  selectedStoreId: string;
 }
 
-export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProps> = ({ currentUser }) => {
+export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProps> = ({ currentUser, selectedStoreId }) => {
   const [calculationOption, setCalculationOption] = useState<'SHIPPING_INCLUDED' | 'SHIPPING_EXCLUDED'>('SHIPPING_INCLUDED');
   const [currency, setCurrency] = useState<'GBP' | 'USD' | 'EUR'>('GBP');
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,14 +50,14 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [prodRes, calcRes, configRes] = await Promise.all([
-        api.getProducts(),
-        api.getDropshippingCalculations(),
+        api.getProducts(selectedStoreId),
+        api.getDropshippingCalculations(selectedStoreId),
         api.getConfig(),
       ]);
       setProducts(prodRes.products || []);

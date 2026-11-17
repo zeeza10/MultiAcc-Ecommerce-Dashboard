@@ -367,9 +367,23 @@ apiRouter.get('/products', async (req: Request, res: Response) => {
     const context = getRepositoryContext(req);
     const repository = new SupabaseProductRepository(context);
     const isClientUser = user.role === 'CLIENT_USER';
+    const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
+    if (accountId && accountId !== 'ALL') {
+      const { data: account, error: accountError } = await context.supabase
+        .from('marketplace_accounts').select('id,is_demo,environment')
+        .eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) {
+        res.status(404).json({ error: 'The selected marketplace account was not found in this workspace.' });
+        return;
+      }
+      dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+    }
     const products = await repository.listForOrganization({
       client3plId: user.clientId,
       onlyClientProducts: isClientUser,
+      dataEnvironment,
     });
 
     const balances = new Map<string, { onHand: number; reserved: number; incoming: number; damaged: number }>();
@@ -681,7 +695,7 @@ apiRouter.post('/stock/adjustments/:id/decision', async (req: Request, res: Resp
 apiRouter.get('/suppliers', async (req: Request, res: Response) => {
   try {
     const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
-    res.json({ suppliers: await repository.listSuppliers() });
+    res.json({ suppliers: await repository.listSuppliers(typeof req.query.accountId === 'string' ? req.query.accountId : undefined) });
   } catch (error) {
     console.error('PostgreSQL supplier listing failed:', error);
     res.status(500).json({ error: 'Suppliers could not be loaded from the workspace database.' });
@@ -692,8 +706,8 @@ apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
   try {
     const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
     const [purchaseOrders, receipts] = await Promise.all([
-      repository.listPurchaseOrders(),
-      repository.listGoodsReceipts(),
+      repository.listPurchaseOrders(typeof req.query.accountId === 'string' ? req.query.accountId : undefined),
+      repository.listGoodsReceipts(typeof req.query.accountId === 'string' ? req.query.accountId : undefined),
     ]);
     res.json({ purchaseOrders, receipts });
   } catch (error) {
@@ -837,7 +851,7 @@ apiRouter.post('/purchase-orders/:id/receive', async (req: Request, res: Respons
 apiRouter.get('/warehouses', async (req: Request, res: Response) => {
   try {
     const repository = new SupabaseWarehouseRepository(getRepositoryContext(req));
-    res.json(await repository.getLayout());
+    res.json(await repository.getLayout(typeof req.query.accountId === 'string' ? req.query.accountId : undefined));
   } catch (error) {
     console.error('PostgreSQL warehouse layout failed:', error);
     res.status(500).json({ error: 'Warehouse layout could not be loaded from the workspace database.' });
@@ -888,7 +902,7 @@ apiRouter.post('/warehouses/:id/locations', async (req: Request, res: Response) 
 apiRouter.get('/returns', async (req: Request, res: Response) => {
   try {
     const repository = new SupabaseReturnRepository(getRepositoryContext(req));
-    res.json({ returns: await repository.listReturns() });
+    res.json({ returns: await repository.listReturns(typeof req.query.accountId === 'string' ? req.query.accountId : undefined) });
   } catch (error) {
     console.error('PostgreSQL returns listing failed:', error);
     res.status(500).json({ error: 'Returns could not be loaded from the workspace database.' });

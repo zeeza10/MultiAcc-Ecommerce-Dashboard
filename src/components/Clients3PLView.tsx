@@ -22,6 +22,7 @@ import { Client3PL, RateCard, User, SystemConfig, Order } from '../types';
 interface Clients3PLViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultSubTab?: 'CLIENTS' | 'FULFILMENT' | 'SHIPPING' | 'STORAGE';
 }
 
@@ -30,6 +31,7 @@ const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('
 export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   defaultSubTab = 'CLIENTS',
 }) => {
   const [subTab, setSubTab] = useState<'CLIENTS' | 'FULFILMENT' | 'SHIPPING' | 'STORAGE'>(defaultSubTab);
@@ -50,15 +52,15 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
 
   useEffect(() => {
     load3PLData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const load3PLData = async () => {
     setLoading(true);
     try {
       const [clientRes, snapRes, ordRes] = await Promise.all([
-        api.get3PLClients(),
-        api.getStorageSnapshots(),
-        api.getOrders(),
+        api.get3PLClients(selectedStoreId),
+        api.getStorageSnapshots(selectedStoreId),
+        api.getOrders({ accountId: selectedStoreId }),
       ]);
       setClients(clientRes.clients);
       setRateCards(clientRes.rateCards);
@@ -66,6 +68,9 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
       setOrders(ordRes.orders);
       if (clientRes.clients.length > 0) {
         runBillingPreview(clientRes.clients[0].id);
+      } else {
+        setSelectedClientId('');
+        setBillingPreview(null);
       }
     } catch (err) {
       console.error('Failed to load 3PL data:', err);
@@ -77,7 +82,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   const runBillingPreview = async (clientId: string) => {
     setSelectedClientId(clientId);
     try {
-      const res = await api.getBillingPreview(clientId);
+      const res = await api.getBillingPreview(clientId, selectedStoreId);
       setBillingPreview(res);
     } catch (err) {
       console.error('Billing preview failed:', err);

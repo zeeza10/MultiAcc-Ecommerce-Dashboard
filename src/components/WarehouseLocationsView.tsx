@@ -6,6 +6,7 @@ import { User, SystemConfig } from '../types';
 interface WarehouseLocationsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultTab?: 'WAREHOUSES' | 'LOCATIONS';
 }
 
@@ -23,6 +24,7 @@ type LocationRow = {
 
 export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   currentUser,
+  selectedStoreId,
   defaultTab = 'WAREHOUSES',
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'WAREHOUSES' | 'LOCATIONS'>(defaultTab);
@@ -46,18 +48,20 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
 
   useEffect(() => {
     void loadData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await api.getWarehouseLayout();
+      const result = await api.getWarehouseLayout(selectedStoreId);
       setWarehouses(result.warehouses || []);
       setLocations(result.locations || []);
       setLocationForm(current => ({
         ...current,
-        warehouseId: current.warehouseId || result.warehouses?.[0]?.id || '',
+        warehouseId: result.warehouses?.some((warehouse) => warehouse.id === current.warehouseId)
+          ? current.warehouseId
+          : (result.warehouses?.[0]?.id || ''),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Warehouse data could not be loaded.');
@@ -81,7 +85,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     setSaving(true);
     setError('');
     try {
-      await api.createWarehouse(warehouseForm);
+      await api.createWarehouse(warehouseForm, selectedStoreId);
       setWarehouseForm({ name: '', code: '', address: '' });
       setShowWarehouseForm(false);
       await loadData();
@@ -101,7 +105,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       await api.createWarehouseLocation(warehouseId, {
         ...details,
         capacityUnits: Number(capacityUnits) || 0,
-      });
+      }, selectedStoreId);
       setLocationForm(current => ({
         ...current,
         locationCode: '', zone: '', aisle: '', shelf: '', bin: '', capacityUnits: '0',

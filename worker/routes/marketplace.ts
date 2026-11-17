@@ -138,9 +138,10 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
 async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
-    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id),
+    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
   ]);
   if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
@@ -235,9 +236,14 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       auth.repositoryContext.supabase.from('marketplace_accounts')
         .select('id,name,marketplace,seller_username,auth_status,environment,last_sync_at,last_sync_status,last_sync_message,token_expires_at,auto_sync_interval_minutes,is_demo')
         .eq('organization_id', auth.organizationId).order('created_at', { ascending: false }),
-      auth.repositoryContext.supabase.from('marketplace_sync_runs')
-        .select('id,marketplace_account_id,status,started_at,completed_at,orders_fetched,orders_imported,orders_skipped_duplicate,exceptions_raised,log_message')
-        .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
+      (() => {
+        let query = auth.repositoryContext.supabase.from('marketplace_sync_runs')
+          .select('id,marketplace_account_id,status,started_at,completed_at,orders_fetched,orders_imported,orders_skipped_duplicate,exceptions_raised,log_message')
+          .eq('organization_id', auth.organizationId);
+        const accountId = new URL(request.url).searchParams.get('accountId');
+        if (accountId) query = query.eq('marketplace_account_id', accountId);
+        return query.order('started_at', { ascending: false }).limit(10);
+      })(),
     ]);
     if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
     const configured = new Set<string>();
@@ -247,10 +253,10 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         .select('environment,client_id_masked,credential_version').eq('provider', 'EBAY');
       for (const row of credentials || []) configured.add(row.environment);
     }
-    const integrationReady = Boolean(env.SUPABASE_SECRET_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.has('SANDBOX'));
+    const integrationReady = Boolean(env.SUPABASE_SECRET_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.size > 0);
     return json({
       integrationReady,
-      integrationMessage: integrationReady ? 'eBay Sandbox credentials are securely configured. Add a non-demo seller account and connect it with eBay OAuth.' : 'Configure eBay Sandbox credentials and the Worker encryption key before connecting seller accounts.',
+      integrationMessage: integrationReady ? 'eBay application credentials are securely configured for at least one environment. Connect a seller account using its matching environment.' : 'Configure credentials for the required eBay environment and the Worker encryption key before connecting seller accounts.',
       configuredEnvironments: ['SANDBOX','PRODUCTION'].map(environment => ({ environment, configured: configured.has(environment) })),
       productionOAuthEnabled: env.EBAY_PRODUCTION_OAUTH_ENABLED === 'true',
       accounts: (accountsResult.data || []).map(row => ({
@@ -310,9 +316,19 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
   if (path === '/ebay/exceptions' && request.method === 'GET') {
-    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_exceptions')
+    const accountId = new URL(request.url).searchParams.get('accountId');
+    let query = auth.repositoryContext.supabase.from('marketplace_exceptions')
       .select('id,marketplace_account_id,exception_type,source,reference_id,details,status,created_at,resolved_at,resolution_note')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false }).limit(250);
+      .eq('organization_id', auth.organizationId);
+    if (accountId) {
+      const { data: account, error: accountError } = await auth.repositoryContext.supabase
+        .from('marketplace_accounts').select('id')
+        .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
+      query = query.eq('marketplace_account_id', accountId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(250);
     if (error) throw new Error('Marketplace exceptions could not be loaded.');
     return json({ exceptions: (data || []).map(row => ({
       id: row.id, marketplaceAccountId: row.marketplace_account_id, type: row.exception_type,

@@ -20,6 +20,7 @@ import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig, Produc
 interface BuyingReturnsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultSubTab?: 'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS';
 }
 
@@ -28,6 +29,7 @@ const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('
 export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   defaultSubTab = 'POS',
 }) => {
   const [subTab, setSubTab] = useState<'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS'>(defaultSubTab);
@@ -68,17 +70,17 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
-        api.getSuppliers(),
-        api.getPurchaseOrders(),
-        api.getReturns(),
-        api.getOrders(),
-        api.getProducts(),
+        api.getSuppliers(selectedStoreId),
+        api.getPurchaseOrders(selectedStoreId),
+        api.getReturns(selectedStoreId),
+        api.getOrders({ accountId: selectedStoreId }),
+        api.getProducts(selectedStoreId),
       ]);
       setSuppliers(supRes.suppliers || []);
       setPurchaseOrders(poRes.purchaseOrders || []);
@@ -106,7 +108,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
         paymentTermsDays: Number.parseInt(supplierForm.paymentTermsDays, 10) || 0,
         currency: supplierForm.currency,
         leadTimeDays: Number.parseInt(supplierForm.leadTimeDays, 10) || 0,
-      });
+      }, selectedStoreId);
       setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: config.baseCurrency, leadTimeDays: '7' });
       setShowSupplierForm(false);
       await loadData();
@@ -151,7 +153,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
           orderedQty: Number.parseInt(line.quantity, 10) || 0,
           unitCostMinor: Math.round((Number.parseFloat(line.unitCost) || 0) * 100),
         })),
-      }, requestId);
+      }, requestId, selectedStoreId);
       setShowPoForm(false);
       setPoRequestId('');
       await loadData();
