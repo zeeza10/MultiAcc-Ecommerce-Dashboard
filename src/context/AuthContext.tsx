@@ -242,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       alive = false;
       authEventGeneration.current += 1;
       loadGeneration.current += 1;
+      inFlightAccountLoad.current = null;
       listener.subscription.unsubscribe();
     };
   }, [loadAccount]);
