@@ -57,7 +57,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const results = await Promise.allSettled([
         api.getKPIs(period, selectedStoreId),
         api.getCharts(selectedStoreId),
-        api.getExceptions(),
+        api.getExceptions(selectedStoreId),
       ]);
 
       if (results[0].status === 'fulfilled' && results[0].value?.kpis) {
