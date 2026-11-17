@@ -10,6 +10,8 @@ export type WorkerEnv = {
   SUPABASE_SECRET_KEY?: string;
   EBAY_TOKEN_ENCRYPTION_KEY?: string;
   EBAY_PRODUCTION_OAUTH_ENABLED?: string;
+  ALLOWED_ORIGIN?: string;
+  PLATFORM_SUPER_ADMIN_USER_IDS?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;
@@ -18,6 +20,7 @@ export type WorkerEnv = {
 
 export type AuthContext = {
   user: { id: string; email: string; name: string; role: string; clientId?: string };
+  assuranceLevel: 'aal1' | 'aal2';
   organizationId: string;
   permissions: Set<string>;
   repositoryContext: RepositoryContext;

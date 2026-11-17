@@ -15,6 +15,7 @@ import { permissionByRoute } from './permissions';
 import { handleAccessRoute } from './routes/access';
 import { resolveEffectivePermissions } from './permission-overrides';
 import { enforceRateLimit } from './rate-limits';
+import { readVerifiedJwtAssurance } from './platform-admin';
 import { handleEbayOAuthCallback } from './routes/marketplace';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
@@ -119,6 +120,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
       clientId: membership.client_3pl_id || undefined,
     },
     organizationId: membership.organization_id,
+    assuranceLevel: readVerifiedJwtAssurance(token),
     permissions,
     repositoryContext: {
       supabase: client,

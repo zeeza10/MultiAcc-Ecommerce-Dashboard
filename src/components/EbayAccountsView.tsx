@@ -197,6 +197,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
           <div className="font-semibold text-sm text-slate-900">eBay Developer Application Credentials</div>
           <p className="text-xs text-slate-600">Credentials are encrypted in the Worker before storage. They are never returned to the browser after saving. Do not paste these values into chat or GitHub.</p>
+          <p className="text-xs text-amber-700">Shared platform credentials can only be viewed by explicitly allowlisted platform owners. Saving also requires a completed authenticator MFA step-up (AAL2); a workspace Super Admin role alone is not sufficient.</p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <select value={credentialEnvironment} onChange={e => setCredentialEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
               <option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
