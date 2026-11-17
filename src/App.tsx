@@ -16,7 +16,6 @@ import { NotificationsView } from './components/NotificationsView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
 import { EmployeeAccessView } from './components/EmployeeAccessView';
-import { IntegrationManagementView } from './components/IntegrationManagementView';
 import { WarehouseServicesView } from './components/WarehouseServicesView';
 import { DropshippingCalculatorView } from './components/DropshippingCalculatorView';
 import { EbayPayoutsView } from './components/EbayPayoutsView';
@@ -45,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   'warehouse-services', 'suppliers', 'purchase-orders', '3pl-clients',
   'fulfilment', 'shipping', 'storage', 'invoices', 'payments', 'expenses',
   'payouts', 'reconciliation', 'profitability', 'reports', 'notifications',
-  'audit-log', 'settings', 'employee-access', 'integration-management',
+  'audit-log', 'settings', 'employee-access',
 ];
 
 const readWorkspacePreference = <T,>(organizationId: string, key: string, fallback: T): T => {
@@ -523,10 +522,6 @@ export default function App() {
           )}
 
           {activeTab === 'employee-access' && <EmployeeAccessView />}
-
-          {activeTab === 'integration-management' && currentUser.role === 'SUPER_ADMIN' && (
-            <IntegrationManagementView />
-          )}
 
           {activeTab === 'settings' && (
             <SettingsView
