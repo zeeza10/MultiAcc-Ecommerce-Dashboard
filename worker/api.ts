@@ -40,16 +40,14 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     return json({ error: 'Authentication service is temporarily unavailable.' }, 503);
   }
 
-  let authData;
-  let authError;
+  let authResult: Awaited<ReturnType<typeof client.auth.getUser>>;
   try {
-    const result = await client.auth.getUser(token);
-    authData = result.data;
-    authError = result.error;
+    authResult = await client.auth.getUser(token);
   } catch {
     return json({ error: 'Authentication service is temporarily unavailable.' }, 503);
   }
-  if (authError || !authData?.user) {
+  const { data: authData, error: authError } = authResult;
+  if (authError || !authData.user) {
     const status = (authError as { status?: number } | null)?.status;
     return status === 401 || status === 403
       ? json({ error: 'Your session is invalid or expired. Please sign in again.' }, 401)
