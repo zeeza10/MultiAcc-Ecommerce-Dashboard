@@ -85,8 +85,8 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
       setPackagingJobs(pkgRes.packagingJobs || []);
       setShippingJobs(shpRes.shippingJobs || []);
       setClients(clientRes.clients || []);
-      if (!pkgClientId && clientRes.clients?.length) setPkgClientId(clientRes.clients[0].id);
-      if (!shpClientId && clientRes.clients?.length) setShpClientId(clientRes.clients[0].id);
+      setPkgClientId((current) => clientRes.clients.some((client) => client.id === current) ? current : (clientRes.clients[0]?.id || ''));
+      setShpClientId((current) => clientRes.clients.some((client) => client.id === current) ? current : (clientRes.clients[0]?.id || ''));
       setRateCards(clientRes.rateCards || []);
       setStorageSnapshots(storageRes.snapshots || []);
       setProducts(productRes.products || []);
