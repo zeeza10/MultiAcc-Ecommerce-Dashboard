@@ -54,100 +54,105 @@ async function authenticate(request: Request, env: WorkerEnv, createSupabaseClie
       : json({ error: 'Authentication service is temporarily unavailable.' }, 503);
   }
 
-  const { data: profile, error: profileError } = await client
-    .from('profiles')
-    .select('id,full_name,is_active,two_factor_enabled,created_at')
-    .eq('id', authData.user.id)
-    .maybeSingle();
-
-  if (profileError) return json({ error: 'Your account profile could not be verified. Please retry.' }, 503);
-  if (!profile || !profile.is_active) {
-    return json({ error: 'Your account is inactive or its profile is unavailable.' }, 403);
-  }
-
-  const requestedOrganizationId = request.headers.get('X-Organization-Id')?.trim();
-  let membershipQuery = client
-    .from('organization_members')
-    .select('organization_id,role_id,client_3pl_id,roles(code)')
-    .eq('user_id', authData.user.id)
-    .eq('is_active', true);
-
-  if (requestedOrganizationId) {
-    membershipQuery = membershipQuery.eq('organization_id', requestedOrganizationId).limit(1);
-  } else {
-    membershipQuery = membershipQuery.order('joined_at', { ascending: true }).limit(2);
-  }
-
-  const { data: memberships, error: membershipError } = await membershipQuery;
-  if (membershipError) return json({ error: 'Workspace membership could not be verified. Please retry.' }, 503);
-  if (!memberships?.length) return json({ error: 'You are not an active member of the requested workspace.' }, 403);
-  if (!requestedOrganizationId && memberships.length > 1) {
-    return json({ error: 'Select an active workspace before making API requests.' }, 409);
-  }
-
-  const membership = memberships[0] as any;
-  const relation = membership.roles;
-  const roleCode = Array.isArray(relation) ? relation[0]?.code : relation?.code;
-  if (typeof roleCode !== 'string' || (!validRoles.has(roleCode) && !roleCode.startsWith('CUSTOM_'))) return json({ error: 'Your workspace role is not valid.' }, 403);
-  if (roleCode === 'CLIENT_USER' && !membership.client_3pl_id) {
-    return json({ error: 'Your client account is not linked to this workspace. Contact your workspace administrator.' }, 403);
-  }
-
-  const { data: permissionRows, error: permissionError } = await client
-    .from('role_permissions')
-    .select('permissions(code)')
-    .eq('role_id', membership.role_id);
-  if (permissionError) return json({ error: 'Workspace permissions could not be verified. Please retry.' }, 503);
-
-  const rolePermissionCodes = (permissionRows || []).map((row: any) => {
-    const permission = row.permissions;
-    return Array.isArray(permission) ? permission[0]?.code : permission?.code;
-  }).filter((code: unknown): code is string => typeof code === 'string');
-
-  const { data: overrideRows, error: overrideError } = await client
-    .from('organization_member_permission_overrides')
-    .select('effect,permissions(code)')
-    .eq('organization_id', membership.organization_id)
-    .eq('user_id', authData.user.id);
-  if (overrideError) return json({ error: 'Individual workspace permissions could not be verified. Please retry.' }, 503);
-
-  const granted = (overrideRows || []).filter((row: any) => row.effect === 'GRANT').map((row: any) => {
-    const relation = row.permissions;
-    return Array.isArray(relation) ? relation[0]?.code : relation?.code;
-  }).filter((code: unknown): code is string => typeof code === 'string');
-  const denied = new Set<string>((overrideRows || []).filter((row: any) => row.effect === 'DENY').map((row: any) => {
-    const relation = row.permissions;
-    return Array.isArray(relation) ? relation[0]?.code : relation?.code;
-  }).filter((code: unknown): code is string => typeof code === 'string'));
-
-  const permissions = resolveEffectivePermissions(
-    roleCode,
-    rolePermissionCodes,
-    [
-      ...granted.map(code => ({ effect: 'GRANT' as const, code })),
-      ...[...denied].map(code => ({ effect: 'DENY' as const, code })),
-    ],
-  );
-
-  return {
-    user: {
-      id: authData.user.id,
-      email: authData.user.email || '',
-      name: profile.full_name || authData.user.email || 'User',
-      role: roleCode,
-      clientId: membership.client_3pl_id || undefined,
-    },
-    organizationId: membership.organization_id,
-    assuranceLevel: readVerifiedJwtAssurance(token),
-    permissions,
-    repositoryContext: {
-      supabase: client,
+  try {
+    const { data: profile, error: profileError } = await client
+      .from('profiles')
+      .select('id,full_name,is_active,two_factor_enabled,created_at')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+  
+    if (profileError) return json({ error: 'Your account profile could not be verified. Please retry.' }, 503);
+    if (!profile || !profile.is_active) {
+      return json({ error: 'Your account is inactive or its profile is unavailable.' }, 403);
+    }
+  
+    const requestedOrganizationId = request.headers.get('X-Organization-Id')?.trim();
+    let membershipQuery = client
+      .from('organization_members')
+      .select('organization_id,role_id,client_3pl_id,roles(code)')
+      .eq('user_id', authData.user.id)
+      .eq('is_active', true);
+  
+    if (requestedOrganizationId) {
+      membershipQuery = membershipQuery.eq('organization_id', requestedOrganizationId).limit(1);
+    } else {
+      membershipQuery = membershipQuery.order('joined_at', { ascending: true }).limit(2);
+    }
+  
+    const { data: memberships, error: membershipError } = await membershipQuery;
+    if (membershipError) return json({ error: 'Workspace membership could not be verified. Please retry.' }, 503);
+    if (!memberships?.length) return json({ error: 'You are not an active member of the requested workspace.' }, 403);
+    if (!requestedOrganizationId && memberships.length > 1) {
+      return json({ error: 'Select an active workspace before making API requests.' }, 409);
+    }
+  
+    const membership = memberships[0] as any;
+    const relation = membership.roles;
+    const roleCode = Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    if (typeof roleCode !== 'string' || (!validRoles.has(roleCode) && !roleCode.startsWith('CUSTOM_'))) return json({ error: 'Your workspace role is not valid.' }, 403);
+    if (roleCode === 'CLIENT_USER' && !membership.client_3pl_id) {
+      return json({ error: 'Your client account is not linked to this workspace. Contact your workspace administrator.' }, 403);
+    }
+  
+    const { data: permissionRows, error: permissionError } = await client
+      .from('role_permissions')
+      .select('permissions(code)')
+      .eq('role_id', membership.role_id);
+    if (permissionError) return json({ error: 'Workspace permissions could not be verified. Please retry.' }, 503);
+  
+    const rolePermissionCodes = (permissionRows || []).map((row: any) => {
+      const permission = row.permissions;
+      return Array.isArray(permission) ? permission[0]?.code : permission?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string');
+  
+    const { data: overrideRows, error: overrideError } = await client
+      .from('organization_member_permission_overrides')
+      .select('effect,permissions(code)')
+      .eq('organization_id', membership.organization_id)
+      .eq('user_id', authData.user.id);
+    if (overrideError) return json({ error: 'Individual workspace permissions could not be verified. Please retry.' }, 503);
+  
+    const granted = (overrideRows || []).filter((row: any) => row.effect === 'GRANT').map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string');
+    const denied = new Set<string>((overrideRows || []).filter((row: any) => row.effect === 'DENY').map((row: any) => {
+      const relation = row.permissions;
+      return Array.isArray(relation) ? relation[0]?.code : relation?.code;
+    }).filter((code: unknown): code is string => typeof code === 'string'));
+  
+    const permissions = resolveEffectivePermissions(
+      roleCode,
+      rolePermissionCodes,
+      [
+        ...granted.map(code => ({ effect: 'GRANT' as const, code })),
+        ...[...denied].map(code => ({ effect: 'DENY' as const, code })),
+      ],
+    );
+  
+    return {
+      user: {
+        id: authData.user.id,
+        email: authData.user.email || '',
+        name: profile.full_name || authData.user.email || 'User',
+        role: roleCode,
+        clientId: membership.client_3pl_id || undefined,
+      },
       organizationId: membership.organization_id,
-      userId: authData.user.id,
-      client3plId: membership.client_3pl_id || undefined,
+      assuranceLevel: readVerifiedJwtAssurance(token),
       permissions,
-    },
-  };
+      repositoryContext: {
+        supabase: client,
+        organizationId: membership.organization_id,
+        userId: authData.user.id,
+        client3plId: membership.client_3pl_id || undefined,
+        permissions,
+      },
+    };
+  } catch {
+    return json({ error: 'Workspace authorization could not be verified. Please retry.' }, 503);
+  }
+
 }
 
 
