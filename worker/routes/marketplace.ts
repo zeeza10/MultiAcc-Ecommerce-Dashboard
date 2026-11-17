@@ -138,14 +138,23 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
 async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
-  const [mappingsResult, productsResult] = await Promise.all([
-    admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
-    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id),
-  ]);
-  if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
-  const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
+  // Only an explicit mapping for this exact marketplace account may link an
+  // eBay line item to an internal product. Never fall back to workspace-wide
+  // SKU matching: another store (including a demo store) may use the same SKU.
+  const mappingsResult = await admin.from('marketplace_sku_mappings')
+    .select('external_sku,product_id')
+    .eq('organization_id', account.organization_id)
+    .eq('marketplace_account_id', account.id);
+  if (mappingsResult.error) throw new Error('The account-specific SKU mappings could not be loaded.');
+  const mappings = mappingsResult.data || [];
+  const mappingBySku = new Map(mappings.map((row: any) => [row.external_sku, row.product_id]));
+  const mappedProductIds = [...new Set(mappings.map((row: any) => row.product_id))];
+  const productsResult = mappedProductIds.length
+    ? await admin.from('products').select('id,sku,name')
+        .eq('organization_id', account.organization_id).in('id', mappedProductIds)
+    : { data: [], error: null };
+  if (productsResult.error) throw new Error('The mapped products for this seller account could not be loaded.');
   const productById = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
-  const productBySku = new Map((productsResult.data || []).map((row: any) => [row.sku, row]));
   let imported = 0, skipped = 0, exceptions = 0, fetched = 0;
   const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING' }).select('id').single();
   if (runError || !run) throw new Error('A marketplace sync run could not be started.');
@@ -166,7 +175,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
         const address = shipping?.contactAddress || {};
         const items = (Array.isArray(order.lineItems) ? order.lineItems : []).map((line: any) => {
           const sku = String(line.sku || line.legacyItemId || line.lineItemId || 'UNKNOWN').slice(0, 128);
-          const productId = mappingBySku.get(sku), product = (productId ? productById.get(productId) : null) || productBySku.get(sku) || null;
+          const productId = mappingBySku.get(sku), product = productId ? productById.get(productId) || null : null;
           const quantity = Math.max(1, Math.trunc(Number(line.quantity || 1))), unit = moneyMinor(line.lineItemCost?.value);
           return { product_id: product?.id || null, sku: product?.sku || sku, product_name: product?.name || String(line.title || 'eBay item').slice(0, 250), quantity, unit_price_minor: unit, tax_amount_minor: 0, total_price_minor: unit * quantity, raw_item: { lineItemId: line.lineItemId || null, sku, title: line.title || null, quantity, unitPrice: line.lineItemCost?.value || null } };
         });
