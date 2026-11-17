@@ -1,27 +1,25 @@
 import type { AuthContext } from '../types';
 import { json } from '../http';
 
-async function getVisibleClientIds(auth: AuthContext, url: URL): Promise<string[]> {
+async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
   const accountId = url.searchParams.get('accountId');
-  let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
-  if (accountId && accountId !== 'ALL') {
-    const { data: account, error: accountError } = await auth.repositoryContext.supabase
-      .from('marketplace_accounts').select('id,is_demo,environment')
-      .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
-    if (accountError) throw accountError;
-    if (!account) throw new Error('The selected marketplace account was not found in this workspace.');
-    dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
-  }
+  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    .select('id,is_demo,environment').eq('id', accountId)
+    .eq('organization_id', auth.organizationId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('The selected marketplace account was not found in this workspace.');
+  if (data.is_demo) return 'DEMO';
+  return data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+}
 
+async function getVisibleClientIds(auth: AuthContext, url: URL): Promise<string[]> {
   let query = auth.repositoryContext.supabase.from('clients_3pl')
-    .select('id').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
+    .select('id').eq('organization_id', auth.organizationId)
+    .eq('data_environment', await getDataEnvironment(auth, url));
   if (auth.user.role === 'CLIENT_USER') {
     if (!auth.repositoryContext.client3plId) return [];
     query = query.eq('id', auth.repositoryContext.client3plId);
-  } else {
-    query = includeDemo
-      ? query.like('external_id', 'demo:%')
-      : query.or('external_id.is.null,external_id.not.like.demo:%');
   }
   const { data, error } = await query;
   if (error) throw error;
@@ -155,15 +153,7 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
         .select('is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
       includeDemo = Boolean(account?.is_demo);
     }
-    ratesQuery = ratesQuery.eq('data_environment', (await getVisibleClientIds(auth, url)).length >= 0
-      ? (url.searchParams.get('accountId') && url.searchParams.get('accountId') !== 'ALL'
-        ? await (async () => {
-            const { data } = await auth.repositoryContext.supabase.from('marketplace_accounts')
-              .select('is_demo,environment').eq('id', url.searchParams.get('accountId')!).eq('organization_id', auth.organizationId).maybeSingle();
-            return data?.is_demo ? 'DEMO' : data?.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
-          })()
-        : 'SANDBOX')
-      : 'SANDBOX');
+    ratesQuery = ratesQuery.eq('data_environment', await getDataEnvironment(auth, url));
     const [clientsResult, ratesResult] = await Promise.all([
       auth.repositoryContext.supabase.from('clients_3pl')
         .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
