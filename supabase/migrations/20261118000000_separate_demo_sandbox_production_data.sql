@@ -82,6 +82,47 @@ FROM public.marketplace_accounts a WHERE l.marketplace_account_id = a.id;
 UPDATE public.stock_ledger l SET data_environment = p.data_environment
 FROM public.products p WHERE l.marketplace_account_id IS NULL AND l.product_id = p.id;
 
+-- Ensure eBay order imports inherit their environment from the owning seller account,
+-- regardless of the caller or the order-import RPC implementation.
+CREATE OR REPLACE FUNCTION public.set_order_data_environment()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $
+DECLARE
+  account_is_demo boolean;
+  account_environment text;
+BEGIN
+  IF NEW.marketplace_account_id IS NULL THEN
+    NEW.data_environment := COALESCE(NEW.data_environment, 'SANDBOX'::public.data_environment);
+    RETURN NEW;
+  END IF;
+
+  SELECT is_demo, environment
+    INTO account_is_demo, account_environment
+  FROM public.marketplace_accounts
+  WHERE id = NEW.marketplace_account_id
+    AND organization_id = NEW.organization_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Marketplace account does not belong to this organization';
+  END IF;
+
+  NEW.data_environment := CASE
+    WHEN account_is_demo THEN 'DEMO'::public.data_environment
+    WHEN account_environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+    ELSE 'SANDBOX'::public.data_environment
+  END;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS trg_orders_set_data_environment ON public.orders;
+CREATE TRIGGER trg_orders_set_data_environment
+BEFORE INSERT OR UPDATE OF marketplace_account_id, organization_id
+ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.set_order_data_environment();
+
 -- Account/environment filters are used on every high-volume list and report query.
 CREATE INDEX IF NOT EXISTS idx_orders_org_environment_account
   ON public.orders (organization_id, data_environment, marketplace_account_id);
