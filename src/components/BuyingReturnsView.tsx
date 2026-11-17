@@ -108,7 +108,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
         paymentTermsDays: Number.parseInt(supplierForm.paymentTermsDays, 10) || 0,
         currency: supplierForm.currency,
         leadTimeDays: Number.parseInt(supplierForm.leadTimeDays, 10) || 0,
-      });
+      }, selectedStoreId);
       setSupplierForm({ name: '', code: '', contactName: '', email: '', phone: '', paymentTermsDays: '30', currency: config.baseCurrency, leadTimeDays: '7' });
       setShowSupplierForm(false);
       await loadData();
@@ -153,7 +153,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
           orderedQty: Number.parseInt(line.quantity, 10) || 0,
           unitCostMinor: Math.round((Number.parseFloat(line.unitCost) || 0) * 100),
         })),
-      }, requestId);
+      }, requestId, selectedStoreId);
       setShowPoForm(false);
       setPoRequestId('');
       await loadData();
