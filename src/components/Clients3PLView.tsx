@@ -68,6 +68,9 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
       setOrders(ordRes.orders);
       if (clientRes.clients.length > 0) {
         runBillingPreview(clientRes.clients[0].id);
+      } else {
+        setSelectedClientId('');
+        setBillingPreview(null);
       }
     } catch (err) {
       console.error('Failed to load 3PL data:', err);
