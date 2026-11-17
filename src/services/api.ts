@@ -160,7 +160,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ items, discrepancyNote, idempotencyKey }),
     }),
-  getReturns: () => request<{ returns: ReturnOrder[] }>('/returns'),
+  getReturns: (accountId?: string) => request<{ returns: ReturnOrder[] }>(`/returns${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   processReturnDisposition: (id: string, dispositions: any[], issueRefund: boolean, idempotencyKey: string) =>
     request<{ success: boolean; return: ReturnOrder; duplicate: boolean }>(`/returns/${id}/disposition`, {
       method: 'POST',
