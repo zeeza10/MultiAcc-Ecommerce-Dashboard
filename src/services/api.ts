@@ -102,8 +102,8 @@ export const api = {
 
   // Products
   getProducts: (accountId?: string) => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createProduct: (payload: any) =>
-    request<{ product: Product }>('/products', {
+  createProduct: (payload: any, accountId?: string) =>
+    request<{ product: Product }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -145,11 +145,11 @@ export const api = {
 
   // Phase 2: Purchasing & Returns
   getSuppliers: (accountId?: string) => request<{ suppliers: Supplier[] }>(`/suppliers${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createSupplier: (payload: { name: string; code: string; contactName?: string; email?: string; phone?: string; paymentTermsDays: number; currency: string; leadTimeDays: number }) =>
-    request<{ supplier: Supplier }>('/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
+  createSupplier: (payload: { name: string; code: string; contactName?: string; email?: string; phone?: string; paymentTermsDays: number; currency: string; leadTimeDays: number }, accountId?: string) =>
+    request<{ supplier: Supplier }>(`/suppliers${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, { method: 'POST', body: JSON.stringify(payload) }),
   getPurchaseOrders: (accountId?: string) => request<{ purchaseOrders: PurchaseOrder[]; receipts: any[] }>(`/purchase-orders${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createPurchaseOrder: (payload: { supplierId: string; expectedDate?: string; notes?: string; taxMinor: number; lines: Array<{ productId: string; orderedQty: number; unitCostMinor: number }> }, idempotencyKey: string) =>
-    request<{ purchaseOrder: PurchaseOrder }>('/purchase-orders', {
+  createPurchaseOrder: (payload: { supplierId: string; expectedDate?: string; notes?: string; taxMinor: number; lines: Array<{ productId: string; orderedQty: number; unitCostMinor: number }> }, idempotencyKey: string, accountId?: string) =>
+    request<{ purchaseOrder: PurchaseOrder }>(`/purchase-orders${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify({ ...payload, idempotencyKey }),
     }),
@@ -252,10 +252,10 @@ export const api = {
     warehouses: Array<{ id: string; name: string; code: string; address: string; isActive: boolean; totalCapacity: number; occupiedQty: number; zones: Array<{ name: string; aisles: string; type: string; capacity: number; locationCount: number }> }>;
     locations: Array<{ id: string; warehouseId: string; warehouseName: string; zone: string; aisle: string; shelf: string; bin: string; locationCode: string; locationType: string; capacityUnits: number; currentQty: number; occupiedQty: number; skuCount: number; isActive: boolean }>;
   }>(`/warehouses${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createWarehouse: (payload: { name: string; code: string; address?: string }) =>
-    request<{ warehouse: unknown }>('/warehouses', { method: 'POST', body: JSON.stringify(payload) }),
-  createWarehouseLocation: (warehouseId: string, payload: { locationCode: string; locationType: string; zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number }) =>
-    request<{ location: unknown }>(`/warehouses/${warehouseId}/locations`, { method: 'POST', body: JSON.stringify(payload) }),
+  createWarehouse: (payload: { name: string; code: string; address?: string }, accountId?: string) =>
+    request<{ warehouse: unknown }>(`/warehouses${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, { method: 'POST', body: JSON.stringify(payload) }),
+  createWarehouseLocation: (warehouseId: string, payload: { locationCode: string; locationType: string; zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number }, accountId?: string) =>
+    request<{ location: unknown }>(`/warehouses/${warehouseId}/locations${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, { method: 'POST', body: JSON.stringify(payload) }),
 
   // Phase 3: Warehouse Services
   getWarehouseServicesSummary: (accountId?: string) => request<any>(`/warehouse-services/summary${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
