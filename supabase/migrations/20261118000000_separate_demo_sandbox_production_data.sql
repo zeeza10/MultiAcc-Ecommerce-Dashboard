@@ -196,6 +196,36 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.record_finance_payment(
+  p_organization_id uuid,
+  p_invoice_id uuid,
+  p_amount_minor bigint,
+  p_payment_method text,
+  p_payment_date date,
+  p_reference text DEFAULT NULL,
+  p_payer_name text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path TO 'public', 'private', 'pg_temp'
+AS $function$
+DECLARE
+  invoice_environment public.data_environment;
+BEGIN
+  SELECT data_environment INTO invoice_environment
+  FROM public.invoices
+  WHERE id = p_invoice_id AND organization_id = p_organization_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invoice not found in this workspace.' USING ERRCODE = 'P0002';
+  END IF;
+  PERFORM set_config('app.data_environment', invoice_environment::text, true);
+  RETURN private.record_finance_payment(
+    p_organization_id, p_invoice_id, p_amount_minor, p_payment_method,
+    p_payment_date, p_reference, p_payer_name
+  );
+END;
+$function$;
+
 -- Child records inherit the partition of their owning parent record.
 CREATE OR REPLACE FUNCTION public.inherit_data_environment_from_parent()
 RETURNS trigger
@@ -243,6 +273,18 @@ BEGIN
       SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
     WHEN 'order_shipments' THEN
       SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+    WHEN 'invoices' THEN
+      IF NEW.recipient_type = 'CLIENT' THEN
+        SELECT data_environment INTO parent_environment FROM public.clients_3pl WHERE id = NEW.recipient_id AND organization_id = NEW.organization_id;
+      ELSIF NEW.recipient_type = 'SUPPLIER' THEN
+        SELECT data_environment INTO parent_environment FROM public.suppliers WHERE id = NEW.recipient_id AND organization_id = NEW.organization_id;
+      END IF;
+    WHEN 'payments' THEN
+      IF current_setting('app.data_environment', true) IN ('DEMO', 'SANDBOX', 'PRODUCTION') THEN
+        parent_environment := current_setting('app.data_environment', true)::public.data_environment;
+      ELSIF NEW.external_id LIKE 'demo:%' THEN
+        parent_environment := 'DEMO'::public.data_environment;
+      END IF;
     WHEN 'invoice_items' THEN
       SELECT data_environment INTO parent_environment FROM public.invoices WHERE id = NEW.invoice_id AND organization_id = NEW.organization_id;
     WHEN 'payment_allocations' THEN
@@ -304,7 +346,7 @@ BEGIN
     'order_items','returns','return_items','purchase_orders','warehouse_locations',
     'stock_adjustments','goods_receipts','goods_receipt_items','packaging_jobs',
     'shipping_jobs','storage_snapshots','journal_entry_lines','stock_ledger','customer_addresses',
-    'order_status_history','order_shipments','invoice_items','payment_allocations','marketplace_payouts',
+    'order_status_history','order_shipments','invoices','payments','invoice_items','payment_allocations','marketplace_payouts',
     'payout_orders','financial_reconciliations','dropshipping_calculations'
   ] LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS trg_%I_inherit_data_environment ON public.%I', target_table, target_table);
