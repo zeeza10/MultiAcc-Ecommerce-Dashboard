@@ -17,6 +17,7 @@ export interface Env {
   SUPABASE_SECRET_KEY?: string;
   EBAY_TOKEN_ENCRYPTION_KEY?: string;
   EBAY_PRODUCTION_OAUTH_ENABLED?: string;
+  PLATFORM_SUPER_ADMIN_USER_IDS?: string;
   ALLOWED_ORIGIN?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
