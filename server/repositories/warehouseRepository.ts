@@ -169,7 +169,7 @@ export class SupabaseWarehouseRepository {
     };
   }
 
-  async createWarehouse(input: { name: string; code: string; address?: string }) {
+  async createWarehouse(input: { name: string; code: string; address?: string; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' }) {
     const name = input.name.trim();
     const code = input.code.trim().toUpperCase();
     const address = (input.address || '').trim();
@@ -185,6 +185,7 @@ export class SupabaseWarehouseRepository {
         code,
         address: address ? { formatted: address } : {},
         is_active: true,
+        data_environment: input.dataEnvironment || 'SANDBOX',
       })
       .select('id,name,code,address,is_active')
       .single();
@@ -193,7 +194,7 @@ export class SupabaseWarehouseRepository {
   }
 
   async createLocation(input: {
-    warehouseId: string; locationCode: string; locationType: string;
+    warehouseId: string; locationCode: string; locationType: string; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
     zone?: string; aisle?: string; shelf?: string; bin?: string; capacityUnits?: number;
   }) {
     const locationCode = input.locationCode.trim().toUpperCase();
@@ -207,13 +208,14 @@ export class SupabaseWarehouseRepository {
 
     const { data: warehouse, error: warehouseError } = await this.context.supabase
       .from('warehouses')
-      .select('id')
+      .select('id,data_environment')
       .eq('id', input.warehouseId)
       .eq('organization_id', this.context.organizationId)
       .eq('is_active', true)
       .maybeSingle();
     if (warehouseError) throw new Error(warehouseError.message);
     if (!warehouse) throw new Error('The selected warehouse is not active in this workspace.');
+    if (input.dataEnvironment && warehouse.data_environment !== input.dataEnvironment) throw new Error('The selected warehouse belongs to a different data environment.');
 
     const { data, error } = await this.context.supabase
       .from('warehouse_locations')
