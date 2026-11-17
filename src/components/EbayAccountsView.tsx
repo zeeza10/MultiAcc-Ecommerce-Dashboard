@@ -18,12 +18,14 @@ import { MarketplaceAccount, ExceptionItem, Product, User, SystemConfig } from '
 interface EbayAccountsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onNavigate: (tab: any) => void;
 }
 
 export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   onNavigate,
 }) => {
   const [activeTab, setActiveTab] = useState<'ACCOUNTS' | 'EXCEPTIONS'>('ACCOUNTS');
@@ -53,14 +55,14 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [accRes, excRes, prodRes] = await Promise.all([
         api.getEbayAccounts(),
-        api.getExceptions(),
+        api.getExceptions(selectedStoreId),
         api.getProducts(),
       ]);
       setAccounts(accRes.accounts);
