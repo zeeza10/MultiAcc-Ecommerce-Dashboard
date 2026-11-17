@@ -681,7 +681,7 @@ apiRouter.post('/stock/adjustments/:id/decision', async (req: Request, res: Resp
 apiRouter.get('/suppliers', async (req: Request, res: Response) => {
   try {
     const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
-    res.json({ suppliers: await repository.listSuppliers() });
+    res.json({ suppliers: await repository.listSuppliers(typeof req.query.accountId === 'string' ? req.query.accountId : undefined) });
   } catch (error) {
     console.error('PostgreSQL supplier listing failed:', error);
     res.status(500).json({ error: 'Suppliers could not be loaded from the workspace database.' });
@@ -692,8 +692,8 @@ apiRouter.get('/purchase-orders', async (req: Request, res: Response) => {
   try {
     const repository = new SupabasePurchasingRepository(getRepositoryContext(req));
     const [purchaseOrders, receipts] = await Promise.all([
-      repository.listPurchaseOrders(),
-      repository.listGoodsReceipts(),
+      repository.listPurchaseOrders(typeof req.query.accountId === 'string' ? req.query.accountId : undefined),
+      repository.listGoodsReceipts(typeof req.query.accountId === 'string' ? req.query.accountId : undefined),
     ]);
     res.json({ purchaseOrders, receipts });
   } catch (error) {
