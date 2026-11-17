@@ -140,7 +140,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
-    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id),
+    admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).or('external_id.is.null,external_id.not.like.demo:%'),
   ]);
   if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
