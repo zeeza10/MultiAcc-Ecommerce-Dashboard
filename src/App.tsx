@@ -82,7 +82,7 @@ export default function App() {
         const canViewProducts = permissions.includes('*') || permissions.includes('products.view');
         const [ordRes, prodRes] = await Promise.all([
           canViewOrders ? api.getOrders({ search: globalSearch, accountId: selectedStoreId }) : Promise.resolve({ orders: [] }),
-          canViewProducts ? api.getProducts() : Promise.resolve({ products: [] }),
+          canViewProducts ? api.getProducts(selectedStoreId) : Promise.resolve({ products: [] }),
         ]);
         const s = globalSearch.toLowerCase();
         const matchedProds = prodRes.products.filter(
@@ -494,6 +494,7 @@ export default function App() {
         onClose={() => setShowNewAdjustmentModal(false)}
         currentUser={currentUser}
         config={config}
+        selectedStoreId={selectedStoreId}
         onSuccess={() => {
           if (activeTab === 'adjustments' || activeTab === 'inventory') {
             window.location.reload();
@@ -506,6 +507,7 @@ export default function App() {
         onClose={() => setShowNewOrderModal(false)}
         currentUser={currentUser}
         config={config}
+        selectedStoreId={selectedStoreId}
         onSuccess={() => {
           if (activeTab === 'orders') {
             window.location.reload();
