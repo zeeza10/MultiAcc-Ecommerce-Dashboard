@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [accountState, setAccountState] = useState<'checking' | 'signed-out' | 'ready' | 'no-membership' | 'error'>('checking');
   const loadGeneration = useRef(0);
+  const authEventGeneration = useRef(0);
   const inFlightAccountLoad = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const completedAccountLoadKey = useRef<string | null>(null);
   const [mode, setMode] = useState<'login' | 'reset'>('login');
@@ -206,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // event as the single bootstrap source avoids racing getSession() against the
     // listener's INITIAL_SESSION callback.
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      const eventGeneration = ++authEventGeneration.current;
       if (event === 'PASSWORD_RECOVERY') {
         setRecoveryActive(true);
         setMode('reset');
@@ -216,6 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // workspace mounted and update only the session used by API requests.
         setSession(nextSession);
         if (!nextSession) void loadAccount(null);
+        else if (!completedAccountLoadKey.current) void loadAccount(nextSession, true);
         return;
       }
 
@@ -230,13 +233,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Supabase advises keeping auth callbacks synchronous; defer database reads
       // until its internal auth lock has been released.
       window.setTimeout(() => {
-        if (!alive) return;
+        if (!alive || eventGeneration !== authEventGeneration.current) return;
         void loadAccount(nextSession);
       }, 0);
     });
 
     return () => {
       alive = false;
+      authEventGeneration.current += 1;
       loadGeneration.current += 1;
       listener.subscription.unsubscribe();
     };
@@ -390,7 +394,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ) : signedInWithoutWorkspace ? (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">{accountState === 'error' ? error || 'Workspace access could not be verified. Please retry.' : 'Your sign-in succeeded, but no active organization membership was found. Ask your organization Super Admin to send or renew your invitation.'}</p>
-            {accountState === 'error' && <button onClick={() => { if (session) void loadAccount(session, true); }} className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white">Retry workspace check</button>}
+            {(accountState === 'error' || accountState === 'no-membership') && <button onClick={() => { if (session) void loadAccount(session, true); }} className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white">Retry workspace check</button>}
             <button onClick={signOut} className="w-full rounded-lg border border-slate-300 py-3 text-sm font-semibold text-slate-700">Sign out</button>
           </div>
         ) : (
