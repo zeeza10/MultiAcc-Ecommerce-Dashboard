@@ -83,7 +83,7 @@ export class SupabasePurchasingRepository {
   }
 
   async listPurchaseOrders(accountId?: string): Promise<PurchaseOrder[]> {
-    const includeDemo = await isDemoAccount(this.context, accountId);
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
     const [orders, suppliers] = await Promise.all([
       readAll<PurchaseOrderRow>((from, to) => {
         let query = this.context.supabase
@@ -145,15 +145,13 @@ export class SupabasePurchasingRepository {
   }
 
   async listGoodsReceipts(accountId?: string): Promise<GoodsReceipt[]> {
-    const includeDemo = await isDemoAccount(this.context, accountId);
+    const dataEnvironment = await getDataEnvironment(this.context, accountId);
     const orders = await readAll<Pick<PurchaseOrderRow, 'id' | 'po_number'>>((from, to) => {
       let query = this.context.supabase
         .from('purchase_orders')
-        .select('id,po_number,external_id')
-        .eq('organization_id', this.context.organizationId);
-      query = includeDemo
-        ? query.like('external_id', 'demo:%')
-        : query.or('external_id.is.null,external_id.not.like.demo:%');
+        .select('id,po_number,data_environment')
+        .eq('organization_id', this.context.organizationId)
+        .eq('data_environment', dataEnvironment);
       return query.range(from, to);
     });
     const visiblePoIds = orders.map(order => order.id);
