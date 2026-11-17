@@ -170,8 +170,8 @@ export const api = {
   // Phase 3: 3PL
   get3PLClients: (accountId?: string) => request<{ clients: Client3PL[]; rateCards: RateCard[] }>(`/3pl/clients${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   getStorageSnapshots: (accountId?: string) => request<{ snapshots: any[] }>(`/3pl/storage-snapshots${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  getBillingPreview: (clientId: string) =>
-    request<any>('/3pl/billing-preview', {
+  getBillingPreview: (clientId: string, accountId?: string) =>
+    request<any>(`/3pl/billing-preview${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify({ clientId }),
     }),
@@ -260,14 +260,14 @@ export const api = {
   // Phase 3: Warehouse Services
   getWarehouseServicesSummary: (accountId?: string) => request<any>(`/warehouse-services/summary${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   getPackagingJobs: (accountId?: string) => request<{ packagingJobs: WarehousePackagingJob[] }>(`/warehouse-services/packaging${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createPackagingJob: (payload: Partial<WarehousePackagingJob>) =>
-    request<{ job: WarehousePackagingJob }>('/warehouse-services/packaging', {
+  createPackagingJob: (payload: Partial<WarehousePackagingJob>, accountId?: string) =>
+    request<{ job: WarehousePackagingJob }>(`/warehouse-services/packaging${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
   getShippingJobs: (accountId?: string) => request<{ shippingJobs: WarehouseShippingJob[] }>(`/warehouse-services/shipping${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createShippingJob: (payload: Partial<WarehouseShippingJob>) =>
-    request<{ job: WarehouseShippingJob }>('/warehouse-services/shipping', {
+  createShippingJob: (payload: Partial<WarehouseShippingJob>, accountId?: string) =>
+    request<{ job: WarehouseShippingJob }>(`/warehouse-services/shipping${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
