@@ -85,7 +85,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     setSaving(true);
     setError('');
     try {
-      await api.createWarehouse(warehouseForm);
+      await api.createWarehouse(warehouseForm, selectedStoreId);
       setWarehouseForm({ name: '', code: '', address: '' });
       setShowWarehouseForm(false);
       await loadData();
@@ -105,7 +105,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       await api.createWarehouseLocation(warehouseId, {
         ...details,
         capacityUnits: Number(capacityUnits) || 0,
-      });
+      }, selectedStoreId);
       setLocationForm(current => ({
         ...current,
         locationCode: '', zone: '', aisle: '', shelf: '', bin: '', capacityUnits: '0',
