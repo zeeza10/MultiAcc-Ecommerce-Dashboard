@@ -34,6 +34,19 @@ ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS data_environment public.dat
 ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 ALTER TABLE public.journal_entry_lines ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.customer_addresses ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.order_status_history ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.order_shipments ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.invoice_items ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.payment_allocations ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.marketplace_payouts ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.payout_orders ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.bank_transactions ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.financial_reconciliations ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.dropshipping_calculations ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.import_jobs ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.export_jobs ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 
 -- Preserve the current client-presentation records as DEMO.
 UPDATE public.customers SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
@@ -50,6 +63,24 @@ UPDATE public.invoices SET data_environment = 'DEMO' WHERE external_id LIKE 'dem
 UPDATE public.expenses SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
 UPDATE public.journal_entries SET data_environment = 'DEMO' WHERE source_type LIKE 'DEMO%';
 UPDATE public.journal_entry_lines l SET data_environment = e.data_environment FROM public.journal_entries e WHERE l.journal_entry_id = e.id;
+UPDATE public.customer_addresses a SET data_environment = c.data_environment FROM public.customers c WHERE a.customer_id = c.id;
+UPDATE public.order_status_history h SET data_environment = o.data_environment FROM public.orders o WHERE h.order_id = o.id;
+UPDATE public.order_shipments sh SET data_environment = o.data_environment FROM public.orders o WHERE sh.order_id = o.id;
+UPDATE public.invoice_items i SET data_environment = inv.data_environment FROM public.invoices inv WHERE i.invoice_id = inv.id;
+UPDATE public.payments SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
+UPDATE public.payment_allocations a SET data_environment = inv.data_environment FROM public.invoices inv WHERE a.invoice_id = inv.id;
+UPDATE public.marketplace_payouts p SET data_environment = CASE
+  WHEN a.is_demo THEN 'DEMO'::public.data_environment
+  WHEN a.environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+  ELSE 'SANDBOX'::public.data_environment END
+FROM public.marketplace_accounts a WHERE p.marketplace_account_id = a.id;
+UPDATE public.payout_orders po SET data_environment = p.data_environment FROM public.marketplace_payouts p WHERE po.payout_id = p.id;
+UPDATE public.financial_reconciliations r SET data_environment = CASE
+  WHEN a.is_demo THEN 'DEMO'::public.data_environment
+  WHEN a.environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+  ELSE 'SANDBOX'::public.data_environment END
+FROM public.marketplace_accounts a WHERE r.marketplace_account_id = a.id;
+UPDATE public.dropshipping_calculations d SET data_environment = p.data_environment FROM public.products p WHERE d.product_id = p.id;
 
 -- Marketplace orders always inherit the exact connected seller account environment.
 UPDATE public.orders o
@@ -206,6 +237,40 @@ BEGIN
       SELECT data_environment INTO parent_environment FROM public.clients_3pl WHERE id = NEW.client_3pl_id AND organization_id = NEW.organization_id;
     WHEN 'journal_entry_lines' THEN
       SELECT data_environment INTO parent_environment FROM public.journal_entries WHERE id = NEW.journal_entry_id AND organization_id = NEW.organization_id;
+    WHEN 'customer_addresses' THEN
+      SELECT data_environment INTO parent_environment FROM public.customers WHERE id = NEW.customer_id AND organization_id = NEW.organization_id;
+    WHEN 'order_status_history' THEN
+      SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+    WHEN 'order_shipments' THEN
+      SELECT data_environment INTO parent_environment FROM public.orders WHERE id = NEW.order_id AND organization_id = NEW.organization_id;
+    WHEN 'invoice_items' THEN
+      SELECT data_environment INTO parent_environment FROM public.invoices WHERE id = NEW.invoice_id AND organization_id = NEW.organization_id;
+    WHEN 'payment_allocations' THEN
+      IF NEW.invoice_id IS NOT NULL THEN
+        SELECT data_environment INTO parent_environment FROM public.invoices WHERE id = NEW.invoice_id AND organization_id = NEW.organization_id;
+      ELSIF NEW.payment_id IS NOT NULL THEN
+        SELECT data_environment INTO parent_environment FROM public.payments WHERE id = NEW.payment_id AND organization_id = NEW.organization_id;
+      END IF;
+    WHEN 'marketplace_payouts' THEN
+      SELECT CASE WHEN is_demo THEN 'DEMO'::public.data_environment
+                  WHEN environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+                  ELSE 'SANDBOX'::public.data_environment END
+        INTO parent_environment
+      FROM public.marketplace_accounts
+      WHERE id = NEW.marketplace_account_id AND organization_id = NEW.organization_id;
+    WHEN 'payout_orders' THEN
+      SELECT data_environment INTO parent_environment FROM public.marketplace_payouts WHERE id = NEW.payout_id AND organization_id = NEW.organization_id;
+    WHEN 'financial_reconciliations' THEN
+      IF NEW.marketplace_account_id IS NOT NULL THEN
+        SELECT CASE WHEN is_demo THEN 'DEMO'::public.data_environment
+                    WHEN environment = 'PRODUCTION' THEN 'PRODUCTION'::public.data_environment
+                    ELSE 'SANDBOX'::public.data_environment END
+          INTO parent_environment
+        FROM public.marketplace_accounts
+        WHERE id = NEW.marketplace_account_id AND organization_id = NEW.organization_id;
+      END IF;
+    WHEN 'dropshipping_calculations' THEN
+      SELECT data_environment INTO parent_environment FROM public.products WHERE id = NEW.product_id AND organization_id = NEW.organization_id;
     WHEN 'stock_ledger' THEN
       IF NEW.marketplace_account_id IS NOT NULL THEN
         SELECT CASE WHEN is_demo THEN 'DEMO'::public.data_environment
@@ -238,7 +303,9 @@ BEGIN
   FOREACH target_table IN ARRAY ARRAY[
     'order_items','returns','return_items','purchase_orders','warehouse_locations',
     'stock_adjustments','goods_receipts','goods_receipt_items','packaging_jobs',
-    'shipping_jobs','storage_snapshots','journal_entry_lines','stock_ledger'
+    'shipping_jobs','storage_snapshots','journal_entry_lines','stock_ledger','customer_addresses',
+    'order_status_history','order_shipments','invoice_items','payment_allocations','marketplace_payouts',
+    'payout_orders','financial_reconciliations','dropshipping_calculations'
   ] LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS trg_%I_inherit_data_environment ON public.%I', target_table, target_table);
     EXECUTE format(
@@ -265,3 +332,9 @@ CREATE INDEX IF NOT EXISTS idx_clients_3pl_org_environment
   ON public.clients_3pl (organization_id, data_environment);
 CREATE INDEX IF NOT EXISTS idx_stock_ledger_org_environment_account
   ON public.stock_ledger (organization_id, data_environment, marketplace_account_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_payouts_org_environment_account
+  ON public.marketplace_payouts (organization_id, data_environment, marketplace_account_id);
+CREATE INDEX IF NOT EXISTS idx_financial_reconciliations_org_environment_account
+  ON public.financial_reconciliations (organization_id, data_environment, marketplace_account_id);
+CREATE INDEX IF NOT EXISTS idx_dropshipping_calculations_org_environment
+  ON public.dropshipping_calculations (organization_id, data_environment);
