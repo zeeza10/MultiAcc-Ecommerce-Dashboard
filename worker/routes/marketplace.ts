@@ -247,10 +247,10 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         .select('environment,client_id_masked,credential_version').eq('provider', 'EBAY');
       for (const row of credentials || []) configured.add(row.environment);
     }
-    const integrationReady = Boolean(env.SUPABASE_SECRET_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.has('SANDBOX'));
+    const integrationReady = Boolean(env.SUPABASE_SECRET_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.size > 0);
     return json({
       integrationReady,
-      integrationMessage: integrationReady ? 'eBay Sandbox credentials are securely configured. Add a non-demo seller account and connect it with eBay OAuth.' : 'Configure eBay Sandbox credentials and the Worker encryption key before connecting seller accounts.',
+      integrationMessage: integrationReady ? 'eBay Sandbox credentials are securely configured. Add a non-demo seller account and connect it with eBay OAuth.' : 'Configure credentials for the required eBay environment and the Worker encryption key before connecting seller accounts.',
       configuredEnvironments: ['SANDBOX','PRODUCTION'].map(environment => ({ environment, configured: configured.has(environment) })),
       productionOAuthEnabled: env.EBAY_PRODUCTION_OAUTH_ENABLED === 'true',
       accounts: (accountsResult.data || []).map(row => ({
@@ -310,9 +310,19 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
   if (path === '/ebay/exceptions' && request.method === 'GET') {
-    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_exceptions')
+    const accountId = new URL(request.url).searchParams.get('accountId');
+    let query = auth.repositoryContext.supabase.from('marketplace_exceptions')
       .select('id,marketplace_account_id,exception_type,source,reference_id,details,status,created_at,resolved_at,resolution_note')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false }).limit(250);
+      .eq('organization_id', auth.organizationId);
+    if (accountId) {
+      const { data: account, error: accountError } = await auth.repositoryContext.supabase
+        .from('marketplace_accounts').select('id')
+        .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
+      query = query.eq('marketplace_account_id', accountId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(250);
     if (error) throw new Error('Marketplace exceptions could not be loaded.');
     return json({ exceptions: (data || []).map(row => ({
       id: row.id, marketplaceAccountId: row.marketplace_account_id, type: row.exception_type,
