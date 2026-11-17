@@ -22,10 +22,11 @@ import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
+import { API_LOADING_EVENT } from './services/loadingEvents';
 import { useAuth } from './context/AuthContext';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
 
-import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink } from 'lucide-react';
+import { ShieldAlert, ArrowRight, CheckCircle, Search, ExternalLink, LoaderCircle } from 'lucide-react';
 
 const DEFAULT_CONFIG: SystemConfig = {
   baseCurrency: 'GBP',
@@ -71,6 +72,7 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tabFilterState, setTabFilterState] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [pendingApiRequests, setPendingApiRequests] = useState(0);
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchResults, setSearchResults] = useState<{ orders: Order[]; products: Product[] }>({
     orders: [],
@@ -87,6 +89,18 @@ export default function App() {
 
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
+
+  // One shared loading signal covers API activity across every module and tab.
+  // A counter (rather than a boolean) keeps parallel requests from hiding the
+  // indicator before the slowest request has completed.
+  useEffect(() => {
+    const handleApiLoading = (event: Event) => {
+      const delta = (event as CustomEvent<{ delta?: number }>).detail?.delta ?? 0;
+      setPendingApiRequests((current) => Math.max(0, current + delta));
+    };
+    window.addEventListener(API_LOADING_EVENT, handleApiLoading);
+    return () => window.removeEventListener(API_LOADING_EVENT, handleApiLoading);
+  }, []);
 
   // Persist navigation context per organization so a resumed browser session
   // returns to the same module and marketplace store.
@@ -252,6 +266,19 @@ export default function App() {
         onOpenNavigation={() => setIsMobileSidebarOpen(true)}
       />
 
+
+      {pendingApiRequests > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="fixed right-5 top-[5.25rem] z-[60] flex items-center gap-2 rounded-full border border-indigo-100 bg-white/95 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-lg shadow-slate-900/10 backdrop-blur-sm"
+        >
+          <LoaderCircle className="h-4 w-4 animate-spin text-indigo-600" aria-hidden="true" />
+          <span>Loading data…</span>
+          <span className="sr-only">{pendingApiRequests} requests in progress</span>
+        </div>
+      )}
 
       {/* Global Search Results Overlay (FR-SRCH-01) */}
       {globalSearch.trim() && (

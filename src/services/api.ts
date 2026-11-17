@@ -27,6 +27,8 @@ import {
 
 
 import { supabase } from '../lib/supabase';
+import { notifyApiLoading } from './loadingEvents';
+
 
 async function getVerifiedAccessToken(): Promise<string> {
   const { data, error } = await supabase.auth.getSession();
@@ -36,6 +38,8 @@ async function getVerifiedAccessToken(): Promise<string> {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  notifyApiLoading(1);
+  try {
   const accessToken = await getVerifiedAccessToken();
 
   const headers = new Headers(options.headers || {});
@@ -56,9 +60,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new Error('The authenticated API service is unavailable. Demo/local fallback is disabled.');
   }
   return payload as T;
+  } finally {
+    notifyApiLoading(-1);
+  }
 }
 
 async function requestBlob(endpoint: string): Promise<Blob> {
+  notifyApiLoading(1);
+  try {
   const accessToken = await getVerifiedAccessToken();
   const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
   const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
@@ -72,6 +81,9 @@ async function requestBlob(endpoint: string): Promise<Blob> {
     throw new Error('The report export did not return a CSV file.');
   }
   return response.blob();
+  } finally {
+    notifyApiLoading(-1);
+  }
 }
 
 export const api = {
