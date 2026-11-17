@@ -20,6 +20,7 @@ import { Supplier, PurchaseOrder, ReturnOrder, Order, User, SystemConfig, Produc
 interface BuyingReturnsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultSubTab?: 'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS';
 }
 
@@ -28,6 +29,7 @@ const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('
 export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   currentUser,
   config,
+  selectedStoreId,
   defaultSubTab = 'POS',
 }) => {
   const [subTab, setSubTab] = useState<'SUPPLIERS' | 'POS' | 'RETURNS' | 'CUSTOMERS'>(defaultSubTab);
@@ -68,7 +70,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -76,8 +78,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
         api.getSuppliers(),
         api.getPurchaseOrders(),
-        api.getReturns(),
-        api.getOrders(),
+        api.getReturns(selectedStoreId),
+        api.getOrders({ accountId: selectedStoreId }),
         api.getProducts(),
       ]);
       setSuppliers(supRes.suppliers || []);
