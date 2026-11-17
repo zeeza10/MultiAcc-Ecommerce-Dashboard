@@ -82,7 +82,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
   const runBillingPreview = async (clientId: string) => {
     setSelectedClientId(clientId);
     try {
-      const res = await api.getBillingPreview(clientId);
+      const res = await api.getBillingPreview(clientId, selectedStoreId);
       setBillingPreview(res);
     } catch (err) {
       console.error('Billing preview failed:', err);
