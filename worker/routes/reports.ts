@@ -163,8 +163,9 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=orders.map((o:any)=>{const lines=items.filter((x:any)=>x.order_id===o.id);const cogs=lines.reduce((s:number,l:any)=>s+Number(l.quantity||0)*Number(pmap.get(l.product_id)?.cost_price_minor||0),0);const shipping=Number(o.shipping_cost_minor||0);const fees=0;return {order:o.order_number,revenue:money(o.total_minor,o.currency||'GBP'),cogs:money(cogs,o.currency||'GBP'),fees:money(fees,o.currency||'GBP'),shipping:money(shipping,o.currency||'GBP'),grossProfit:money(Number(o.total_minor)-cogs-fees-shipping,o.currency||'GBP')};});
   report=result(id,{orders:data.length,revenue:money(orders.reduce((s:number,x:any)=>s+Number(x.total_minor||0),0)),expenses:money(allocatedExpenseTotal)},['Order','Revenue','COGS','Marketplace Fee','Postage Cost','Gross Profit'],data);
  }else if(id==='R-14'){
-  let [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor,data_environment'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status,data_environment'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at,marketplace_account_id')]);
+  let [lines,accounts,entries,recs]=await Promise.all([rows(auth,'journal_entry_lines','journal_entry_id,account_id,debit_minor,credit_minor,data_environment'),rows(auth,'chart_of_accounts','id,account_code,account_name'),rows(auth,'journal_entries','id,entry_number,entry_date,source_type,status,data_environment'),rows(auth,'financial_reconciliations','period,status,difference_minor,last_reconciled_at,marketplace_account_id,data_environment')]);
   entries=entries.filter((x:any)=>x.data_environment===dataEnvironment);
+  recs=recs.filter((x:any)=>x.data_environment===dataEnvironment);
   const visibleEntryIds=new Set(entries.map((x:any)=>x.id));
   lines=lines.filter((x:any)=>x.data_environment===dataEnvironment && visibleEntryIds.has(x.journal_entry_id));
   if(accountId&&accountId!=='ALL'){
