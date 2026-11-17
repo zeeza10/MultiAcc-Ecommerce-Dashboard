@@ -251,6 +251,7 @@ export class SupabasePurchasingRepository {
   async createSupplier(input: {
     name: string; code: string; contactName?: string; email?: string; phone?: string;
     paymentTermsDays: number; currency: string; leadTimeDays: number;
+    dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   }): Promise<Supplier> {
     const name = input.name.trim();
     const code = input.code.trim().toUpperCase();
@@ -278,6 +279,7 @@ export class SupabasePurchasingRepository {
         currency,
         lead_time_days: input.leadTimeDays,
         is_active: true,
+        data_environment: input.dataEnvironment || 'SANDBOX',
       })
       .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
       .single();
