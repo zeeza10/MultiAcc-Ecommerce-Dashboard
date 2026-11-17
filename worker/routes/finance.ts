@@ -243,11 +243,12 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/expenses' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace expense records are not available to client users.' }, 403);
     let query = auth.repositoryContext.supabase
       .from('expenses')
       .select('id,expense_number,category,supplier_name,expense_date,amount_minor,vat_minor,currency,allocated_to,status,approved_by,note')
-      .eq('organization_id', auth.organizationId)
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment)
       .order('expense_date', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') {
@@ -269,12 +270,13 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/finance/ledger' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Workspace general ledger is not available to client users.' }, 403);
     let query = auth.repositoryContext.supabase
       .from('journal_entries')
       .select('id,source_type,source_id,description,created_at,status')
       .eq('organization_id', auth.organizationId)
-      .eq('status', 'POSTED')
+      .eq('status', 'POSTED').eq('data_environment', dataEnvironment)
       .order('created_at', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') {
@@ -292,7 +294,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const { data: lines, error: lineError } = entryIds.length
       ? await auth.repositoryContext.supabase.from('journal_entry_lines')
           .select('id,journal_entry_id,account_id,debit_minor,credit_minor,description')
-          .eq('organization_id', auth.organizationId).in('journal_entry_id', entryIds)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('journal_entry_id', entryIds)
       : { data: [], error: null };
     if (lineError) throw lineError;
     const accountIds = [...new Set((lines || []).map(row => row.account_id))];
@@ -316,13 +318,14 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/payouts' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view')) {
       return json({ error: 'Marketplace account access is required to view payout account details.' }, 403);
     }
     let query = auth.repositoryContext.supabase
       .from('marketplace_payouts')
       .select('id,payout_reference,marketplace_account_id,total_sales_minor,total_fees_minor,refunds_minor,shipping_adjustments_minor,other_adjustments_minor,net_payout_minor,currency,payout_date,status,transaction_id,bank_deposit_status,bank_reference,notes')
-      .eq('organization_id', auth.organizationId).order('payout_date', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('payout_date', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') query = query.eq('marketplace_account_id', accountId);
     const { data: payouts, error } = await query;
@@ -336,7 +339,7 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
     const payoutIds = (payouts || []).map(row => row.id);
     const { data: payoutOrders, error: orderError } = payoutIds.length
       ? await auth.repositoryContext.supabase.from('payout_orders').select('payout_id,order_id')
-          .eq('organization_id', auth.organizationId).in('payout_id', payoutIds)
+          .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('payout_id', payoutIds)
       : { data: [], error: null };
     if (orderError) throw orderError;
     const accountNames = new Map((accounts || []).map(row => [row.id, row.name]));
@@ -365,13 +368,14 @@ export async function handleFinanceRoute(path: string, request: Request, url: UR
   }
 
   if (path === '/reconciliation' && request.method === 'GET') {
+    const dataEnvironment = await getDataEnvironment(auth, url);
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view')) {
       return json({ error: 'Marketplace account access is required to view reconciliation account details.' }, 403);
     }
     let query = auth.repositoryContext.supabase
       .from('financial_reconciliations')
       .select('id,period,marketplace_account_id,expected_payout_minor,actual_payout_minor,difference_minor,unmatched_transactions_count,status,last_reconciled_at,reconciled_by,audit_notes,breakdown')
-      .eq('organization_id', auth.organizationId).order('created_at', { ascending: false });
+      .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).order('created_at', { ascending: false });
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') query = query.eq('marketplace_account_id', accountId);
     const { data: reconciliations, error } = await query;
