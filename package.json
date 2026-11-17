@@ -15,7 +15,8 @@
     "cf:dry-run": "wrangler deploy --dry-run",
     "cf:typegen": "wrangler types",
     "test": "tsx --test worker/*.test.ts",
-    "check:migrations": "node scripts/verify-migrations.mjs"
+    "check:migrations": "node scripts/verify-migrations.mjs",
+    "check:demo-finance": "node scripts/verify-demo-finance-seed.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
