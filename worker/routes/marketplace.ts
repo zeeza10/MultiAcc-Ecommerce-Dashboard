@@ -26,7 +26,7 @@ function isPlatformAdmin(auth: AuthContext, env: WorkerEnv): boolean {
 function cleanCredential(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > maxLength || /[\\u0000-\\u001f\\u007f]/.test(trimmed)) return null;
+  if (!trimmed || trimmed.length > maxLength || /[\u0000-\u001f\u007f]/.test(trimmed)) return null;
   return trimmed;
 }
 
