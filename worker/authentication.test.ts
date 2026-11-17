@@ -11,6 +11,8 @@ type FakeOptions = {
   profileError?: boolean;
   membership?: boolean;
   membershipError?: boolean;
+  multipleMemberships?: boolean;
+  queryThrows?: string;
   permissionsError?: boolean;
   overridesError?: boolean;
   authError?: { status?: number } | null;
@@ -42,13 +44,18 @@ function fakeSupabaseFactory(options: FakeOptions = {}): typeof createClient {
           if (table === 'organization_members') {
             const selectedOrg = filters.organization_id;
             const found = options.membership !== false && (!selectedOrg || selectedOrg === 'org-1');
+            const membershipRows = found ? [{
+              organization_id: 'org-1',
+              role_id: 'role-1',
+              client_3pl_id: null,
+              roles: { code: options.roleCode || 'FINANCE_USER' },
+            }] : [];
+            if (!selectedOrg && options.multipleMemberships) membershipRows.push({
+              organization_id: 'org-2', role_id: 'role-2', client_3pl_id: null,
+              roles: { code: options.roleCode || 'FINANCE_USER' },
+            });
             return {
-              data: options.membershipError ? null : found ? [{
-                organization_id: 'org-1',
-                role_id: 'role-1',
-                client_3pl_id: null,
-                roles: { code: options.roleCode || 'FINANCE_USER' },
-              }] : [],
+              data: options.membershipError ? null : membershipRows,
               error: options.membershipError ? { message: 'database unavailable' } : null,
             };
           }
@@ -71,9 +78,14 @@ function fakeSupabaseFactory(options: FakeOptions = {}): typeof createClient {
           eq: (column: string, value: unknown) => { filters[column] = value; return query; },
           order: () => query,
           limit: () => query,
-          maybeSingle: async () => result(),
+          maybeSingle: async () => {
+            if (options.queryThrows === table) throw new Error('database transport failed');
+            return result();
+          },
           then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
-            Promise.resolve(result()).then(resolve, reject),
+            options.queryThrows === table
+              ? Promise.reject(new Error('database transport failed')).then(resolve, reject)
+              : Promise.resolve(result()).then(resolve, reject),
         };
         return query;
       },
@@ -107,8 +119,14 @@ describe('Worker authentication and authorization boundary', () => {
   });
 
   it('rejects an inactive organization membership', async () => {
+    // The Worker filters is_active=true, so an inactive row must resolve as no active membership.
     const response = await handleApiRequest(request('/auth/me'), env, fakeSupabaseFactory({ membership: false }));
     assert.equal(response.status, 403);
+  });
+
+  it('requires an explicit workspace when the account has multiple active memberships', async () => {
+    const response = await handleApiRequest(request('/auth/me'), env, fakeSupabaseFactory({ multipleMemberships: true }));
+    assert.equal(response.status, 409);
   });
 
   it('rejects invalid or expired JWTs at the backend', async () => {
@@ -138,6 +156,11 @@ describe('Worker authentication and authorization boundary', () => {
     assert.equal(response.status, 503);
   });
 
+  it('handles thrown database transport errors without granting access', async () => {
+    const response = await handleApiRequest(request('/auth/me'), env, fakeSupabaseFactory({ queryThrows: 'organization_members' }));
+    assert.equal(response.status, 503);
+  });
+
   it('rejects attempts to select an organization where the user has no membership', async () => {
     const response = await handleApiRequest(request('/auth/me', { 'X-Organization-Id': 'org-2' }), env, fakeSupabaseFactory());
     assert.equal(response.status, 403);
@@ -148,6 +171,15 @@ describe('Worker authentication and authorization boundary', () => {
       request('/products', { 'X-Role': 'SUPER_ADMIN', 'X-Permissions': '*' }),
       env,
       fakeSupabaseFactory({ roleCode: 'FINANCE_USER', permissions: [] }),
+    );
+    assert.equal(response.status, 403);
+  });
+
+  it('blocks ordinary employees from Super Admin access-management APIs even if the UI sends a forged role', async () => {
+    const response = await handleApiRequest(
+      request('/access/overview', { 'X-Role': 'SUPER_ADMIN', 'X-Permissions': '*' }),
+      env,
+      fakeSupabaseFactory({ roleCode: 'FINANCE_USER', permissions: ['users.manage'] }),
     );
     assert.equal(response.status, 403);
   });
