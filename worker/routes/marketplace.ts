@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
 import { json } from '../http';
+import { isPlatformAdminUser } from '../platform-admin';
 import {
   createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials,
   hashEbayState, ebayAuthUrl, ebayBaseUrl, sanitizeEbayError,
@@ -18,8 +19,15 @@ function isEnvironment(value: unknown): value is EbayEnvironment {
   return value === 'SANDBOX' || value === 'PRODUCTION';
 }
 
-function isPlatformAdmin(auth: AuthContext): boolean {
-  return auth.user.role === 'SUPER_ADMIN' || auth.permissions.has('*');
+function isPlatformAdmin(auth: AuthContext, env: WorkerEnv): boolean {
+  return isPlatformAdminUser(auth.user.id, auth.user.role, env.PLATFORM_SUPER_ADMIN_USER_IDS);
+}
+
+function cleanCredential(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength || /[\\u0000-\\u001f\\u007f]/.test(trimmed)) return null;
+  return trimmed;
 }
 
 function randomState(): string {
@@ -31,7 +39,7 @@ function randomState(): string {
 
 async function handleIntegrationConfig(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
   if (path !== '/ebay/integration/config') return null;
-  if (!isPlatformAdmin(auth)) return json({ error: 'Only a Super Admin can manage platform eBay application credentials.' }, 403);
+  if (!isPlatformAdmin(auth, env)) return json({ error: 'Platform owner authorization is required.' }, 403);
   const admin = createServiceClient(env);
 
   if (request.method === 'GET') {
@@ -51,17 +59,43 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
   }
 
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
-  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-  const environment = body?.environment;
-  const clientId = typeof body?.clientId === 'string' ? body.clientId.trim() : '';
-  const clientSecret = typeof body?.clientSecret === 'string' ? body.clientSecret.trim() : '';
-  const ruName = typeof body?.ruName === 'string' ? body.ruName.trim() : '';
-  const expectedVersion = Number(body?.expectedVersion);
-  if (!isEnvironment(environment) || !clientId || !clientSecret || !ruName || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
-    return json({ error: 'Environment, Client ID, Client Secret, RuName and current credential version are required.' }, 400);
+  if (auth.assuranceLevel !== 'aal2') {
+    return json({ error: 'Complete an authenticator MFA verification before changing platform credentials.' }, 403);
   }
-  if (clientId.length > 512 || clientSecret.length > 2048 || ruName.length > 256) {
-    return json({ error: 'One or more eBay credential fields exceed the allowed length.' }, 400);
+  const origin = request.headers.get('Origin');
+  const requestOrigin = new URL(request.url).origin;
+  if (!origin || (origin !== requestOrigin && origin !== env.ALLOWED_ORIGIN)) {
+    return json({ error: 'A same-origin browser request is required for credential changes.' }, 403);
+  }
+  const mediaType = (request.headers.get('Content-Type') || '').split(';', 1)[0].trim().toLowerCase();
+  if (mediaType !== 'application/json') return json({ error: 'Content-Type must be application/json.' }, 415);
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return json({ error: 'A JSON object is required.' }, 400);
+    }
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return json({ error: 'A valid JSON request is required.' }, 400);
+  }
+  if (Object.keys(body).some(key => !['environment', 'clientId', 'clientSecret', 'ruName', 'expectedVersion'].includes(key))) {
+    return json({ error: 'Unexpected credential fields were supplied.' }, 400);
+  }
+  const environment = body.environment;
+  if (!isEnvironment(environment)) return json({ error: 'A valid eBay environment is required.' }, 400);
+  if (typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 0) {
+    return json({ error: 'A valid expected credential version is required. Refresh the page and try again.' }, 409);
+  }
+  const expectedVersion = body.expectedVersion;
+  const clientId = cleanCredential(body.clientId, 512);
+  const clientSecret = cleanCredential(body.clientSecret, 2048);
+  const ruName = cleanCredential(body.ruName, 256);
+  if (!clientId || !clientSecret || !ruName) {
+    return json({ error: 'Client ID, Client Secret and RuName are required. Existing credentials remain unchanged.' }, 400);
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(clientId) || !/^[A-Za-z0-9_-]+$/.test(ruName)) {
+    return json({ error: 'The eBay Client ID or RuName format is invalid.' }, 400);
   }
   const [clientIdCiphertext, clientSecretCiphertext, ruNameCiphertext] = await Promise.all([
     encryptEbayValue(clientId, env), encryptEbayValue(clientSecret, env), encryptEbayValue(ruName, env),
