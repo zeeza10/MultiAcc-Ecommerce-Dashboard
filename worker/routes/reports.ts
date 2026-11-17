@@ -70,7 +70,6 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
    for(const p of products){balances.set(p.id,{product:p,onHand:0,reserved:0,incoming:0,damaged:0,quarantined:0,missing:0});}
    for(const l of ledger){const b=balances.get(l.product_id);if(!b)continue;const state=String(l.stock_state).toLowerCase();if(state==='on_hand')b.onHand+=Number(l.quantity_delta);else if(state==='reserved')b.reserved+=Number(l.quantity_delta);else if(state==='incoming')b.incoming+=Number(l.quantity_delta);else if(state==='damaged')b.damaged+=Number(l.quantity_delta);else if(state==='quarantined')b.quarantined+=Number(l.quantity_delta);else if(state==='missing')b.missing+=Number(l.quantity_delta);}
   }
-  const dataEnvironment = await getDataEnvironment(auth, accountId);
   let items=[...balances.values()].filter((x:any)=>x.product.data_environment===dataEnvironment);
   if(skuFilter)items=items.filter(x=>String(x.product.sku).toUpperCase().includes(skuFilter));
   const data=items.map(x=>{const p=x.product,available=Math.max(0,x.onHand-x.reserved),value=x.onHand*Number(p.cost_price_minor||0);return {sku:p.sku,product:p.name,owner:p.owner_type,onHand:x.onHand,reserved:x.reserved,available,incoming:x.incoming,damaged:x.damaged,quarantined:x.quarantined,reorderLevel:p.reorder_level,unitCost:money(p.cost_price_minor),inventoryValue:money(value),status:available<=Number(p.reorder_level||0)?'LOW_STOCK':'HEALTHY'};});
@@ -145,7 +144,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   report=result(id,{receivables:invoices.length,payables:pos.length},['Type','Reference','Party','Balance','Due Date','Status'],data);
  }else if(id==='R-13'){
   let [orders,items,products,expenses]=await Promise.all([rows(auth,'orders','id,order_number,total_minor,currency,shipping_cost_minor,created_at,marketplace_account_id,data_environment','created_at',url),rows(auth,'order_items','order_id,product_id,quantity,data_environment'),rows(auth,'products','id,cost_price_minor,sku,data_environment'),rows(auth,'expenses','id,category,amount_minor,expense_date,data_environment','expense_date',url)]);
-  products=products.filter((x:any)=>x.external_id.data_environment===dataEnvironment);
+  products=products.filter((x:any)=>x.data_environment===dataEnvironment);
   expenses=expenses.filter((x:any)=>x.data_environment===dataEnvironment);
   let allocatedExpenseTotal=0;
   if(accountId&&accountId!=='ALL'){
