@@ -144,10 +144,10 @@ export const api = {
     }),
 
   // Phase 2: Purchasing & Returns
-  getSuppliers: () => request<{ suppliers: Supplier[] }>('/suppliers'),
+  getSuppliers: (accountId?: string) => request<{ suppliers: Supplier[] }>(`/suppliers${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   createSupplier: (payload: { name: string; code: string; contactName?: string; email?: string; phone?: string; paymentTermsDays: number; currency: string; leadTimeDays: number }) =>
     request<{ supplier: Supplier }>('/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
-  getPurchaseOrders: () => request<{ purchaseOrders: PurchaseOrder[]; receipts: any[] }>('/purchase-orders'),
+  getPurchaseOrders: (accountId?: string) => request<{ purchaseOrders: PurchaseOrder[]; receipts: any[] }>(`/purchase-orders${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   createPurchaseOrder: (payload: { supplierId: string; expectedDate?: string; notes?: string; taxMinor: number; lines: Array<{ productId: string; orderedQty: number; unitCostMinor: number }> }, idempotencyKey: string) =>
     request<{ purchaseOrder: PurchaseOrder }>('/purchase-orders', {
       method: 'POST',
