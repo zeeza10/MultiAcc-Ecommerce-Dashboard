@@ -189,7 +189,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
 
     const orderPurchasingResponse = await handleOrderPurchasingRoute(path, request, url, auth);
     if (orderPurchasingResponse) return orderPurchasingResponse;
-    const returnResponse = await handleReturnRoute(path, request, auth);
+    const returnResponse = await handleReturnRoute(path, request, url, auth);
     if (returnResponse) return returnResponse;
 
     const fulfilmentResponse = await handleFulfilmentRoute(path, request, auth);
