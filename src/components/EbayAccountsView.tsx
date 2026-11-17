@@ -61,7 +61,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     setLoading(true);
     try {
       const [accRes, excRes, prodRes] = await Promise.all([
-        api.getEbayAccounts(),
+        api.getEbayAccounts(selectedStoreId),
         api.getExceptions(selectedStoreId),
         api.getProducts(),
       ]);
