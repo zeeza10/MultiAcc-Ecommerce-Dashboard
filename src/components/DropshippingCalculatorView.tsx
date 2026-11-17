@@ -57,7 +57,7 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
     try {
       const [prodRes, calcRes, configRes] = await Promise.all([
         api.getProducts(selectedStoreId),
-        api.getDropshippingCalculations(),
+        api.getDropshippingCalculations(selectedStoreId),
         api.getConfig(),
       ]);
       setProducts(prodRes.products || []);
