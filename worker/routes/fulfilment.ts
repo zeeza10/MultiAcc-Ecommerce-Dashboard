@@ -171,6 +171,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
   }
 
   if (path === '/3pl/storage-snapshots' && request.method === 'GET') {
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (visibleClientIds.length === 0) return json({ snapshots: [] });
     let snapshotsQuery = auth.repositoryContext.supabase.from('storage_snapshots')
       .select('id,client_3pl_id,snapshot_date,occupied_pallets,occupied_shelves,occupied_bins,estimated_cost_minor,currency')
       .eq('organization_id', auth.organizationId).in('client_3pl_id', visibleClientIds).order('snapshot_date', { ascending: false });
