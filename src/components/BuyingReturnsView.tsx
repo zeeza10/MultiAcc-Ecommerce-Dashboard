@@ -76,11 +76,11 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     setLoading(true);
     try {
       const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
-        api.getSuppliers(),
-        api.getPurchaseOrders(),
+        api.getSuppliers(selectedStoreId),
+        api.getPurchaseOrders(selectedStoreId),
         api.getReturns(selectedStoreId),
         api.getOrders({ accountId: selectedStoreId }),
-        api.getProducts(),
+        api.getProducts(selectedStoreId),
       ]);
       setSuppliers(supRes.suppliers || []);
       setPurchaseOrders(poRes.purchaseOrders || []);
