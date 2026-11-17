@@ -20,7 +20,7 @@ import { handleEbayOAuthCallback } from './routes/marketplace';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
-async function authenticate(request: Request, env: WorkerEnv): Promise<AuthContext | Response> {
+async function authenticate(request: Request, env: WorkerEnv, createSupabaseClient: typeof createClient = createClient): Promise<AuthContext | Response> {
   const authorization = request.headers.get('Authorization') || '';
   const bearerMatch = authorization.match(/^Bearer\s+([^\s]+)$/i);
   const token = bearerMatch?.[1] || '';
@@ -32,7 +32,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
 
   let client: ReturnType<typeof createClient>;
   try {
-    client = createClient(url, key, {
+    client = createSupabaseClient(url, key, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
@@ -152,7 +152,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
 
 
 
-export async function handleApiRequest(request: Request, env: WorkerEnv): Promise<Response> {
+export async function handleApiRequest(request: Request, env: WorkerEnv, createSupabaseClient: typeof createClient = createClient): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/api/health' || url.pathname === '/api/v1/health') {
     return json({ success: true, message: 'MultiAcc Backend Worker is running', platform: 'Cloudflare Workers' });
@@ -170,7 +170,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv): Promis
     const limited = await enforceRateLimit(env.API_IP_RATE_LIMITER, `ip:${connectingIp}`, 'API request');
     if (limited) return limited;
   }
-  const auth = await authenticate(request, env);
+  const auth = await authenticate(request, env, createSupabaseClient);
   if (auth instanceof Response) return auth;
 
   const generalLimiter = request.method === 'GET'
