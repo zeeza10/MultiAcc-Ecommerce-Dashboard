@@ -22,20 +22,39 @@ const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FI
 
 async function authenticate(request: Request, env: WorkerEnv): Promise<AuthContext | Response> {
   const authorization = request.headers.get('Authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const bearerMatch = authorization.match(/^Bearer\s+([^\s]+)$/i);
+  const token = bearerMatch?.[1] || '';
   const url = env.SUPABASE_URL;
   const key = env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!token) return json({ error: 'A valid Supabase bearer token is required.' }, 401);
   if (!url || !key) return json({ error: 'Supabase API configuration is missing.' }, 503);
 
-  const client = createClient(url, key, {
+  let client: ReturnType<typeof createClient>;
+  try {
+    client = createClient(url, key, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+    });
+  } catch {
+    return json({ error: 'Authentication service is temporarily unavailable.' }, 503);
+  }
 
-  const { data: authData, error: authError } = await client.auth.getUser(token);
-  if (authError || !authData.user) return json({ error: 'Your session is invalid or expired. Please sign in again.' }, 401);
+  let authData;
+  let authError;
+  try {
+    const result = await client.auth.getUser(token);
+    authData = result.data;
+    authError = result.error;
+  } catch {
+    return json({ error: 'Authentication service is temporarily unavailable.' }, 503);
+  }
+  if (authError || !authData?.user) {
+    const status = (authError as { status?: number } | null)?.status;
+    return status === 401 || status === 403
+      ? json({ error: 'Your session is invalid or expired. Please sign in again.' }, 401)
+      : json({ error: 'Authentication service is temporarily unavailable.' }, 503);
+  }
 
   const { data: profile, error: profileError } = await client
     .from('profiles')
@@ -43,7 +62,8 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  if (profileError || !profile || !profile.is_active) {
+  if (profileError) return json({ error: 'Your account profile could not be verified. Please retry.' }, 503);
+  if (!profile || !profile.is_active) {
     return json({ error: 'Your account is inactive or its profile is unavailable.' }, 403);
   }
 
@@ -61,7 +81,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
   }
 
   const { data: memberships, error: membershipError } = await membershipQuery;
-  if (membershipError) return json({ error: 'Workspace membership could not be verified.' }, 403);
+  if (membershipError) return json({ error: 'Workspace membership could not be verified. Please retry.' }, 503);
   if (!memberships?.length) return json({ error: 'You are not an active member of the requested workspace.' }, 403);
   if (!requestedOrganizationId && memberships.length > 1) {
     return json({ error: 'Select an active workspace before making API requests.' }, 409);
@@ -79,7 +99,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     .from('role_permissions')
     .select('permissions(code)')
     .eq('role_id', membership.role_id);
-  if (permissionError) return json({ error: 'Workspace permissions could not be verified.' }, 403);
+  if (permissionError) return json({ error: 'Workspace permissions could not be verified. Please retry.' }, 503);
 
   const rolePermissionCodes = (permissionRows || []).map((row: any) => {
     const permission = row.permissions;
@@ -91,7 +111,7 @@ async function authenticate(request: Request, env: WorkerEnv): Promise<AuthConte
     .select('effect,permissions(code)')
     .eq('organization_id', membership.organization_id)
     .eq('user_id', authData.user.id);
-  if (overrideError) return json({ error: 'Individual workspace permissions could not be verified.' }, 403);
+  if (overrideError) return json({ error: 'Individual workspace permissions could not be verified. Please retry.' }, 503);
 
   const granted = (overrideRows || []).filter((row: any) => row.effect === 'GRANT').map((row: any) => {
     const relation = row.permissions;
