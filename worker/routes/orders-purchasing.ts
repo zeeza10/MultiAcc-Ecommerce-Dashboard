@@ -69,7 +69,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   }
 
   if (path === '/suppliers' && request.method === 'GET') {
-    const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers();
+    const suppliers = await new SupabasePurchasingRepository(auth.repositoryContext).listSuppliers(url.searchParams.get('accountId') || undefined);
     return json({ suppliers });
   }
 
@@ -120,8 +120,8 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   if (path === '/purchase-orders' && request.method === 'GET') {
     const repository = new SupabasePurchasingRepository(auth.repositoryContext);
     const [purchaseOrders, receipts] = await Promise.all([
-      repository.listPurchaseOrders(),
-      repository.listGoodsReceipts(),
+      repository.listPurchaseOrders(url.searchParams.get('accountId') || undefined),
+      repository.listGoodsReceipts(url.searchParams.get('accountId') || undefined),
     ]);
     return json({ purchaseOrders, receipts });
   }
