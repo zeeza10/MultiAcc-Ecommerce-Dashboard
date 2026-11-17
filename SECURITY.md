@@ -24,3 +24,11 @@ Do not include seller credentials, OAuth tokens, customer personal data, payment
 - Review dependency advisories and CodeQL/secret-scan results before merge.
 
 Maintainers will triage reports and coordinate remediation and disclosure. No response-time SLA is currently published.
+
+## Shared platform integration credentials
+
+- Workspace `SUPER_ADMIN` is not sufficient to read or rotate shared eBay Developer credentials.
+- Platform-owner access is restricted by the Worker deployment variable `PLATFORM_SUPER_ADMIN_USER_IDS`, containing comma-separated Supabase Auth user UUIDs. An absent or empty allowlist denies access.
+- Credential writes require a verified Supabase Auth `aal2` session (completed authenticator MFA), a same-origin browser request, JSON content type, strict field validation and optimistic credential-version matching.
+- Existing encrypted credentials are not re-encrypted or rotated automatically by an application deployment.
+- Keep the platform-owner allowlist limited to named, trusted operators and review it whenever platform ownership changes.
