@@ -235,9 +235,14 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       auth.repositoryContext.supabase.from('marketplace_accounts')
         .select('id,name,marketplace,seller_username,auth_status,environment,last_sync_at,last_sync_status,last_sync_message,token_expires_at,auto_sync_interval_minutes,is_demo')
         .eq('organization_id', auth.organizationId).order('created_at', { ascending: false }),
-      auth.repositoryContext.supabase.from('marketplace_sync_runs')
-        .select('id,marketplace_account_id,status,started_at,completed_at,orders_fetched,orders_imported,orders_skipped_duplicate,exceptions_raised,log_message')
-        .eq('organization_id', auth.organizationId).order('started_at', { ascending: false }).limit(10),
+      (() => {
+        let query = auth.repositoryContext.supabase.from('marketplace_sync_runs')
+          .select('id,marketplace_account_id,status,started_at,completed_at,orders_fetched,orders_imported,orders_skipped_duplicate,exceptions_raised,log_message')
+          .eq('organization_id', auth.organizationId);
+        const accountId = new URL(request.url).searchParams.get('accountId');
+        if (accountId) query = query.eq('marketplace_account_id', accountId);
+        return query.order('started_at', { ascending: false }).limit(10);
+      })(),
     ]);
     if (accountsResult.error || syncResult.error) throw new Error('Marketplace account data could not be loaded.');
     const configured = new Set<string>();
@@ -250,7 +255,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     const integrationReady = Boolean(env.SUPABASE_SECRET_KEY && env.EBAY_TOKEN_ENCRYPTION_KEY && configured.size > 0);
     return json({
       integrationReady,
-      integrationMessage: integrationReady ? 'eBay Sandbox credentials are securely configured. Add a non-demo seller account and connect it with eBay OAuth.' : 'Configure credentials for the required eBay environment and the Worker encryption key before connecting seller accounts.',
+      integrationMessage: integrationReady ? 'eBay application credentials are securely configured for at least one environment. Connect a seller account using its matching environment.' : 'Configure credentials for the required eBay environment and the Worker encryption key before connecting seller accounts.',
       configuredEnvironments: ['SANDBOX','PRODUCTION'].map(environment => ({ environment, configured: configured.has(environment) })),
       productionOAuthEnabled: env.EBAY_PRODUCTION_OAUTH_ENABLED === 'true',
       accounts: (accountsResult.data || []).map(row => ({
