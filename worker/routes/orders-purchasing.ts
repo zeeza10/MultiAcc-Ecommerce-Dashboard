@@ -57,6 +57,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
   if (path === '/orders' && request.method === 'POST') {
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create workspace orders.' }, 403);
     const body = await request.json() as Record<string, unknown>;
+    body.dataEnvironment = await resolveDataEnvironment(auth, url);
     const order = await new SupabaseOrderRepository(auth.repositoryContext).createOrder(body);
     return json({ order }, 201);
   }
