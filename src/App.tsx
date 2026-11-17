@@ -104,28 +104,27 @@ export default function App() {
     setLoading(true);
     try {
       const canViewMarketplace = permissions.includes('*') || permissions.includes('marketplace.view');
-      const [cfgRes, notifRes, excRes, accountsRes] = await Promise.all([
-        api.getConfig(), api.getNotifications(),
-        canViewMarketplace ? api.getExceptions() : Promise.resolve({ exceptions: [] }),
+      const [cfgRes, notifRes, accountsRes] = await Promise.all([
+        api.getConfig(),
+        api.getNotifications(),
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
+      const accounts = accountsRes.accounts || [];
+      const preferredAccount = accounts.find((account) => account.isDemo)
+        || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
+        || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
+      const activeAccountId = selectedStoreId !== 'ALL' ? selectedStoreId : preferredAccount?.id;
       setConfig(cfgRes.config);
       setConfigLoaded(true);
       setInitError('');
       setNotifications(notifRes.notifications);
-      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
-      const accounts = accountsRes.accounts || [];
       setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
-      setSelectedStoreId((current) => {
-        if (current !== 'ALL' || accounts.length === 0) return current;
-        // Keep the client-presentation workspace as the initial view during the demo phase.
-        // Users can explicitly switch to a real Sandbox or Production seller account.
-        const preferredAccount = accounts.find((account) => account.isDemo)
-          || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
-          || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
-        return preferredAccount?.id || current;
-      });
+      if (selectedStoreId === 'ALL' && preferredAccount) setSelectedStoreId(preferredAccount.id);
+      const excRes = canViewMarketplace && activeAccountId
+        ? await api.getExceptions(activeAccountId)
+        : { exceptions: [] };
+      setExceptionsCount(excRes.exceptions.filter((e) => e.status === 'PENDING').length);
     } catch (err: any) {
       console.error('Failed to initialize app:', err);
       setInitError(err.message || 'Workspace data could not be loaded.');
@@ -160,7 +159,7 @@ export default function App() {
       const [notifRes, excRes] = await Promise.all([
         api.getNotifications(),
         permissions.includes('*') || permissions.includes('marketplace.view')
-          ? api.getExceptions()
+          ? api.getExceptions(selectedAccount.id)
           : Promise.resolve({ exceptions: [] }),
       ]);
       setNotifications(notifRes.notifications);
@@ -348,6 +347,7 @@ export default function App() {
             <EbayAccountsView
               currentUser={currentUser}
               config={config}
+              selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
             />
           )}
