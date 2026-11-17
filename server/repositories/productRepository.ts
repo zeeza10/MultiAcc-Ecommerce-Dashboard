@@ -24,7 +24,7 @@ export interface StockLedgerQuantityRow {
 }
 
 export interface ProductRepository {
-  listForOrganization(options?: { client3plId?: string; onlyClientProducts?: boolean }): Promise<Product[]>;
+  listForOrganization(options?: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' }): Promise<Product[]>;
   listStockLedgerQuantities(productIds: string[], client3plId?: string): Promise<StockLedgerQuantityRow[]>;
   createForOrganization(input: ProductCreateInput): Promise<Product>;
 }
