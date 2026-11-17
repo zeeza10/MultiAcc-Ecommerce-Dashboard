@@ -6,6 +6,7 @@ import { User, SystemConfig } from '../types';
 interface WarehouseLocationsViewProps {
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   defaultTab?: 'WAREHOUSES' | 'LOCATIONS';
 }
 
@@ -23,6 +24,7 @@ type LocationRow = {
 
 export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   currentUser,
+  selectedStoreId,
   defaultTab = 'WAREHOUSES',
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'WAREHOUSES' | 'LOCATIONS'>(defaultTab);
@@ -46,13 +48,13 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
 
   useEffect(() => {
     void loadData();
-  }, [currentUser.id]);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await api.getWarehouseLayout();
+      const result = await api.getWarehouseLayout(selectedStoreId);
       setWarehouses(result.warehouses || []);
       setLocations(result.locations || []);
       setLocationForm(current => ({
