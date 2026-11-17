@@ -72,7 +72,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser.id, selectedStoreId]);
 
   const loadData = async () => {
     setLoading(true);
