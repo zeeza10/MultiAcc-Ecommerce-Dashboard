@@ -32,6 +32,8 @@ ALTER TABLE public.shipping_jobs ADD COLUMN IF NOT EXISTS data_environment publi
 ALTER TABLE public.storage_snapshots ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE public.journal_entry_lines ADD COLUMN IF NOT EXISTS data_environment public.data_environment NOT NULL DEFAULT 'SANDBOX';
 
 -- Preserve the current client-presentation records as DEMO.
 UPDATE public.customers SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
@@ -46,6 +48,8 @@ UPDATE public.returns SET data_environment = 'DEMO' WHERE external_id LIKE 'demo
 UPDATE public.stock_adjustments SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
 UPDATE public.invoices SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
 UPDATE public.expenses SET data_environment = 'DEMO' WHERE external_id LIKE 'demo:%';
+UPDATE public.journal_entries SET data_environment = 'DEMO' WHERE source_type LIKE 'DEMO%';
+UPDATE public.journal_entry_lines l SET data_environment = e.data_environment FROM public.journal_entries e WHERE l.journal_entry_id = e.id;
 
 -- Marketplace orders always inherit the exact connected seller account environment.
 UPDATE public.orders o
@@ -59,6 +63,7 @@ WHERE o.marketplace_account_id = a.id;
 
 UPDATE public.order_items i SET data_environment = o.data_environment
 FROM public.orders o WHERE i.order_id = o.id;
+UPDATE public.journal_entry_lines l SET data_environment = e.data_environment FROM public.journal_entries e WHERE l.journal_entry_id = e.id;
 UPDATE public.returns r SET data_environment = o.data_environment
 FROM public.orders o WHERE r.order_id = o.id;
 UPDATE public.return_items i SET data_environment = r.data_environment
