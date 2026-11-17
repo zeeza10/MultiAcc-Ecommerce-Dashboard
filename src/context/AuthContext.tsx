@@ -212,8 +212,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // The verified identity and membership have not changed. Keep the current
         // workspace mounted and update only the session used by API requests.
         setSession(nextSession);
-        if (!nextSession) void loadAccount(null);
-        else if (!completedAccountLoadKey.current) void loadAccount(nextSession, true);
+        if (!nextSession) {
+          void loadAccount(null);
+        } else if (!completedAccountLoadKey.current) {
+          // Do not call Supabase data APIs while the auth callback holds its lock.
+          const eventGeneration = authEventGeneration.current;
+          window.setTimeout(() => {
+            if (alive && eventGeneration === authEventGeneration.current) {
+              void loadAccount(nextSession, true);
+            }
+          }, 0);
+        }
         return;
       }
 
