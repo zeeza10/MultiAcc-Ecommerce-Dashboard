@@ -3,18 +3,18 @@ import { json } from '../http';
 
 async function getVisibleClientIds(auth: AuthContext, url: URL): Promise<string[]> {
   const accountId = url.searchParams.get('accountId');
-  let includeDemo = false;
+  let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
   if (accountId && accountId !== 'ALL') {
     const { data: account, error: accountError } = await auth.repositoryContext.supabase
-      .from('marketplace_accounts').select('id,is_demo')
+      .from('marketplace_accounts').select('id,is_demo,environment')
       .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
     if (accountError) throw accountError;
     if (!account) throw new Error('The selected marketplace account was not found in this workspace.');
-    includeDemo = Boolean(account.is_demo);
+    dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   }
 
   let query = auth.repositoryContext.supabase.from('clients_3pl')
-    .select('id').eq('organization_id', auth.organizationId);
+    .select('id').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
   if (auth.user.role === 'CLIENT_USER') {
     if (!auth.repositoryContext.client3plId) return [];
     query = query.eq('id', auth.repositoryContext.client3plId);
@@ -66,6 +66,8 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
     if (auth.user.role === 'CLIENT_USER') return json({ error: 'Client users cannot create warehouse jobs.' }, 403);
     const body = await request.json() as Record<string, unknown>;
     const clientId = String(body.clientId || '');
+    const visibleClientIds = await getVisibleClientIds(auth, url);
+    if (!visibleClientIds.includes(clientId)) return json({ error: 'The selected 3PL client is not available in this account context.' }, 404);
     let orderId: string | null = null;
     if (body.orderNumber) {
       const { data: order, error: orderError } = await auth.repositoryContext.supabase.from('orders')
@@ -153,9 +155,15 @@ export async function handleFulfilmentRoute(path: string, request: Request, url:
         .select('is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
       includeDemo = Boolean(account?.is_demo);
     }
-    ratesQuery = includeDemo
-      ? ratesQuery.like('external_id', 'demo:%')
-      : ratesQuery.or('external_id.is.null,external_id.not.like.demo:%');
+    ratesQuery = ratesQuery.eq('data_environment', (await getVisibleClientIds(auth, url)).length >= 0
+      ? (url.searchParams.get('accountId') && url.searchParams.get('accountId') !== 'ALL'
+        ? await (async () => {
+            const { data } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+              .select('is_demo,environment').eq('id', url.searchParams.get('accountId')!).eq('organization_id', auth.organizationId).maybeSingle();
+            return data?.is_demo ? 'DEMO' : data?.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+          })()
+        : 'SANDBOX')
+      : 'SANDBOX');
     const [clientsResult, ratesResult] = await Promise.all([
       auth.repositoryContext.supabase.from('clients_3pl')
         .select('id,company_name,code,contact_email,contact_phone,billing_address,billing_period,rate_card_id,account_status,created_at')
