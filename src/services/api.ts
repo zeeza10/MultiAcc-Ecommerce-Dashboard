@@ -28,12 +28,18 @@ import {
 
 import { supabase } from '../lib/supabase';
 
+async function getVerifiedAccessToken(): Promise<string> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error('Your sign-in session could not be refreshed. Please sign in again.');
+  if (!data.session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+  return data.session.access_token;
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+  const accessToken = await getVerifiedAccessToken();
 
   const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${session.access_token}`);
+  headers.set('Authorization', `Bearer ${accessToken}`);
   const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
   if (organizationId) headers.set('X-Organization-Id', organizationId);
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
@@ -53,9 +59,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 async function requestBlob(endpoint: string): Promise<Blob> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
-  const headers = new Headers({ Authorization: `Bearer ${session.access_token}` });
+  const accessToken = await getVerifiedAccessToken();
+  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
   const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
   if (organizationId) headers.set('X-Organization-Id', organizationId);
   const response = await fetch(`/api/v1${endpoint}`, { headers });
