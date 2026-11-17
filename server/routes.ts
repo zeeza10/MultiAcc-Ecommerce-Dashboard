@@ -837,7 +837,7 @@ apiRouter.post('/purchase-orders/:id/receive', async (req: Request, res: Respons
 apiRouter.get('/warehouses', async (req: Request, res: Response) => {
   try {
     const repository = new SupabaseWarehouseRepository(getRepositoryContext(req));
-    res.json(await repository.getLayout());
+    res.json(await repository.getLayout(typeof req.query.accountId === 'string' ? req.query.accountId : undefined));
   } catch (error) {
     console.error('PostgreSQL warehouse layout failed:', error);
     res.status(500).json({ error: 'Warehouse layout could not be loaded from the workspace database.' });
