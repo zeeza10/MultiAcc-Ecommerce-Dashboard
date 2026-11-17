@@ -73,6 +73,13 @@ export default function App() {
   const [tabFilterState, setTabFilterState] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingApiRequests, setPendingApiRequests] = useState(0);
+  const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('oriafuture:theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchResults, setSearchResults] = useState<{ orders: Order[]; products: Product[] }>({
     orders: [],
@@ -89,6 +96,17 @@ export default function App() {
 
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
+
+  // Apply one application-wide theme at the document root and persist the choice.
+  useEffect(() => {
+    document.documentElement.dataset.theme = isDarkTheme ? 'dark' : 'light';
+    document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
+    try {
+      window.localStorage.setItem('oriafuture:theme', isDarkTheme ? 'dark' : 'light');
+    } catch {
+      // The theme remains active for this session when storage is unavailable.
+    }
+  }, [isDarkTheme]);
 
   // One shared loading signal covers API activity across every module and tab.
   // A counter (rather than a boolean) keeps parallel requests from hiding the
@@ -226,7 +244,12 @@ export default function App() {
   };
 
   if (loading && !configLoaded) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">Loading your Oria Future workspace…</div>;
+    return (
+      <div className="workspace-loading min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-600" role="status" aria-live="polite">
+        <LoaderCircle className="h-9 w-9 animate-spin text-indigo-600" aria-hidden="true" />
+        <span className="text-sm font-medium">Loading your Oria Future workspace…</span>
+      </div>
+    );
   }
   if (!configLoaded) {
     return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">
@@ -264,21 +287,10 @@ export default function App() {
         selectedStoreId={selectedStoreId}
         onStoreChange={setSelectedStoreId}
         onOpenNavigation={() => setIsMobileSidebarOpen(true)}
+        isDarkTheme={isDarkTheme}
+        onToggleTheme={() => setIsDarkTheme((current) => !current)}
       />
 
-
-      {pendingApiRequests > 0 && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className="fixed right-5 top-[5.25rem] z-[60] flex items-center gap-2 rounded-full border border-indigo-100 bg-white/95 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-lg shadow-slate-900/10 backdrop-blur-sm"
-        >
-          <LoaderCircle className="h-4 w-4 animate-spin text-indigo-600" aria-hidden="true" />
-          <span>Loading data…</span>
-          <span className="sr-only">{pendingApiRequests} requests in progress</span>
-        </div>
-      )}
 
       {/* Global Search Results Overlay (FR-SRCH-01) */}
       {globalSearch.trim() && (
@@ -376,7 +388,17 @@ export default function App() {
         />
 
         {/* Center Main View */}
-        <main className="flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
+        <main className="relative flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
+          {pendingApiRequests > 0 && (
+            <div className="workspace-loading-overlay" role="status" aria-live="polite" aria-atomic="true">
+              <div className="workspace-loading-card">
+                <LoaderCircle className="h-9 w-9 animate-spin text-indigo-600" aria-hidden="true" />
+                <span className="text-sm font-semibold">Loading data…</span>
+                <span className="text-xs text-slate-500">Please wait while this section updates</span>
+                <span className="sr-only">{pendingApiRequests} requests in progress</span>
+              </div>
+            </div>
+          )}
           {activeTab === 'dashboard' && (
             <DashboardView
               key={`dashboard:${selectedStoreId}`}
