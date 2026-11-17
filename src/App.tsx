@@ -119,9 +119,11 @@ export default function App() {
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
       setSelectedStoreId((current) => {
         if (current !== 'ALL' || accounts.length === 0) return current;
-        const preferredAccount = accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
-          || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION')
-          || accounts.find((account) => account.isDemo);
+        // Keep the client-presentation workspace as the initial view during the demo phase.
+        // Users can explicitly switch to a real Sandbox or Production seller account.
+        const preferredAccount = accounts.find((account) => account.isDemo)
+          || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
+          || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
         return preferredAccount?.id || current;
       });
     } catch (err: any) {
