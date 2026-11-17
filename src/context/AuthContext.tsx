@@ -171,6 +171,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRecoveryActive(true);
         setMode('reset');
       }
+
+      // A refreshed access token does not change identity or organization membership.
+      // Keep the mounted application tree intact so the current tab and UI state survive
+      // browser resume and Supabase's automatic token refresh.
+      if (event === 'TOKEN_REFRESHED') {
+        setSession(nextSession);
+        return;
+      }
+
       // Defer Supabase reads until the auth callback has released its internal lock.
       window.setTimeout(async () => {
         if (!alive) return;

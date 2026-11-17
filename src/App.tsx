@@ -39,15 +39,36 @@ const DEFAULT_CONFIG: SystemConfig = {
   autoSyncEnabled: true,
 };
 
+const NAV_ITEMS: NavItem[] = [
+  'dashboard', 'orders', 'ebay-accounts', 'customers', 'returns', 'products',
+  'inventory', 'adjustments', 'dropshipping', 'warehouse', 'locations',
+  'warehouse-services', 'suppliers', 'purchase-orders', '3pl-clients',
+  'fulfilment', 'shipping', 'storage', 'invoices', 'payments', 'expenses',
+  'payouts', 'reconciliation', 'profitability', 'reports', 'notifications',
+  'audit-log', 'settings', 'employee-access', 'integration-management',
+];
+
+const readWorkspacePreference = <T,>(organizationId: string, key: string, fallback: T): T => {
+  try {
+    const value = window.localStorage.getItem(`oriafuture:${organizationId}:${key}`);
+    return value === null ? fallback : JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 export default function App() {
-  const { user: authenticatedUser, signOut, organizationName, permissions } = useAuth();
+  const { user: authenticatedUser, organizationId, signOut, organizationName, permissions } = useAuth();
   const [currentUser, setCurrentUser] = useState<User>(authenticatedUser);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [initError, setInitError] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<NavItem>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavItem>(() => {
+    const saved = readWorkspacePreference<string>(organizationId, 'active-tab', 'dashboard');
+    return NAV_ITEMS.includes(saved as NavItem) ? saved as NavItem : 'dashboard';
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [tabFilterState, setTabFilterState] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -58,13 +79,25 @@ export default function App() {
   });
   const [showNewAdjustmentModal, setShowNewAdjustmentModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(() =>
+    readWorkspacePreference<string>(organizationId, 'selected-store', 'ALL')
+  );
   const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
   const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
+
+  // Persist navigation context per organization so a resumed browser session
+  // returns to the same module and marketplace store.
+  useEffect(() => {
+    window.localStorage.setItem(`oriafuture:${organizationId}:active-tab`, JSON.stringify(activeTab));
+  }, [activeTab, organizationId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(`oriafuture:${organizationId}:selected-store`, JSON.stringify(selectedStoreId));
+  }, [selectedStoreId, organizationId]);
 
   useEffect(() => {
     initApp();
@@ -113,14 +146,15 @@ export default function App() {
       const preferredAccount = accounts.find((account) => account.isDemo)
         || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
         || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
-      const activeAccountId = selectedStoreId !== 'ALL' ? selectedStoreId : preferredAccount?.id;
+      const savedAccountIsAvailable = accounts.some((account) => account.id === selectedStoreId);
+      const activeAccountId = savedAccountIsAvailable ? selectedStoreId : preferredAccount?.id;
       setConfig(cfgRes.config);
       setConfigLoaded(true);
       setInitError('');
       setNotifications(notifRes.notifications);
       setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
-      if (selectedStoreId === 'ALL' && preferredAccount) setSelectedStoreId(preferredAccount.id);
+      if (!savedAccountIsAvailable && preferredAccount) setSelectedStoreId(preferredAccount.id);
       const excRes = canViewMarketplace && activeAccountId
         ? await api.getExceptions(activeAccountId)
         : { exceptions: [] };

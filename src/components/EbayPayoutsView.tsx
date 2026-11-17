@@ -42,6 +42,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   const [balances, setBalances] = useState<any>(null);
   const [reconciliations, setReconciliations] = useState<FinancialReconciliation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const canManageFinance = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'FINANCE_USER';
 
   // Confirm Deposit Modal
@@ -59,10 +60,12 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [payoutRes, recRes, accountRes, ledgerRes, configRes] = await Promise.all([
         api.getPayouts(storeFilter), api.getReconciliations(storeFilter),
-        api.getEbayAccounts(), api.getFinancialLedger(), api.getConfig(),
+        // Resolve the ledger with the same store/environment filter as payouts and reconciliation.
+        api.getEbayAccounts(), api.getFinancialLedger(storeFilter), api.getConfig(),
       ]);
       setPayouts(payoutRes.payouts || []);
       setBalances(payoutRes.balances || null);
@@ -72,6 +75,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
       setCurrency(String(configRes.config?.baseCurrency || payoutRes.payouts?.[0]?.currency || 'GBP').toUpperCase());
     } catch (err) {
       console.error('Failed to load eBay payouts data:', err);
+      setLoadError(err instanceof Error ? err.message : 'Payout and reconciliation data could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -238,6 +242,16 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div>
+            <p className="font-semibold">Payout and reconciliation data could not be loaded</p>
+            <p className="mt-1 text-xs">{loadError}</p>
+          </div>
+          <button type="button" onClick={loadData} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-rose-100">Retry</button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-slate-200 dark:border-slate-800">

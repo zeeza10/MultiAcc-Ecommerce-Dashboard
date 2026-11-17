@@ -44,6 +44,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'BANK_TRANSFER' | 'CARD' | 'CASH' | 'OTHER'>('BANK_TRANSFER');
   const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const isClientUser = currentUser.role === 'CLIENT_USER';
   const formatMoney = (minor: number, currency = config.baseCurrency) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
 
@@ -58,6 +59,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   const loadFinanceData = async () => {
     setLoading(true);
+    setLoadError('');
     setInvoices([]);
     setPayments([]);
     setExpenses([]);
@@ -81,6 +83,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       }
     } catch (err) {
       console.error('Failed to load finance data:', err);
+      setLoadError(err instanceof Error ? err.message : 'Finance data could not be loaded. Check your connection and selected store.');
     } finally {
       setLoading(false);
     }
@@ -181,6 +184,16 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           )}
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div>
+            <p className="font-semibold">Finance data could not be loaded</p>
+            <p className="text-xs mt-1">{loadError}</p>
+          </div>
+          <button type="button" onClick={loadFinanceData} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-rose-100">Retry</button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center space-x-2 border-b border-gray-200 text-xs overflow-x-auto">
