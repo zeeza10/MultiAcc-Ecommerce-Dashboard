@@ -888,7 +888,7 @@ apiRouter.post('/warehouses/:id/locations', async (req: Request, res: Response) 
 apiRouter.get('/returns', async (req: Request, res: Response) => {
   try {
     const repository = new SupabaseReturnRepository(getRepositoryContext(req));
-    res.json({ returns: await repository.listReturns() });
+    res.json({ returns: await repository.listReturns(typeof req.query.accountId === 'string' ? req.query.accountId : undefined) });
   } catch (error) {
     console.error('PostgreSQL returns listing failed:', error);
     res.status(500).json({ error: 'Returns could not be loaded from the workspace database.' });
