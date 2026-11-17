@@ -44,7 +44,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     try {
       const [balRes, ledRes, clientRes] = await Promise.all([
         api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId),
-        api.get3PLClients().catch(() => ({ clients: [], rateCards: [] })),
+        api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setBalances(balRes.balances);
       setLedger(ledRes.ledger);
