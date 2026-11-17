@@ -146,7 +146,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         { id: 'audit-log', label: 'Audit Log', icon: History, phase: 'P1', permission: 'audit.view' },
         { id: 'employee-access', label: 'Employees & Permissions', icon: Users, phase: 'P1', permission: 'users.manage', allowedRoles: ['SUPER_ADMIN'] },
-        { id: 'integration-management', label: 'Integrations & API Management', icon: Sliders, phase: 'P1', allowedRoles: ['SUPER_ADMIN'] },
         { id: 'settings', label: 'Settings', icon: Settings, phase: 'P1', permission: 'settings.manage' },
       ],
     },

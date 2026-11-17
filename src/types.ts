@@ -89,5 +89,4 @@ export type NavItem =
   | 'notifications'
   | 'audit-log'
   | 'settings'
-  | 'employee-access'
-  | 'integration-management';
+  | 'employee-access';
