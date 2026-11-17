@@ -55,7 +55,7 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
    report=result(id,{orders:orders.length,statuses:grouped.size},['Status','Orders','Gross Value'],data);
   }
  }else if(['R-03','R-05','R-07'].includes(id)){
-  let [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
+  let [products,ledger]=await Promise.all([rows(auth,'products','id,sku,name,owner_type,client_3pl_id,cost_price_minor,low_stock_threshold,reorder_level,external_id'),rows(auth,'stock_ledger','product_id,quantity_delta,stock_state')]);
   const balances=new Map<string,any>();
   if(accountId&&accountId!=='ALL'){
    const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_inventory_allocations')
@@ -69,15 +69,18 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
    for(const p of products){balances.set(p.id,{product:p,onHand:0,reserved:0,incoming:0,damaged:0,quarantined:0,missing:0});}
    for(const l of ledger){const b=balances.get(l.product_id);if(!b)continue;const state=String(l.stock_state).toLowerCase();if(state==='on_hand')b.onHand+=Number(l.quantity_delta);else if(state==='reserved')b.reserved+=Number(l.quantity_delta);else if(state==='incoming')b.incoming+=Number(l.quantity_delta);else if(state==='damaged')b.damaged+=Number(l.quantity_delta);else if(state==='quarantined')b.quarantined+=Number(l.quantity_delta);else if(state==='missing')b.missing+=Number(l.quantity_delta);}
   }
-  let items=[...balances.values()];
+  const includeDemoProducts = await isDemoAccount(auth, accountId);
+  let items=[...balances.values()].filter((x:any)=>matchesDemoScope(x.product.external_id,includeDemoProducts));
   if(skuFilter)items=items.filter(x=>String(x.product.sku).toUpperCase().includes(skuFilter));
   const data=items.map(x=>{const p=x.product,available=Math.max(0,x.onHand-x.reserved),value=x.onHand*Number(p.cost_price_minor||0);return {sku:p.sku,product:p.name,owner:p.owner_type,onHand:x.onHand,reserved:x.reserved,available,incoming:x.incoming,damaged:x.damaged,quarantined:x.quarantined,reorderLevel:p.reorder_level,unitCost:money(p.cost_price_minor),inventoryValue:money(value),status:available<=Number(p.reorder_level||0)?'LOW_STOCK':'HEALTHY'};});
   if(id==='R-03')report=result(id,{skus:data.length,units:data.reduce((s,x)=>s+Number(x.onHand),0)},['SKU','Product','Owner','On Hand','Reserved','Available','Incoming','Damaged','Quarantined','Reorder Level','Unit Cost','Inventory Value','Status'],data);
   if(id==='R-05'){const low=data.filter(x=>Number(x.available)<=Number(x.reorderLevel));report=result(id,{lowStockSkus:low.length},['SKU','Product','Available','Reorder Level','Status'],low.map(x=>({sku:x.sku,product:x.product,available:x.available,reorderLevel:x.reorderLevel,status:x.status})));}
   if(id==='R-07')report=result(id,{inventoryValue:money(data.reduce((s,x)=>s+Number(String(x.inventoryValue).replace(/[^0-9.-]/g,''))*100,0)),skus:data.length},['SKU','Product','On Hand','Unit Cost','Inventory Value'],data.map(x=>({sku:x.sku,product:x.product,onHand:x.onHand,unitCost:x.unitCost,inventoryValue:x.inventoryValue})));
  }else if(id==='R-04'){
-  let [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id','created_at',url),rows(auth,'products','id,sku,name')]);
+  let [ledger,products]=await Promise.all([rows(auth,'stock_ledger','id,product_id,location_id,quantity_delta,stock_state,source_type,source_id,note,created_at,marketplace_account_id','created_at',url),rows(auth,'products','id,sku,name,external_id')]);
   if(accountId&&accountId!=='ALL')ledger=ledger.filter((x:any)=>x.marketplace_account_id===accountId);
+  const includeDemoProducts = await isDemoAccount(auth, accountId);
+  products=products.filter((x:any)=>matchesDemoScope(x.external_id,includeDemoProducts));
   const pmap=new Map<string, any>(products.map((x:any)=>[String(x.id),x] as [string, any]));
   const data=ledger.map((x:any)=>({timestamp:x.created_at,sku:pmap.get(x.product_id)?.sku||'—',product:pmap.get(x.product_id)?.name||'—',delta:x.quantity_delta,state:x.stock_state,source:x.source_type,reference:x.source_id||'—',note:x.note||''}));
   report=result(id,{movements:data.length},['Timestamp','SKU','Product','Delta','State','Source','Reference','Note'],data);
@@ -126,14 +129,15 @@ export async function handleReportRoute(path:string,request:Request,url:URL,auth
   const data=snapshots.map((x:any)=>({client:cmap.get(x.client_3pl_id)||'—',date:x.snapshot_date,pallets:x.occupied_pallets,shelves:x.occupied_shelves,bins:x.occupied_bins,estimatedCost:money(x.estimated_cost_minor)}));
   report=result(id,{snapshots:data.length,estimatedCost:money(snapshots.reduce((n:number,x:any)=>n+Number(x.estimated_cost_minor||0),0))},['Client','Snapshot Date','Pallets','Shelves','Bins','Estimated Cost'],data);
  }else if(id==='R-12'){
-  let [invoices,pos]=await Promise.all([rows(auth,'invoices','id,invoice_number,recipient_name,total_minor,paid_amount_minor,due_date,status'),rows(auth,'purchase_orders','po_number,supplier_id,total_minor,expected_date,status')]);
+  let [invoices,pos]=await Promise.all([rows(auth,'invoices','id,invoice_number,recipient_name,total_minor,paid_amount_minor,due_date,status'),rows(auth,'purchase_orders','po_number,supplier_id,total_minor,expected_date,status,external_id')]);
+  const includeDemo = await isDemoAccount(auth, accountId);
+  pos=pos.filter((x:any)=>matchesDemoScope(x.external_id,includeDemo));
   if(accountId&&accountId!=='ALL'){
    const {data:allocations,error}=await auth.repositoryContext.supabase.from('marketplace_finance_allocations')
     .select('source_id,amount_minor').eq('organization_id',auth.organizationId).eq('marketplace_account_id',accountId).eq('source_type','INVOICE');
    if(error)throw new Error('Store invoice allocations could not be loaded.');
    const amountById=new Map((allocations||[]).map((a:any)=>[a.source_id,Number(a.amount_minor)]));
    invoices=invoices.filter((x:any)=>amountById.has(x.id)).map((x:any)=>({...x,total_minor:Math.min(Number(x.total_minor||0),amountById.get(x.id)||0)}));
-   pos=[];
   }
   const data=[...invoices.map((x:any)=>({type:'Receivable',reference:x.invoice_number,party:x.recipient_name,balance:money(Math.max(0,Number(x.total_minor)-Number(x.paid_amount_minor||0))),dueDate:x.due_date||'—',status:x.status})),...pos.map((x:any)=>({type:'Purchase commitment',reference:x.po_number,party:x.supplier_id,balance:money(x.total_minor),dueDate:x.expected_date||'—',status:x.status}))];
   report=result(id,{receivables:invoices.length,payables:pos.length},['Type','Reference','Party','Balance','Due Date','Status'],data);
