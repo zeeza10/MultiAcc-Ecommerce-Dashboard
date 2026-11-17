@@ -54,6 +54,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [credentialSaving, setCredentialSaving] = useState(false);
 
   useEffect(() => {
+    setSelectedException(null);
+    setResolutionNote('');
     loadData();
   }, [currentUser.id, selectedStoreId]);
 
