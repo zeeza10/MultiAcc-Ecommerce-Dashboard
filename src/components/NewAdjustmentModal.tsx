@@ -8,6 +8,7 @@ interface NewAdjustmentModalProps {
   onClose: () => void;
   currentUser: User;
   config: SystemConfig;
+  selectedStoreId: string;
   onSuccess: () => void;
 }
 
@@ -16,6 +17,7 @@ export const NewAdjustmentModal: React.FC<NewAdjustmentModalProps> = ({
   onClose,
   currentUser,
   config,
+  selectedStoreId,
   onSuccess,
 }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -32,11 +34,11 @@ export const NewAdjustmentModal: React.FC<NewAdjustmentModalProps> = ({
     if (isOpen) {
       loadProducts();
     }
-  }, [isOpen]);
+  }, [isOpen, selectedStoreId]);
 
   const loadProducts = async () => {
     try {
-      const res = await api.getProducts();
+      const res = await api.getProducts(selectedStoreId);
       setProducts(res.products);
       if (res.products.length > 0 && !selectedProductId) {
         setSelectedProductId(res.products[0].id);
