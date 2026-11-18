@@ -56,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const queryParams = new URLSearchParams(window.location.search);
     return window.location.pathname === '/accept-invitation'
       || hashParams.get('type') === 'invite'
-      || queryParams.get('type') === 'invite';
+      || queryParams.get('type') === 'invite'
+      || hashParams.has('invitation_id')
+      || queryParams.has('invitation_id');
   });
   const [invitationId] = useState<string | null>(() => {
     const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
