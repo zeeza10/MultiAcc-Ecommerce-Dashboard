@@ -61,6 +61,18 @@ function createIpRateLimiter(maxRequests: number, windowMs: number) {
 }
 
 async function startServer() {
+  // The legacy Express compatibility app is not part of the Cloudflare Worker
+  // production runtime. Fail closed unless explicitly enabled for local-only
+  // troubleshooting, and never allow it to bind to a public interface.
+  if (process.env.ENABLE_LEGACY_EXPRESS_SERVER !== 'true') {
+    throw new Error('Legacy Express is disabled. It may only be enabled explicitly for isolated local troubleshooting.');
+  }
+
+  const host = process.env.HOST || '127.0.0.1';
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
+    throw new Error('Legacy Express is restricted to loopback interfaces and cannot bind to a public network address.');
+  }
+
   const app = express();
   const port = 3000;
   const distPath = path.resolve(__dirname, 'dist');
@@ -126,7 +138,6 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  const host = process.env.HOST || '127.0.0.1';
   app.listen(port, host, () => {
     console.log(`OriaFuture server is active on http://${host}:${port} [hasDist: ${hasDist}]`);
   });
