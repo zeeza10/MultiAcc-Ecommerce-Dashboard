@@ -181,7 +181,11 @@ export default function App() {
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
       const accounts = accountsRes.accounts || [];
-      const savedAccountIsAvailable = selectedStoreId === 'ALL' || accounts.some((account) => account.id === selectedStoreId);
+      const selectedAccount = accounts.find((account) => account.id === selectedStoreId);
+      const selectedAccountMatchesEnvironment = selectedEnvironment === 'DEMO'
+        ? Boolean(selectedAccount?.isDemo)
+        : Boolean(selectedAccount && !selectedAccount.isDemo && selectedAccount.environment === selectedEnvironment);
+      const savedAccountIsAvailable = selectedStoreId === 'ALL' || selectedAccountMatchesEnvironment;
       const activeAccountId = savedAccountIsAvailable ? selectedStoreId : 'ALL';
       setConfig(cfgRes.config);
       setConfigLoaded(true);
