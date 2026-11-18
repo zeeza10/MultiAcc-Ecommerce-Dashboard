@@ -267,7 +267,7 @@ create or replace function private.get_org_employee_access(p_organization_id uui
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare v_actor uuid := auth.uid(); v_result jsonb;
 begin
