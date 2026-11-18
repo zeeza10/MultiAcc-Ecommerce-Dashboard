@@ -211,12 +211,26 @@ Deno.serve(async (request: Request) => {
   });
 
   const createdUserId = generated?.user?.id;
-  const actionLink = generated?.properties?.action_link;
-  if (generateError || !createdUserId || !actionLink) {
+  const inviteTokenHash = generated?.properties?.hashed_token;
+  const verificationType = generated?.properties?.verification_type;
+  if (generateError || !createdUserId || !inviteTokenHash || verificationType !== "invite") {
     await revokeClaimedInvitation(admin, invite.id, createdUserId);
     console.error("Supabase could not generate the employee invitation link.");
     return Response.json({ error: "Invitation link could not be created. The invitation was safely cancelled." }, { status: 502, headers: cors });
   }
+
+  // Send the one-time Supabase OTP hash to our fixed first-party callback.
+  // The client verifies it with verifyOtp({ type: 'invite' }) only after the
+  // invitee submits the password form; this avoids redirect allowlist fallbacks
+  // and prevents email link scanners from consuming the invitation token.
+  const inviteUrl = new URL("/accept-invitation", "https://app.oriafuture.com");
+  // Put the single-use token in the URL fragment: browsers never send fragments
+  // in HTTP requests, access logs, or Referer headers.
+  inviteUrl.hash = new URLSearchParams({
+    token_hash: inviteTokenHash,
+    type: "invite",
+  }).toString();
+  const actionLink = inviteUrl.toString();
 
   let resendResponse: Response;
   try {

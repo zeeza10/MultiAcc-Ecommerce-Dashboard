@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { User } from '../types';
 import { supabase } from '../lib/supabase';
@@ -58,12 +58,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       || hashParams.get('type') === 'invite'
       || queryParams.get('type') === 'invite';
   });
+  const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(() => {
+    if (window.location.pathname !== '/accept-invitation') return null;
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    if (fragmentParams.get('type') === 'invite') return fragmentParams.get('token_hash');
+    return queryParams.get('type') === 'invite' ? queryParams.get('token_hash') : null;
+  });
   const [inviteConfirmPassword, setInviteConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  // Remove the one-time token from the address bar before the page can load
+  // subresources or the user can copy/share the URL. The token remains in
+  // memory only and is submitted to Supabase only when the invitee sets a password.
+  useLayoutEffect(() => {
+    if (window.location.pathname !== '/accept-invitation') return;
+    const queryParams = new URLSearchParams(window.location.search);
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (queryParams.has('token_hash') || queryParams.has('type')
+      || fragmentParams.has('token_hash') || fragmentParams.has('type')) {
+      window.history.replaceState({}, '', '/accept-invitation');
+    }
+  }, []);
 
   const loadAccount = useCallback(async (activeSession: Session | null, force = false) => {
     setSession(activeSession);
@@ -280,10 +300,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     event.preventDefault();
 
     if (inviteSetupActive) {
-      if (!session) {
-        setError('This invitation link is invalid or expired. Ask your Super Admin to send a new invitation.');
-        return;
-      }
       if (password.length < 12) {
         setError('Choose a password with at least 12 characters.');
         return;
@@ -293,11 +309,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       await runAuth(async () => {
+        // Verify the single-use invitation token only after an explicit form
+        // submission. This prevents email security scanners from consuming it.
+        let activeSession = session;
+        if (pendingInviteToken) {
+          const { data: verified, error: verificationError } = await supabase.auth.verifyOtp({
+            token_hash: pendingInviteToken,
+            type: 'invite',
+          });
+          if (verificationError) {
+            setPendingInviteToken(null);
+            return { error: verificationError };
+          }
+          activeSession = verified.session;
+          setPendingInviteToken(null);
+        }
+        if (!activeSession) {
+          return { error: new Error('This invitation is invalid, expired, or already used. Ask your Super Admin to send a new invitation.') };
+        }
+
         const { error: updateError } = await supabase.auth.updateUser({ password });
         if (!updateError) {
           setPassword('');
           setInviteConfirmPassword('');
-          await loadAccount(session);
+          await loadAccount(activeSession, true);
           setInviteSetupActive(false);
           window.history.replaceState({}, '', '/');
           setMessage('Your account password is set. Opening your workspace…');
@@ -375,7 +410,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {inviteSetupActive
-              ? session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
+              ? session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : pendingInviteToken ? 'Create a password to continue. Your one-time invitation will be verified securely when you submit this form.' : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
               : signedInWithoutWorkspace
                 ? accountState === 'error' ? 'Workspace access could not be verified. Your access has not been assumed or granted. Retry the check or contact your administrator.' : 'This account has no active organization membership. Contact your organization administrator.'
                 : 'Secure sign-in to your Oria Future workspace.'}
@@ -386,7 +421,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         {message && <div role="status" className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">{message}</div>}
 
         {inviteSetupActive ? (
-          session ? (
+          session || pendingInviteToken ? (
             <form onSubmit={submit} className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
                 New password

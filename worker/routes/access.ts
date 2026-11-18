@@ -48,7 +48,7 @@ export async function handleAccessRoute(
         invitationId,
         email,
         fullName,
-        redirectTo: new URL('/accept-invitation', request.url).toString(),
+        redirectTo: 'https://app.oriafuture.com/accept-invitation',
       }),
     });
 
