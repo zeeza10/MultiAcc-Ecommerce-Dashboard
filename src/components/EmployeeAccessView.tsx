@@ -222,8 +222,7 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const setMemberActive = async (member: Member, active: boolean) => {
-    const action = active ? 'reactivate' : 'suspend and immediately block workspace API access for';
-    if (!(await askConfirmation({ title: active ? 'Restore employee access?' : 'Suspend employee?', description: active ? `Workspace access will be restored for ${member.full_name || member.email || 'this employee'}.` : ` ${member.full_name || member.email || 'This employee'} will immediately lose workspace API access. Their account and history will remain محفوظ.`, confirmLabel: active ? 'Restore access' : 'Suspend employee', tone: active ? 'primary' : 'danger', busyLabel: active ? 'Restoring…' : 'Suspending…' }))) return;
+    if (!(await askConfirmation({ title: active ? 'Restore employee access?' : 'Suspend employee?', description: active ? `Workspace access will be restored for ${member.full_name || member.email || 'this employee'}.` : ` ${member.full_name || member.email || 'This employee'} will immediately lose workspace API access. Their account and history will be retained.`, confirmLabel: active ? 'Restore access' : 'Suspend employee', tone: active ? 'primary' : 'danger', busyLabel: active ? 'Restoring…' : 'Suspending…' }))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: updateError } = await supabase.rpc('set_org_member_active', {
