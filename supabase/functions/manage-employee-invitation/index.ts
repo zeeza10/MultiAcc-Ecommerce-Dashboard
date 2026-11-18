@@ -17,8 +17,10 @@ function escapeHtml(value: string): string {
   })[character] || character);
 }
 
-function invitationEmailHtml(name: string, actionLink: string): string {
+function invitationEmailHtml(name: string, roleName: string, organizationName: string, actionLink: string): string {
   const safeName = escapeHtml(name || "there");
+  const safeRole = escapeHtml(roleName);
+  const safeOrganization = escapeHtml(organizationName);
   const safeLink = escapeHtml(actionLink);
   return `<!doctype html>
 <html lang="en">
@@ -27,9 +29,14 @@ function invitationEmailHtml(name: string, actionLink: string): string {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px">
       <tr><td style="padding:32px 32px 12px">
         <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:#4f46e5">ORIA FUTURE</div>
-        <h1 style="margin:20px 0 12px;font-size:25px;line-height:1.3">You’re invited to join Oria Future</h1>
-        <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#475569">Hello ${safeName},</p>
-        <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#475569">Your organization administrator has invited you to access the Oria Future workspace. Accept the invitation and create your password to get started.</p>
+        <h1 style="margin:20px 0 12px;font-size:25px;line-height:1.3">Congratulations, ${safeName}!</h1>
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#475569">We’re delighted to welcome you to ${safeOrganization}.</p>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#475569">You’ve been invited to join the team with the role of:</p>
+        <div style="margin:0 0 22px;padding:16px 18px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#6366f1;text-transform:uppercase">Your assigned position</div>
+          <div style="margin-top:6px;font-size:19px;font-weight:700;color:#1e1b4b">${safeRole}</div>
+        </div>
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#475569">Congratulations on this new opportunity. We’re excited to have you on board. To get started, accept your invitation and create a secure password for your Oria Future workspace account.</p>
         <p style="margin:28px 0">
           <a href="${safeLink}" style="display:inline-block;padding:14px 22px;border-radius:9px;background:#4f46e5;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700">Accept invitation</a>
         </p>
@@ -43,12 +50,8 @@ function invitationEmailHtml(name: string, actionLink: string): string {
 </html>`;
 }
 
-function invitationEmailText(name: string, actionLink: string): string {
-  return `Hello ${name || "there"},
-
-Your organization administrator has invited you to access the Oria Future workspace.
-
-Accept your invitation and create your password:
+function invitationEmailText(name: string, roleName: string, organizationName: string, actionLink: string): string {
+  return `Congratulations ${name || "there"}!\n\nWe’re delighted to welcome you to ${organizationName}.\n\nYou’ve been invited to join the team as: ${roleName}\n\nCongratulations on this new opportunity. We’re excited to have you on board. Accept your invitation and create a secure password for your Oria Future workspace account:
 ${actionLink}
 
 If you were not expecting this invitation, you can ignore this email.
@@ -136,8 +139,14 @@ Deno.serve(async (request: Request) => {
     return Response.json({ error: "Invitation redirect URL is not allowed" }, { status: 400, headers: cors });
   }
 
-  const { data: role, error: roleError } = await admin.from("roles").select("code").eq("id", invite.role_id).maybeSingle();
-  if (roleError || !role) return Response.json({ error: "Assigned role could not be verified" }, { status: 400, headers: cors });
+  const [{ data: role, error: roleError }, { data: organization, error: organizationError }] = await Promise.all([
+    admin.from("roles").select("code,name").eq("id", invite.role_id).maybeSingle(),
+    admin.from("organizations").select("name").eq("id", body.organizationId).maybeSingle(),
+  ]);
+  if (roleError || !role?.code || !role.name?.trim()) return Response.json({ error: "Assigned role could not be verified" }, { status: 400, headers: cors });
+  if (organizationError || !organization?.name?.trim()) return Response.json({ error: "Organization details could not be verified" }, { status: 400, headers: cors });
+  const roleName = role.name.trim().slice(0, 120);
+  const organizationName = organization.name.trim().slice(0, 120);
   if (role.code === "SUPER_ADMIN") {
     const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel(token);
     if (assuranceError || assurance?.currentLevel !== "aal2") {
@@ -244,9 +253,9 @@ Deno.serve(async (request: Request) => {
         from: SENDER,
         to: [email],
         reply_to: "hr@oriafuture.com",
-        subject: "You’re invited to join Oria Future",
-        html: invitationEmailHtml(fullName, actionLink),
-        text: invitationEmailText(fullName, actionLink),
+        subject: `Congratulations! You’re invited to join ${organizationName} as ${roleName}`,
+        html: invitationEmailHtml(fullName, roleName, organizationName, actionLink),
+        text: invitationEmailText(fullName, roleName, organizationName, actionLink),
       }),
       signal: AbortSignal.timeout(15000),
     });
@@ -269,7 +278,7 @@ Deno.serve(async (request: Request) => {
     action: "EMPLOYEE_INVITATION_EMAIL_SENT",
     entity: "user_invitations",
     entity_id: invite.id,
-    after_snapshot: { email, role_id: invite.role_id, provider: "resend", resend_message_id: resendResult.id || null },
+    after_snapshot: { email, role_id: invite.role_id, role_name: roleName, organization_name: organizationName, provider: "resend", resend_message_id: resendResult.id || null },
     notes: "Employee invitation email accepted by Resend",
   });
 
