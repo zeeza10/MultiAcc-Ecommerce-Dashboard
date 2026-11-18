@@ -184,7 +184,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
-    .select('cursor_state,watermark_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
+    .select('cursor_state,watermark_at,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
   if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
   const since = typeof savedCursor.since === 'string'
