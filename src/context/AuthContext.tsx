@@ -59,7 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       || queryParams.get('type') === 'invite';
   });
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(() => {
-    if (window.location.pathname !== '/accept-invitation') return null;
+    // Email clients and auth redirects can preserve the invitation token while
+    // normalizing the callback path. Read the token from either URL location;
+    // the invite marker, not the pathname, identifies this one-time flow.
     const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const queryParams = new URLSearchParams(window.location.search);
     if (fragmentParams.get('type') === 'invite') return fragmentParams.get('token_hash');
@@ -76,13 +78,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // subresources or the user can copy/share the URL. The token remains in
   // memory only and is submitted to Supabase only when the invitee sets a password.
   useLayoutEffect(() => {
-    if (window.location.pathname !== '/accept-invitation') return;
     const queryParams = new URLSearchParams(window.location.search);
     const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    if (queryParams.has('token_hash') || queryParams.has('type')
-      || fragmentParams.has('token_hash') || fragmentParams.has('type')) {
-      window.history.replaceState({}, '', '/accept-invitation');
-    }
+    const isInvitationCallback = window.location.pathname === '/accept-invitation'
+      || queryParams.get('type') === 'invite'
+      || fragmentParams.get('type') === 'invite';
+    if (!isInvitationCallback) return;
+
+    // Normalize every recognized invitation callback to the dedicated route,
+    // then scrub query/fragment credentials before the app loads subresources.
+    window.history.replaceState({}, '', '/accept-invitation');
   }, []);
 
   const loadAccount = useCallback(async (activeSession: Session | null, force = false) => {
