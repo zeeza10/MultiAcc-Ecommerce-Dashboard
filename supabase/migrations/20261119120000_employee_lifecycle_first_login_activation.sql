@@ -91,11 +91,11 @@ for each row
 when (old.encrypted_password is distinct from new.encrypted_password)
 execute procedure public.mark_org_invitation_accepted_after_password_setup();
 
-create or replace function public.activate_org_member_after_first_login()
+create or replace function private.activate_org_member_after_first_login()
 returns boolean
 language plpgsql
 security definer
-set search_path = public, auth, pg_temp
+set search_path = ''
 as $$
 declare
   v_user_id uuid := auth.uid();
@@ -155,10 +155,15 @@ begin
   return v_count > 0;
 end;
 $$;
+revoke all on function private.activate_org_member_after_first_login() from public, anon;
+grant execute on function private.activate_org_member_after_first_login() to authenticated;
+create or replace function public.activate_org_member_after_first_login()
+returns boolean language sql set search_path = ''
+as $$ select private.activate_org_member_after_first_login() $$;
 revoke all on function public.activate_org_member_after_first_login() from public, anon;
 grant execute on function public.activate_org_member_after_first_login() to authenticated;
 
-create or replace function public.set_org_member_active(
+create or replace function private.set_org_member_active(
   p_organization_id uuid,
   p_user_id uuid,
   p_is_active boolean
@@ -203,16 +208,21 @@ begin
     case when p_is_active then 'Employee access restored by Super Admin' else 'Employee suspended; workspace API access denied' end);
 end;
 $$;
+revoke all on function private.set_org_member_active(uuid,uuid,boolean) from public, anon;
+grant execute on function private.set_org_member_active(uuid,uuid,boolean) to authenticated;
+create or replace function public.set_org_member_active(p_organization_id uuid,p_user_id uuid,p_is_active boolean)
+returns void language sql set search_path = ''
+as $$ select private.set_org_member_active($1,$2,$3) $$;
 revoke all on function public.set_org_member_active(uuid,uuid,boolean) from public, anon;
 grant execute on function public.set_org_member_active(uuid,uuid,boolean) to authenticated;
 
-create or replace function public.archive_org_member(
+create or replace function private.archive_org_member(
   p_organization_id uuid,
   p_user_id uuid
 ) returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   v_actor uuid := auth.uid();
@@ -245,10 +255,15 @@ begin
     'Employee archived; account and historical records retained');
 end;
 $$;
+revoke all on function private.archive_org_member(uuid,uuid) from public, anon;
+grant execute on function private.archive_org_member(uuid,uuid) to authenticated;
+create or replace function public.archive_org_member(p_organization_id uuid,p_user_id uuid)
+returns void language sql set search_path = ''
+as $$ select private.archive_org_member($1,$2) $$;
 revoke all on function public.archive_org_member(uuid,uuid) from public, anon;
 grant execute on function public.archive_org_member(uuid,uuid) to authenticated;
 
-create or replace function public.get_org_employee_access(p_organization_id uuid)
+create or replace function private.get_org_employee_access(p_organization_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -256,10 +271,7 @@ set search_path = public, pg_temp
 as $$
 declare v_actor uuid := auth.uid(); v_result jsonb;
 begin
-  if v_actor is null or not exists (
-    select 1 from public.organization_members m join public.roles r on r.id=m.role_id
-    where m.organization_id=p_organization_id and m.user_id=v_actor and m.is_active and r.code='SUPER_ADMIN'
-  ) then raise exception 'Only this organization Super Admin can review employee access' using errcode='42501'; end if;
+  if v_actor is null or not private.is_org_super_admin(p_organization_id) then raise exception 'Only this organization Super Admin can review employee access' using errcode='42501'; end if;
 
   select jsonb_build_object(
     'members',coalesce((select jsonb_agg(jsonb_build_object(
@@ -269,7 +281,10 @@ begin
       'status',case when m.archived_at is not null then 'ARCHIVED'
         when m.is_active then 'ACTIVE'
         when m.onboarding_completed_at is null then 'PENDING'
-        else 'SUSPENDED' end
+        else 'SUSPENDED' end,
+      'permission_overrides',coalesce((select jsonb_agg(jsonb_build_object('code',perm.code,'effect',o.effect) order by perm.code)
+        from public.organization_member_permission_overrides o join public.permissions perm on perm.id=o.permission_id
+        where o.organization_id=m.organization_id and o.user_id=m.user_id),'[]'::jsonb)
     ) order by m.joined_at desc) from public.organization_members m
       join public.profiles p on p.id=m.user_id join public.roles r on r.id=m.role_id
       where m.organization_id=p_organization_id),'[]'::jsonb),
@@ -297,6 +312,11 @@ begin
   return v_result;
 end;
 $$;
+revoke all on function private.get_org_employee_access(uuid) from public, anon;
+grant execute on function private.get_org_employee_access(uuid) to authenticated;
+create or replace function public.get_org_employee_access(p_organization_id uuid)
+returns jsonb language sql set search_path = ''
+as $$ select private.get_org_employee_access($1) $$;
 revoke all on function public.get_org_employee_access(uuid) from public, anon;
 grant execute on function public.get_org_employee_access(uuid) to authenticated;
 
