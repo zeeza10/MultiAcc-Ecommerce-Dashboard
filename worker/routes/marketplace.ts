@@ -451,7 +451,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         .select('id,organization_id,environment,is_demo,auth_status,marketplace')
         .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id).maybeSingle();
       if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
-        || !isEnvironment(account.environment) || account.environment !== (job as any).environment && false) {
+        || !isEnvironment(account.environment)) {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
       await syncSellerOrders(account, env);
