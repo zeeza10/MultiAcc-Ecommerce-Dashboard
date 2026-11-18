@@ -198,7 +198,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">eBay Marketplace Integration</h1>
           <p className="text-xs text-gray-500">
-            Connect each seller once, then automatically import orders, inventory items, live listing offers, prices and quantities.
+            Connect each seller once, then automatically import orders, inventory items and Inventory API listing offers, prices and quantities.
           </p>
         </div>
 
