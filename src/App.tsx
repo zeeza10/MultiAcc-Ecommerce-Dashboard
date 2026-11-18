@@ -406,6 +406,7 @@ export default function App() {
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
+              selectedEnvironment={selectedEnvironment}
               onNavigate={handleNavigate}
               onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
               onOpenNewOrder={() => setShowNewOrderModal(true)}
