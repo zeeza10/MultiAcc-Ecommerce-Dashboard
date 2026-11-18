@@ -116,6 +116,7 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
     p_ru_name_ciphertext: ruNameCiphertext,
     p_client_id_masked: clientId.length > 8 ? `${clientId.slice(0, 4)}••••${clientId.slice(-4)}` : '••••',
     p_actor_user_id: auth.user.id,
+    p_credentials_verified_at: new Date().toISOString(),
   });
   if (error) {
     const conflict = /version conflict/i.test(error.message || '');
