@@ -56,7 +56,7 @@ Production migrations `20261118090917_database_fk_index_rls_hardening` and `2026
 - Three RLS initialization-plan warnings were resolved by evaluating `auth.uid()` through a scalar subquery.
 - Four duplicate permissive-policy overlaps were removed by splitting write permissions from read permissions. The previous read/write authorization semantics were preserved, and the repeat audit reports zero duplicate permissive-policy groups.
 - No business rows were deleted or rewritten.
-- Supabase now reports 114 unused indexes. This is not a reason to drop them blindly: the database is very small, usage statistics are newly initialized, and many of the new indexes exist specifically to support foreign-key maintenance. Review again after real workload and query-statistics accumulation.
+- Supabase now reports 113 unused indexes. This is not a reason to drop them blindly: the database is very small, usage statistics are newly initialized, and many of the new indexes exist specifically to support foreign-key maintenance. Review again after real workload and query-statistics accumulation.
 
 ### Privileged function review
 
