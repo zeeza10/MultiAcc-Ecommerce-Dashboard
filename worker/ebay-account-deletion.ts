@@ -100,6 +100,10 @@ async function fetchEbayPublicKey(
     if (!keyResponse.ok) return null;
     const keyData = await keyResponse.json() as { key?: string };
     if (typeof keyData.key !== 'string' || !keyData.key.includes('-----BEGIN PUBLIC KEY-----')) return null;
+    if (publicKeyCache.size >= 100) {
+      const oldestKey = publicKeyCache.keys().next().value;
+      if (oldestKey) publicKeyCache.delete(oldestKey);
+    }
     publicKeyCache.set(cacheKey, { key: keyData.key, expiresAt: Date.now() + 60 * 60 * 1000 });
     return keyData.key;
   } catch {
