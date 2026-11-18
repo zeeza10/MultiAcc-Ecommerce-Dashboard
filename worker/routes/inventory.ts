@@ -84,6 +84,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
     let balances = await new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
       client3plId: auth.user.clientId,
       onlyClientProducts: isClientUser,
+      dataEnvironment,
     });
     if (accountId && accountId !== 'ALL') {
       if (!auth.permissions.has('*') && !auth.permissions.has('inventory.view')) return json({ error: 'Inventory access is required.' }, 403);
@@ -147,7 +148,7 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
 
   const inventory = new SupabaseInventoryRepository(auth.repositoryContext);
   const isClientUser = auth.user.role === 'CLIENT_USER';
-  const options = { client3plId: auth.user.clientId, onlyClientProducts: isClientUser };
+  const options = { client3plId: auth.user.clientId, onlyClientProducts: isClientUser, dataEnvironment: await resolveDataEnvironment(auth, url) };
 
   if (path === '/inventory/allocations' && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('inventory.manage')) return json({ error: 'Inventory management permission is required.' }, 403);
