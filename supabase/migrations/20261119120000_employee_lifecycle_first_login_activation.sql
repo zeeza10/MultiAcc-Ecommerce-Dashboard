@@ -116,7 +116,9 @@ begin
   if not exists (
     select 1 from auth.users u where u.id = v_user_id and coalesce(u.encrypted_password,'') <> ''
   ) then
-    raise exception 'Set your account password before accessing the workspace' using errcode='42501';
+    -- Invitation-link verification creates a temporary session before the
+    -- invitee chooses a password; that session must never activate membership.
+    return false;
   end if;
 
   for v_member in
