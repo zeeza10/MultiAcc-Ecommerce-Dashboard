@@ -136,41 +136,48 @@ export const Navbar: React.FC<NavbarProps> = ({
             {searchDropdown}
           </div>
 
-          <div className="w-28 shrink-0">
-            <select value={selectedEnvironment} onChange={(e) => { onEnvironmentChange(e.target.value as any); onStoreChange && onStoreChange('ALL'); }} aria-label="Data environment" className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5">
-              <option value="DEMO">Demo</option><option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
-            </select>
-          </div>
-          <div className="w-40 shrink-0">
+          <div className="w-48 sm:w-56 shrink-0">
             <select
               value={selectedStoreId}
-              onChange={(e) => onStoreChange && onStoreChange(e.target.value)}
-              title="Global Store Context Filter"
-              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              onChange={(e) => {
+                const accountId = e.target.value;
+                if (accountId === 'ALL') {
+                  onStoreChange && onStoreChange('ALL');
+                  return;
+                }
+                const account = marketplaceAccounts.find((item) => item.id === accountId);
+                if (account) {
+                  onEnvironmentChange(account.isDemo ? 'DEMO' : account.environment);
+                }
+                onStoreChange && onStoreChange(accountId);
+              }}
+              aria-label="Marketplace and seller account"
+              title="Select marketplace account by environment"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              <option value="ALL">All Accounts</option>
-              {selectedEnvironment === 'DEMO' && marketplaceAccounts.some((account) => account.isDemo) && (
-                <optgroup label="Demo Accounts — Presentation Only">
+              <option value="ALL">All Marketplace Accounts</option>
+              {marketplaceAccounts.some((account) => account.isDemo) && (
+                <optgroup label="DEMO ACCOUNTS">
                   {marketplaceAccounts.filter((account) => account.isDemo).map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {selectedEnvironment === 'SANDBOX' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
-                <optgroup label="eBay Sandbox — Testing Only">
+              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
+                <optgroup label="SANDBOX ACCOUNTS">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'SANDBOX').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {selectedEnvironment === 'PRODUCTION' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
-                <optgroup label="eBay Production — Live Business">
+              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
+                <optgroup label="PRODUCTION ACCOUNTS">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No seller accounts available</option>}
+              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No marketplace accounts available</option>}
             </select>
           </div>
         </div>
