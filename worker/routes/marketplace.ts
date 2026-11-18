@@ -190,7 +190,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   const since = typeof savedCursor.since === 'string'
     ? savedCursor.since
     : new Date(checkpoint?.watermark_at ? new Date(checkpoint.watermark_at).getTime() - 3 * 86400000 : Date.now() - 730 * 86400000).toISOString();
-  const filterField = checkpoint?.watermark_at && !savedCursor.since ? 'lastmodifieddate' : 'creationdate';
+  const filterField = typeof savedCursor.filterField === 'string' ? savedCursor.filterField : checkpoint?.watermark_at ? 'lastmodifieddate' : 'creationdate';
   let resumeOffset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
@@ -246,7 +246,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
       await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
         resource_type: 'ORDERS', data_environment: dataEnvironment,
-        cursor_state: hasMore ? { since, offset } : {},
+        cursor_state: hasMore ? { since, offset, filterField } : {},
         watermark_at: hasMore ? (checkpoint?.watermark_at || null) : new Date().toISOString(),
         last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
         consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
