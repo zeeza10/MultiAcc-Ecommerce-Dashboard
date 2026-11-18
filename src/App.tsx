@@ -384,7 +384,7 @@ export default function App() {
       )}
 
       {/* Main Layout Area */}
-      <div className="flex-1 min-h-0 flex max-w-7xl w-full mx-auto overflow-hidden">
+      <div className="flex-1 min-h-0 flex w-full max-w-none mx-auto overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
