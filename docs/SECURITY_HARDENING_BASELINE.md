@@ -11,7 +11,7 @@ The following rules are active and scoped only to `app.oriafuture.com` so unrela
 - Cloudflare Managed Free Ruleset is executed for the dashboard hostname.
 - TLS 1.0 and TLS 1.1 connections are blocked for the dashboard hostname.
 - HTTP requests are redirected to HTTPS while preserving the original path and query.
-- The Worker emits HSTS on HTTPS responses, plus `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a restrictive Permissions Policy.
+- The Worker emits HSTS and an enforced restrictive Content Security Policy on HTTPS responses, plus `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a restrictive Permissions Policy. Inline scripts and inline style blocks are not allowed; the PDF report stylesheet is served from the same origin.
 - API responses use `Cache-Control: no-store`.
 - Worker rate limits are configured for IP traffic, reads, writes, and invitations.
 
@@ -36,11 +36,19 @@ Verified against the Production project:
 - The `anon` role has zero direct table grants in `public`.
 - The `platform_integration_credentials` and `platform_integration_audit` tables have RLS enabled, no client policies, and are granted only to `service_role` as intended for server-only data.
 - No public views or Storage buckets currently exist.
-- The seven organization access `SECURITY DEFINER` functions callable by `authenticated` have a fixed empty search path and enforce the caller's active organization Super Admin membership; Super Admin role assignment/invitation is protected by AAL2 checks.
+- All 62 public tables have RLS enabled; no RLS-enabled public table was found without a policy. Server-only marketplace credential/state/job/audit tables explicitly deny browser roles and are granted only to `service_role`.
+- All 149 public foreign keys have valid supporting indexes. No duplicate index definitions were found. The performance advisor reports 113 currently unused indexes; these are retained pending workload/query-plan evidence rather than removed blindly.
+- The seven organization-admin public RPCs are `SECURITY INVOKER` wrappers; their privileged implementations live in the non-exposed `private` schema. `anon` has no execute grant. Ten additional private `SECURITY DEFINER` functions are scheduled to receive an empty search path through the pending hardening migration; existing table/helper references are schema-qualified.
 - The eBay credential-save RPC is service-role-only. The legacy RPC signature has been removed and the new signature requires a recent server verification timestamp.
-- Existing eBay app credentials remain encrypted but are intentionally marked unverified until replaced through the eBay verification flow.
+- eBay application Client ID, Client Secret and RuName are stored as AES-GCM ciphertext; seller access/refresh tokens are also ciphertext. The current Sandbox application keypair has a successful eBay verification timestamp. Seller OAuth authorization remains a separate per-account state; Production application credentials are not configured.
 
 Outstanding Auth item: Supabase Leaked Password Protection is disabled. The current Supabase organization is on the Free plan; Supabase documents this feature as available on Pro and above. Enable it after upgrading the project/organization to a supporting plan. Do not weaken other Auth controls to compensate.
+
+## Legacy compatibility server
+
+- The Express compatibility server is not part of the Cloudflare Worker production entry point.
+- Its entry point now fails closed unless `ENABLE_LEGACY_EXPRESS_SERVER=true` is explicitly set for local troubleshooting.
+- It rejects non-loopback bind addresses and cannot listen on a public network interface.
 
 ## GitHub repository and CI
 
@@ -59,8 +67,8 @@ Outstanding repository control: the current GitHub Free plan does not allow repo
 3. Enable GitHub code-scanning alert upload when repository entitlement supports it; review CodeQL findings, not only workflow completion.
 4. Consider a Cloudflare plan with the full managed WAF/OWASP ruleset if the dashboard's threat model and budget require it.
 5. Review the Worker compatibility date and update it in a separate tested change.
-6. Add a Content Security Policy in report-only mode, inventorying all legitimate browser connections first, then enforce it after testing.
-7. Run an authenticated end-to-end Sandbox eBay test using valid credentials entered only in the dashboard. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
+6. Review CSP violation reports/real browser behavior after deployment and refine the enforced policy only when a legitimate required origin is identified.
+7. Complete an authenticated end-to-end Sandbox seller OAuth and order-import acceptance test. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
 8. Maintain tested backups and a documented recovery/credential-rotation procedure.
 
 ## Change safety
