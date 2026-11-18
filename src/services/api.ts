@@ -127,8 +127,8 @@ export const api = {
     }),
 
   // Inventory & Ledger
-  getBalances: (accountId?: string) => request<{ balances: StockBalance[] }>(`/inventory/balances${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  getStockLedger: (accountId?: string) => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getBalances: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ balances: StockBalance[] }>(`/inventory/balances?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getStockLedger: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
   allocateStoreInventory: (payload: { marketplaceAccountId: string; productId: string; allocatedQuantity: number; reservedQuantity?: number }) =>
     request<{ allocation: unknown }>('/inventory/allocations', { method: 'POST', body: JSON.stringify(payload) }),
 
