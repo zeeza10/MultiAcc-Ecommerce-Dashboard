@@ -25,6 +25,7 @@ interface DashboardViewProps {
   currentUser: User;
   config: SystemConfig;
   selectedStoreId: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   onNavigate: (tab: any, filterState?: any) => void;
   onOpenNewAdjustment: () => void;
   onOpenNewOrder: () => void;
@@ -34,6 +35,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   config,
   selectedStoreId,
+  selectedEnvironment,
   onNavigate,
   onOpenNewAdjustment,
   onOpenNewOrder,
@@ -46,7 +48,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     loadDashboardData();
-  }, [period, selectedStoreId, currentUser.id]);
+  }, [period, selectedStoreId, selectedEnvironment, currentUser.id]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -55,8 +57,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setExceptions([]);
     try {
       const results = await Promise.allSettled([
-        api.getKPIs(period, selectedStoreId),
-        api.getCharts(selectedStoreId),
+        api.getKPIs(period, selectedStoreId, selectedEnvironment),
+        api.getCharts(selectedStoreId, selectedEnvironment),
         api.getExceptions(selectedStoreId),
       ]);
 

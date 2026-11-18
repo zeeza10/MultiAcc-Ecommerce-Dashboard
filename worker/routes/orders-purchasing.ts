@@ -5,7 +5,11 @@ import { SupabasePurchasingRepository } from '../../server/repositories/purchasi
 
 async function resolveDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
   const accountId = url.searchParams.get('accountId');
-  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  if (!accountId || accountId === 'ALL') {
+    const requested = url.searchParams.get('environment') || 'SANDBOX';
+    if (requested === 'DEMO' || requested === 'SANDBOX' || requested === 'PRODUCTION') return requested;
+    throw new Error('The selected data environment is invalid.');
+  }
   const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
     .select('id,is_demo,environment').eq('id', accountId)
     .eq('organization_id', auth.organizationId).maybeSingle();
@@ -24,6 +28,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
     const orders = await repository.listOrders({
       status: url.searchParams.get('status') || undefined,
       accountId: url.searchParams.get('accountId') || undefined,
+      dataEnvironment: await resolveDataEnvironment(auth, url),
       search: url.searchParams.get('search') || undefined,
       client3plId: auth.user.clientId,
       onlyClientOrders: isClientUser,

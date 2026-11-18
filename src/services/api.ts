@@ -90,24 +90,25 @@ export const api = {
   // Auth
 
   // Dashboard
-  getKPIs: (period = '30D', accountId?: string) => {
-    let url = `/dashboard/kpis?period=${encodeURIComponent(period)}`;
+  getKPIs: (period = '30D', accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => {
+    let url = `/dashboard/kpis?period=${encodeURIComponent(period)}&environment=${environment}`;
     if (accountId && accountId !== 'ALL') url += `&accountId=${encodeURIComponent(accountId)}`;
     return request<{ kpis: any; userRole: string }>(url);
   },
-  getCharts: (accountId?: string) => request<any>(`/dashboard/charts${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getCharts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<any>(`/dashboard/charts?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Orders
-  getOrders: (params: { status?: string; accountId?: string; search?: string } = {}) => {
+  getOrders: (params: { status?: string; accountId?: string; search?: string; environment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}) => {
     const q = new URLSearchParams();
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
     if (params.accountId && params.accountId !== 'ALL') q.set('accountId', params.accountId);
     if (params.search) q.set('search', params.search);
+    if (params.environment) q.set('environment', params.environment);
     return request<{ orders: Order[] }>(`/orders?${q.toString()}`);
   },
   getOrder: (id: string) => request<{ order: Order; histories: any[] }>(`/orders/${id}`),
-  createOrder: (payload: any, accountId?: string) =>
-    request<{ order: Order }>(`/orders${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
+  createOrder: (payload: any, accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') =>
+    request<{ order: Order }>(`/orders?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -118,16 +119,16 @@ export const api = {
     }),
 
   // Products
-  getProducts: (accountId?: string) => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createProduct: (payload: any, accountId?: string) =>
-    request<{ product: Product }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
+  getProducts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
+  createProduct: (payload: any, accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') =>
+    request<{ product: Product }>(`/products?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
   // Inventory & Ledger
-  getBalances: (accountId?: string) => request<{ balances: StockBalance[] }>(`/inventory/balances${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  getStockLedger: (accountId?: string) => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getBalances: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ balances: StockBalance[] }>(`/inventory/balances?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getStockLedger: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ ledger: StockLedgerEntry[] }>(`/inventory/ledger?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
   allocateStoreInventory: (payload: { marketplaceAccountId: string; productId: string; allocatedQuantity: number; reservedQuantity?: number }) =>
     request<{ allocation: unknown }>('/inventory/allocations', { method: 'POST', body: JSON.stringify(payload) }),
 

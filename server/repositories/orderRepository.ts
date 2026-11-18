@@ -65,6 +65,7 @@ const ORDER_COLUMNS = [
 export interface OrderListOptions {
   status?: string;
   accountId?: string;
+  dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   search?: string;
   client3plId?: string;
   onlyClientOrders?: boolean;
@@ -147,6 +148,7 @@ export class SupabaseOrderRepository implements OrderRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
+      if (options.dataEnvironment) query = query.eq('data_environment', options.dataEnvironment);
       if (options.status && options.status !== 'ALL') query = query.eq('status', options.status);
       if (options.accountId && options.accountId !== 'ALL') query = query.eq('marketplace_account_id', options.accountId);
       if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId);

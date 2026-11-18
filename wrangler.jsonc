@@ -15,6 +15,9 @@
     "enabled": true,
     "redact_query_string": true
   },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "ratelimits": [
     {
       "name": "API_IP_RATE_LIMITER",

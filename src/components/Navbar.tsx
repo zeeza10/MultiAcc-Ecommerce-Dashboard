@@ -38,6 +38,8 @@ interface NavbarProps {
   globalSearch: string;
   setGlobalSearch: (s: string) => void;
   selectedStoreId?: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
+  onEnvironmentChange: (environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION') => void;
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
   isMobileNavigationOpen: boolean;
@@ -66,6 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   globalSearch,
   setGlobalSearch,
   selectedStoreId = 'ALL',
+  selectedEnvironment,
+  onEnvironmentChange,
   onStoreChange,
   onOpenNavigation,
   isMobileNavigationOpen,
@@ -126,6 +130,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             />
           </div>
 
+          <div className="w-32 shrink-0">
+            <select value={selectedEnvironment} onChange={(e) => { onEnvironmentChange(e.target.value as any); onStoreChange && onStoreChange('ALL'); }} aria-label="Data environment" className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5">
+              <option value="DEMO">Demo</option><option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
+            </select>
+          </div>
           <div className="w-48 shrink-0">
             <select
               value={selectedStoreId}
@@ -133,21 +142,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Global Store Context Filter"
               className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              {marketplaceAccounts.some((account) => account.isDemo) && (
+              <option value="ALL">All Accounts</option>
+              {selectedEnvironment === 'DEMO' && marketplaceAccounts.some((account) => account.isDemo) && (
                 <optgroup label="Demo Accounts — Presentation Only">
                   {marketplaceAccounts.filter((account) => account.isDemo).map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
+              {selectedEnvironment === 'SANDBOX' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
                 <optgroup label="eBay Sandbox — Testing Only">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'SANDBOX').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
+              {selectedEnvironment === 'PRODUCTION' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
                 <optgroup label="eBay Production — Live Business">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>

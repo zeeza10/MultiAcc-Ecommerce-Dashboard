@@ -182,8 +182,16 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
 }
 async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,watermark_at,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
+  if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
+  const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
+  const since = typeof savedCursor.since === 'string'
+    ? savedCursor.since
+    : new Date(checkpoint?.watermark_at ? new Date(checkpoint.watermark_at).getTime() - 3 * 86400000 : Date.now() - 730 * 86400000).toISOString();
+  const filterField = typeof savedCursor.filterField === 'string' ? savedCursor.filterField : checkpoint?.watermark_at ? 'lastmodifieddate' : 'creationdate';
+  let resumeOffset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
     admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
@@ -196,15 +204,15 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING' }).select('id').single();
   if (runError || !run) throw new Error('A marketplace sync run could not be started.');
   try {
-    let offset = 0, total = 0;
+    let offset = resumeOffset, total = 0, pages = 0, hasMore = false;
     do {
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
-      endpoint.searchParams.set('limit', '100'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `creationdate:[${since}..]`);
+      endpoint.searchParams.set('limit', '200'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw new Error(`eBay order API returned HTTP ${response.status}.`);
       const page = await response.json() as { orders?: any[]; total?: number };
       const orders = Array.isArray(page.orders) ? page.orders : [];
-      total = Number(page.total || orders.length); fetched += orders.length;
+      total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; pages++;
       for (const order of orders) {
         const externalId = typeof order.orderId === 'string' ? order.orderId : '';
         if (!externalId) continue;
@@ -234,17 +242,91 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
         else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
       }
       offset += orders.length;
-      if (!orders.length || offset >= total || offset >= 1000) break;
+      hasMore = orders.length === 200 || offset < total;
+      const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
+        organization_id: account.organization_id, marketplace_account_id: account.id,
+        resource_type: 'ORDERS', data_environment: dataEnvironment,
+        cursor_state: hasMore ? { since, offset, filterField } : {},
+        watermark_at: hasMore ? (checkpoint?.watermark_at || null) : new Date().toISOString(),
+        last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
+        consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
+      }, { onConflict: 'marketplace_account_id,resource_type' });
+      if (checkpointSaveError) throw new Error('The eBay order sync checkpoint could not be saved.');
+      if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
-    const finished = new Date().toISOString(), status = exceptions ? 'PARTIAL' : 'COMPLETED';
-    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`, attempt_count: 1, retryable: false }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
+    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
     return { imported, skipped, exceptions, fetched };
   } catch (error) {
     await admin.from('marketplace_sync_runs').update({ completed_at: new Date().toISOString(), status: 'FAILED', last_error_code: 'EBAY_ORDER_SYNC_FAILED', last_error_message: 'eBay order synchronization failed.', retryable: true, attempt_count: 1 }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({ last_sync_status: 'FAILED', last_sync_message: 'eBay order synchronization failed. Check the integration events and try again.' }).eq('id', account.id);
     throw error;
   }
+}
+
+
+async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetched: number; pagesPending: boolean }> {
+  const admin = createServiceClient(env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const dataEnvironment = account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'INVENTORY').maybeSingle();
+  if (checkpointError) throw new Error('The eBay inventory checkpoint could not be loaded.');
+  const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
+    ? checkpoint.cursor_state as Record<string, unknown> : {};
+  let offset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
+  let pages = 0, fetched = 0, hasMore = false;
+  do {
+    const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/inventory_item`);
+    endpoint.searchParams.set('limit', '100');
+    endpoint.searchParams.set('offset', String(offset));
+    const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`eBay inventory API returned HTTP ${response.status}.`);
+    const page = await response.json() as { inventoryItems?: any[]; total?: number };
+    const items = Array.isArray(page.inventoryItems) ? page.inventoryItems : [];
+    fetched += items.length;
+    pages++;
+    const rows = items.map((item: any) => {
+      const sku = String(item.sku || '').trim().slice(0, 128);
+      const quantityValue = item.availability?.shipToLocationAvailability?.quantity;
+      return {
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        data_environment: dataEnvironment,
+        external_sku: sku,
+        inventory_item: item,
+        offers: [],
+        total_ship_to_location_quantity: Number.isFinite(Number(quantityValue)) ? Math.max(0, Math.trunc(Number(quantityValue))) : null,
+        source_updated_at: item.product?.aspects?.updatedAt || null,
+        synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }).filter((row: any) => row.external_sku);
+    if (rows.length) {
+      const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
+      if (saveError) throw new Error('eBay inventory snapshots could not be saved.');
+    }
+    offset += items.length;
+    const total = Number(page.total ?? offset);
+    hasMore = items.length === 100 || offset < total;
+    const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      resource_type: 'INVENTORY',
+      data_environment: dataEnvironment,
+      cursor_state: hasMore ? { offset } : {},
+      last_attempt_at: new Date().toISOString(),
+      last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
+      watermark_at: hasMore ? null : new Date().toISOString(),
+      consecutive_failures: 0,
+      last_error_code: null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'marketplace_account_id,resource_type' });
+    if (checkpointSaveError) throw new Error('The eBay inventory checkpoint could not be saved.');
+    if (!items.length || !hasMore || pages >= 5) break;
+  } while (true);
+  return { fetched, pagesPending: hasMore };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
@@ -323,7 +405,11 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.is_demo || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected eBay seller account can be synchronized.' }, 409);
     if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
-    try { return json(await syncSellerOrders(account, env)); }
+    try {
+      const orders = await syncSellerOrders(account, env);
+      const inventory = await syncSellerInventory(account, env);
+      return json({ ...orders, inventory });
+    }
     catch (error) { return json({ error: error instanceof Error ? error.message : 'eBay order synchronization failed.' }, 502); }
   }
 
@@ -409,6 +495,68 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
   return null;
+}
+
+
+/**
+ * Cloudflare Cron entry point. Enqueues due non-demo seller accounts and
+ * drains a bounded batch through the existing service-role job lease.
+ * Demo accounts are intentionally excluded.
+ */
+export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void> {
+  const admin = createServiceClient(env);
+  const now = Date.now();
+  const { data: accounts, error } = await admin.from('marketplace_accounts')
+    .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,auto_sync_interval_minutes')
+    .eq('is_demo', false).eq('auth_status', 'CONNECTED')
+    .in('environment', ['SANDBOX', 'PRODUCTION']);
+  if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
+  for (const account of accounts || []) {
+    const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
+    const lastSync = account.last_sync_at ? new Date(account.last_sync_at).getTime() : 0;
+    if (lastSync && now - lastSync < intervalMs) continue;
+    const bucket = Math.floor(now / intervalMs);
+    const idempotencyKey = `scheduled-orders:${account.id}:${bucket}`;
+    const { error: enqueueError } = await admin.from('marketplace_sync_jobs').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      idempotency_key: idempotencyKey,
+      trigger_reason: 'SCHEDULED',
+      status: 'QUEUED',
+      scheduled_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+    }, { onConflict: 'marketplace_account_id,idempotency_key', ignoreDuplicates: true });
+    if (enqueueError) throw new Error('A scheduled marketplace sync could not be queued.');
+  }
+
+  const { data: jobs, error: claimError } = await admin.rpc('claim_marketplace_sync_jobs', { p_limit: 5 });
+  if (claimError) throw new Error('Scheduled marketplace sync jobs could not be claimed.');
+  for (const job of jobs || []) {
+    try {
+      const { data: account, error: accountError } = await admin.from('marketplace_accounts')
+        .select('id,organization_id,environment,is_demo,auth_status,marketplace')
+        .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id).maybeSingle();
+      if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
+        || !isEnvironment(account.environment)) {
+        throw new Error('The scheduled seller account is not eligible for live synchronization.');
+      }
+      await syncSellerOrders(account, env);
+      await syncSellerInventory(account, env);
+      await admin.from('marketplace_sync_jobs').update({
+        status: 'SUCCEEDED', completed_at: new Date().toISOString(),
+        locked_until: null, last_error_code: null, last_error_message: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id);
+    } catch {
+      await admin.from('marketplace_sync_jobs').update({
+        status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+        scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
+        locked_until: null, last_error_code: 'SCHEDULED_SYNC_FAILED',
+        last_error_message: 'Scheduled eBay synchronization failed. Retry is queued when eligible.',
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id);
+    }
+  }
 }
 
 export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv): Promise<Response> {

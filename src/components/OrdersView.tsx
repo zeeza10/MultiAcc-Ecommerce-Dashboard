@@ -27,6 +27,7 @@ interface OrdersViewProps {
   currentUser: User;
   config: SystemConfig;
   selectedStoreId: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   initialFilter?: any;
   onOpenNewOrder: () => void;
 }
@@ -37,6 +38,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   currentUser,
   config,
   selectedStoreId,
+  selectedEnvironment,
   initialFilter,
   onOpenNewOrder,
 }) => {
@@ -64,11 +66,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     setShowEditModal(false);
     loadOrders();
     loadProducts();
-  }, [statusFilter, currentUser.id, selectedStoreId]);
+  }, [statusFilter, currentUser.id, selectedStoreId, selectedEnvironment]);
 
   const loadProducts = async () => {
     try {
-      const res = await api.getProducts(selectedStoreId);
+      const res = await api.getProducts(selectedStoreId, selectedEnvironment);
       setProducts(res.products);
     } catch (e) {
       console.warn('Failed to load products for editing', e);
@@ -82,6 +84,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         status: statusFilter === 'PENDING_GROUP' ? undefined : statusFilter,
         search,
         accountId: selectedStoreId,
+        environment: selectedEnvironment,
       });
 
 
