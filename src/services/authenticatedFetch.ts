@@ -50,9 +50,14 @@ export async function fetchWithSessionRecovery(
 ): Promise<Response> {
   const current = await auth.getSession();
   if (current.error) {
+    if (isDefinitiveRefreshFailure(current.error)) {
+      await clearLocalSession(auth);
+      throw new Error('Your session has expired. Please sign in again.');
+    }
     throw new Error('Authentication could not be checked right now. Your session has been preserved. Please retry.');
   }
   if (!current.data.session?.access_token) {
+    await clearLocalSession(auth);
     throw new Error('Your session has expired. Please sign in again.');
   }
 
