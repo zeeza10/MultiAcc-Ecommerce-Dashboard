@@ -16,6 +16,8 @@ describe('browser security headers', () => {
     assert.equal(response.headers.get('Strict-Transport-Security'), 'max-age=31536000');
     assert.match(PRODUCTION_CONTENT_SECURITY_POLICY, /script-src 'self'/);
     assert.match(PRODUCTION_CONTENT_SECURITY_POLICY, /object-src 'none'/);
+    assert.match(PRODUCTION_CONTENT_SECURITY_POLICY, /style-src 'self'/);
+    assert.doesNotMatch(PRODUCTION_CONTENT_SECURITY_POLICY, /style-src 'self'[^;]*unsafe-inline/);
     assert.match(PRODUCTION_CONTENT_SECURITY_POLICY, /frame-ancestors 'none'/);
     assert.doesNotMatch(PRODUCTION_CONTENT_SECURITY_POLICY, /unsafe-eval/);
   });
