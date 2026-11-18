@@ -4,6 +4,7 @@
  * caller's Supabase JWT so database RLS remains the tenant isolation boundary.
  */
 import { handleApiRequest } from './api';
+import { runScheduledMarketplaceSync } from './routes/marketplace';
 import type { RateLimitBinding } from './types';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
@@ -32,6 +33,10 @@ export interface ExecutionContext {
 }
 
 export default {
+  async scheduled(_controller: { cron: string; scheduledTime: number }, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runScheduledMarketplaceSync(env));
+  },
+
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const secure = (response: Response) => withBrowserSecurityHeaders(response, url.protocol === 'https:');
