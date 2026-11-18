@@ -99,6 +99,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       setSyncFeedback(
         `Full sync completed: ${res.imported} orders imported, ${res.skipped} duplicate orders skipped, ${res.inventory?.fetched || 0} inventory items and ${res.inventory?.offersFetched || 0} listing offers fetched, ${res.exceptions} SKU exceptions.`
       );
+      setListingSnapshots(current => { const next = { ...current }; delete next[accountId]; return next; });
+      setListingTotals(current => { const next = { ...current }; delete next[accountId]; return next; });
       loadData();
     } catch (err: any) {
       setSyncFeedback(`Sync failed: ${err.message}`);
@@ -255,7 +257,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           </select>
           <button onClick={handleCreateAccount} disabled={accountSaving || !newAccountName.trim()} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs disabled:opacity-50">{accountSaving ? 'Adding…' : 'Add Seller Account'}</button>
         </div>
-        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. Demo accounts cannot be OAuth-connected.</p>
+        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. After OAuth connects the seller, the first sync starts automatically on the next scheduled run (within about 5 minutes). Demo accounts cannot be OAuth-connected.</p>
       </div>
 
       {syncFeedback && (
@@ -365,7 +367,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Syncing...' : acc.authStatus !== 'CONNECTED' ? 'Connect first' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
+                      <span>{isSyncing ? 'Syncing...' : acc.authStatus !== 'CONNECTED' ? 'Connect first' : integrationReady ? 'Sync Orders + Inventory' : 'Sync unavailable'}</span>
                     </button>
                   </div>
                   {acc.authStatus === 'CONNECTED' && (
