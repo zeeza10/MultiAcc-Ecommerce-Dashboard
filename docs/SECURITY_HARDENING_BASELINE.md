@@ -15,7 +15,7 @@ The following rules are active and scoped only to `app.oriafuture.com` so unrela
 - API responses use `Cache-Control: no-store`.
 - Worker rate limits are configured for IP traffic, reads, writes, and invitations.
 
-Cloudflare's legacy zone `waf` setting is deprecated; Managed Rulesets are activated through the Rulesets phase entrypoint. The app-specific managed-ruleset rule is therefore the active control. No zone-wide minimum-TLS or Always-HTTPS setting was changed because this DNS zone also contains mail and cPanel hostnames.
+Cloudflare's legacy zone `waf` setting is deprecated; Managed Rulesets are activated through the Rulesets phase entrypoint. The app-specific Managed Free Ruleset rule is therefore the active control. The zone is currently on Cloudflare's Free Website plan, so this is not equivalent to the full paid managed WAF/OWASP feature set. No zone-wide minimum-TLS or Always-HTTPS setting was changed because this DNS zone also contains mail and cPanel hostnames.
 
 ## Cloudflare Worker secrets
 
@@ -57,10 +57,11 @@ Outstanding repository control: the current GitHub Free plan does not allow repo
 1. Upgrade Supabase to a plan that supports Leaked Password Protection and enable it.
 2. Upgrade GitHub plan and enforce `main` branch protection and required checks.
 3. Enable GitHub code-scanning alert upload when repository entitlement supports it; review CodeQL findings, not only workflow completion.
-4. Review the Worker compatibility date and update it in a separate tested change.
-5. Add a Content Security Policy in report-only mode, inventorying all legitimate browser connections first, then enforce it after testing.
-6. Run an authenticated end-to-end Sandbox eBay test using valid credentials entered only in the dashboard. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
-7. Maintain tested backups and a documented recovery/credential-rotation procedure.
+4. Consider a Cloudflare plan with the full managed WAF/OWASP ruleset if the dashboard's threat model and budget require it.
+5. Review the Worker compatibility date and update it in a separate tested change.
+6. Add a Content Security Policy in report-only mode, inventorying all legitimate browser connections first, then enforce it after testing.
+7. Run an authenticated end-to-end Sandbox eBay test using valid credentials entered only in the dashboard. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
+8. Maintain tested backups and a documented recovery/credential-rotation procedure.
 
 ## Change safety
 
