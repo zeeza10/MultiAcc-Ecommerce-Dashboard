@@ -314,9 +314,8 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
     const offersBySku = new Map(offerResults.map((entry) => [entry.sku, entry.offers]));
     offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0);
     const syncedAt = new Date().toISOString();
-    const rows = items.map((item: any) => {
+    const rows = items.filter((item: any) => String(item.sku || '').trim()).map((item: any) => {
       const sku = String(item.sku || '').trim().slice(0, 128);
-      if (!sku) return null;
       const quantityValue = item.availability?.shipToLocationAvailability?.quantity;
       const offers = offersBySku.get(sku) || [];
       const listingStatuses = offers.map((offer: any) => String(offer.listingStatus || '').trim()).filter(Boolean);
@@ -333,7 +332,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
         synced_at: syncedAt,
         updated_at: syncedAt,
       };
-    }).filter(Boolean);
+    });
     if (rows.length) {
       const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
       if (saveError) throw new Error('eBay inventory and listing snapshots could not be saved.');
