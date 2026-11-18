@@ -74,7 +74,7 @@ There are now 33 `SECURITY DEFINER` functions in the non-exposed `private` schem
 
 ## Additional private function hardening
 
-A reviewed additive migration (`20261118142500_harden_private_definer_search_paths`) pins ten additional private `SECURITY DEFINER` functions to an empty `search_path`. Their application tables and helper functions are schema-qualified. The change is prepared in the current security PR and will be applied only after CI and merge. The remaining legacy private functions retain `pg_temp` last and run in schemas where application roles cannot create objects.
+The additive migration (`20261118142500_harden_private_definer_search_paths`) has been applied and verified in Production: ten private `SECURITY DEFINER` functions now use an empty `search_path`. A follow-up migration (`20261118150000_harden_remaining_private_definer_search_paths`) is under review to apply the same protection to the remaining twelve private privileged functions. Their application relations and helper functions are schema-qualified; the follow-up does not change function bodies, grants, triggers, RLS policies, or business behavior.
 
 ## Express compatibility server containment
 
