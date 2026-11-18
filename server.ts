@@ -86,6 +86,10 @@ async function startServer() {
   const hasDist = fs.existsSync(path.resolve(clientPath, 'index.html'));
 
   if (hasDist) {
+    // Static file serving performs filesystem reads; apply an IP limiter before
+    // Express static middleware so assets and index.html are not an unmetered path.
+    app.use(createIpRateLimiter(600, 60_000));
+
     // Ultra-fast instant static serving (zero bundle delay)
     // Assets with content hashes can be cached safely
     app.use('/assets', express.static(path.resolve(clientPath, 'assets'), {

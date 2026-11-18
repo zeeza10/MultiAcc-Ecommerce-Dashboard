@@ -157,7 +157,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       setRuNameInput('');
       setIntegrationConfig(await api.getEbayIntegrationConfig());
       await loadData();
-      alert('eBay application credentials were encrypted and saved.');
+      alert('eBay verified the application keypair and the credentials were securely saved. Seller authorization is still pending and must be completed separately.');
     } catch (err: any) {
       alert(err.message || 'Could not save eBay credentials.');
     } finally {
@@ -196,7 +196,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       {currentUser.role === 'SUPER_ADMIN' && (
         <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
           <div className="font-semibold text-sm text-slate-900">eBay Developer Application Credentials</div>
-          <p className="text-xs text-slate-600">Credentials are encrypted in the Worker before storage. They are never returned to the browser after saving. Do not paste these values into chat or GitHub.</p>
+          <p className="text-xs text-slate-600">Credentials are first verified directly with the selected eBay environment, then encrypted in the Worker before storage. They are never returned to the browser. Seller authorization is a separate step; saving app credentials does not connect a seller account. Do not paste these values into chat or GitHub.</p>
           <p className="text-xs text-amber-700">Shared platform credentials can only be viewed by explicitly allowlisted platform owners. Saving also requires a completed authenticator MFA step-up (AAL2); a workspace Super Admin role alone is not sufficient.</p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <select value={credentialEnvironment} onChange={e => setCredentialEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
@@ -208,10 +208,10 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] text-slate-500">
-              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? item.clientIdMasked : 'not configured'}`).join(' · ') || 'Server encryption and Supabase secret-key credentials must be configured first.'}
+              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? `${item.clientIdMasked} (${item.credentialsVerified ? 'verified' : 'NOT VERIFIED — replace and verify'})` : 'not configured'}`).join(' · ') || 'Server encryption and Supabase secret-key credentials must be configured first.'}
             </span>
             <button onClick={handleSaveCredentials} disabled={credentialSaving || !clientIdInput.trim() || !clientSecretInput.trim() || !ruNameInput.trim()} className="px-3 py-2 rounded-md bg-slate-900 text-white text-xs disabled:opacity-50">
-              {credentialSaving ? 'Saving securely…' : 'Save Encrypted Credentials'}
+              {credentialSaving ? 'Saving securely…' : 'Verify & Save Credentials'}
             </button>
           </div>
           {integrationConfig && !integrationConfig.encryptionReady && <p className="text-xs text-rose-700">Worker encryption key is not configured. Add EBAY_TOKEN_ENCRYPTION_KEY in Cloudflare Worker Secrets before saving.</p>}
