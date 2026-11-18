@@ -138,7 +138,7 @@ export async function verifyEbayApplicationCredentials(
     } catch {
       payload = null;
     }
-    const token = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const token: Record<string, unknown> = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
     if (typeof token.access_token !== 'string' || !token.access_token || typeof token.expires_in !== 'number' || !Number.isFinite(token.expires_in) || token.expires_in <= 0) {
       throw new EbayCredentialVerificationError(
         'eBay returned an unexpected verification response. No credentials were saved.',
