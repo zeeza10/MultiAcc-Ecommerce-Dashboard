@@ -214,7 +214,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
               {credentialSaving ? 'Saving securely…' : 'Verify & Save Credentials'}
             </button>
           </div>
-          {integrationConfig && !integrationConfig.encryptionReady && <p className="text-xs text-rose-700">Worker encryption key is not configured. Add EBAY_TOKEN_ENCRYPTION_KEY in Cloudflare Worker Secrets before saving.</p>}
+          {integrationConfig && !integrationConfig.encryptionReady && <p className="text-xs text-rose-700">Worker encryption secret is not configured. Add the eBay token-encryption secret in Cloudflare Worker settings before saving.</p>}
           {integrationConfig && !integrationConfig.productionOAuthEnabled && <p className="text-xs text-amber-700">Production OAuth remains locked until eBay activates the Production keyset and Marketplace Account Deletion compliance is verified.</p>}
         </div>
       )}
