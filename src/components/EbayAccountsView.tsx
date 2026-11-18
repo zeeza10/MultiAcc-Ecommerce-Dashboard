@@ -38,6 +38,10 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [expandedListingsAccountId, setExpandedListingsAccountId] = useState<string | null>(null);
+  const [listingSnapshots, setListingSnapshots] = useState<Record<string, any[]>>({});
+  const [listingTotals, setListingTotals] = useState<Record<string, number>>({});
+  const [listingLoadingAccountId, setListingLoadingAccountId] = useState<string | null>(null);
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
@@ -93,13 +97,35 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     try {
       const res = await api.syncEbayAccount(accountId);
       setSyncFeedback(
-        `Sync completed: ${res.imported} new imported, ${res.skipped} skipped as duplicates (AT-01 idempotent), ${res.exceptions} exceptions raised.`
+        `Full sync completed: ${res.imported} orders imported, ${res.skipped} duplicate orders skipped, ${res.inventory?.fetched || 0} inventory items and ${res.inventory?.offersFetched || 0} listing offers fetched, ${res.exceptions} SKU exceptions.`
       );
+      setListingSnapshots(current => { const next = { ...current }; delete next[accountId]; return next; });
+      setListingTotals(current => { const next = { ...current }; delete next[accountId]; return next; });
       loadData();
     } catch (err: any) {
       setSyncFeedback(`Sync failed: ${err.message}`);
     } finally {
       setSyncingAccountId(null);
+    }
+  };
+
+  const handleToggleListings = async (accountId: string) => {
+    if (expandedListingsAccountId === accountId) {
+      setExpandedListingsAccountId(null);
+      return;
+    }
+    setExpandedListingsAccountId(accountId);
+    if (listingSnapshots[accountId]) return;
+    setListingLoadingAccountId(accountId);
+    try {
+      const result = await api.getEbayListings(accountId, 100, 0);
+      setListingSnapshots(current => ({ ...current, [accountId]: result.listings }));
+      setListingTotals(current => ({ ...current, [accountId]: result.total }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load seller listings: ${err.message}`);
+      setExpandedListingsAccountId(null);
+    } finally {
+      setListingLoadingAccountId(null);
     }
   };
 
@@ -174,7 +200,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">eBay Marketplace Integration</h1>
           <p className="text-xs text-gray-500">
-            Account metadata and SKU exception management. Live OAuth and order synchronization are gated until secure credentials and token storage are configured.
+            Connect each seller once, then automatically import orders, inventory items and Inventory API listing offers, prices and quantities.
           </p>
         </div>
 
@@ -231,7 +257,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           </select>
           <button onClick={handleCreateAccount} disabled={accountSaving || !newAccountName.trim()} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs disabled:opacity-50">{accountSaving ? 'Adding…' : 'Add Seller Account'}</button>
         </div>
-        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. Demo accounts cannot be OAuth-connected.</p>
+        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. After OAuth connects the seller, the first sync starts automatically on the next scheduled run (within about 5 minutes). Demo accounts cannot be OAuth-connected.</p>
       </div>
 
       {syncFeedback && (
@@ -332,7 +358,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       title={!integrationReady ? integrationMessage : acc.environment === 'PRODUCTION' && !productionOAuthEnabled ? 'Production keyset is not yet activated by eBay.' : undefined}
                       className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Renew OAuth
+                      {acc.authStatus === 'CONNECTED' ? 'Reconnect eBay Account' : 'Connect eBay Account'}
                     </button>
 
                     <button
@@ -341,9 +367,49 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       className="px-3 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-md shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Syncing...' : acc.authStatus !== 'CONNECTED' ? 'Connect first' : integrationReady ? 'Sync Orders Now' : 'Sync unavailable'}</span>
+                      <span>{isSyncing ? 'Syncing...' : acc.authStatus !== 'CONNECTED' ? 'Connect first' : integrationReady ? 'Sync Orders + Inventory' : 'Sync unavailable'}</span>
                     </button>
                   </div>
+                  {acc.authStatus === 'CONNECTED' && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <button onClick={() => handleToggleListings(acc.id)} className="text-xs font-semibold text-indigo-700 hover:text-indigo-900">
+                        {expandedListingsAccountId === acc.id ? 'Hide synced listings' : `View synced listings (${listingTotals[acc.id] ?? 'load'})`}
+                      </button>
+                      {expandedListingsAccountId === acc.id && (
+                        <div className="mt-3 overflow-x-auto">
+                          {listingLoadingAccountId === acc.id ? (
+                            <p className="text-xs text-slate-500 py-3">Loading seller inventory and listings…</p>
+                          ) : (
+                            <table className="w-full text-left text-[11px]">
+                              <thead className="bg-slate-50 text-slate-600">
+                                <tr><th className="p-2">SKU</th><th className="p-2">Product</th><th className="p-2">Listing</th><th className="p-2">Inventory Qty</th><th className="p-2">Offer Qty / Price</th></tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {(listingSnapshots[acc.id] || []).map((listing: any) => (
+                                  <tr key={listing.sku}>
+                                    <td className="p-2 font-mono">{listing.sku}</td>
+                                    <td className="p-2 min-w-40">{listing.title || '—'}</td>
+                                    <td className="p-2">{listing.listingStatus}</td>
+                                    <td className="p-2 tabular-nums">{listing.inventoryQuantity ?? '—'}</td>
+                                    <td className="p-2">
+                                      {listing.offers?.length ? listing.offers.map((offer: any) => (
+                                        <div key={offer.offerId || offer.listingId || listing.sku}>
+                                          {offer.availableQuantity ?? '—'} / {offer.pricingSummary?.price?.value ? `${offer.pricingSummary.price.currency || ''} ${offer.pricingSummary.price.value}` : '—'}
+                                        </div>
+                                      )) : 'No offer'}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {!(listingSnapshots[acc.id] || []).length && (
+                                  <tr><td colSpan={5} className="p-3 text-center text-slate-500">No synced inventory yet. Use “Sync Orders + Inventory” after connecting. The first automatic sync also starts on the next scheduled run (within about 5 minutes).</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

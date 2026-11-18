@@ -151,7 +151,9 @@ export const api = {
   getEbayIntegrationConfig: () => request<{ environments: Array<{ environment: string; configured: boolean; clientIdMasked: string; credentialVersion: number; updatedAt: string | null }>; productionOAuthEnabled: boolean; encryptionReady: boolean }>('/ebay/integration/config'),
   saveEbayIntegrationConfig: (payload: { environment: 'SANDBOX' | 'PRODUCTION'; clientId: string; clientSecret: string; ruName: string; expectedVersion: number }) => request<{ success: boolean }>('/ebay/integration/config', { method: 'POST', body: JSON.stringify(payload) }),
   syncEbayAccount: (id: string) =>
-    request<{ imported: number; skipped: number; exceptions: number }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
+    request<{ imported: number; skipped: number; exceptions: number; fetched: number; inventory: { fetched: number; offersFetched: number; pagesPending: boolean } }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
+  getEbayListings: (id: string, limit = 50, offset = 0) =>
+    request<{ listings: Array<{ sku: string; title: string; description: string; imageUrls: string[]; condition: string; inventoryQuantity: number | null; listingStatus: string; offers: any[]; syncedAt: string }>; total: number; limit: number; offset: number }>(`/ebay/accounts/${id}/listings?limit=${limit}&offset=${offset}`),
   connectEbayAccount: (id: string) =>
     request<{ authorizationUrl: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
   getExceptions: (accountId?: string) => request<{ exceptions: ExceptionItem[] }>(`/ebay/exceptions${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),

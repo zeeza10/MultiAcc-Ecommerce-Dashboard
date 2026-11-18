@@ -266,20 +266,22 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
 }
 
 
-async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetched: number; pagesPending: boolean }> {
+async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetched: number; offersFetched: number; pagesPending: boolean }> {
   const admin = createServiceClient(env);
   const accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
     .select('cursor_state,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'INVENTORY').maybeSingle();
   if (checkpointError) throw new Error('The eBay inventory checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
     ? checkpoint.cursor_state as Record<string, unknown> : {};
   let offset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
-  let pages = 0, fetched = 0, hasMore = false;
+  let pages = 0, fetched = 0, offersFetched = 0, hasMore = false;
   do {
     const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/inventory_item`);
-    endpoint.searchParams.set('limit', '100');
+    endpoint.searchParams.set('limit', '25');
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
     if (!response.ok) throw new Error(`eBay inventory API returned HTTP ${response.status}.`);
@@ -287,29 +289,57 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
     const items = Array.isArray(page.inventoryItems) ? page.inventoryItems : [];
     fetched += items.length;
     pages++;
-    const rows = items.map((item: any) => {
+
+    // Inventory items contain product details and base stock. Offers contain the
+    // actual marketplace listing state, listing ID, price and offer-level quantity.
+    // Fetch offers in small concurrent batches to respect eBay API limits.
+    const offerResults: Array<{ sku: string; offers: any[] }> = [];
+    const skus = items.map((item: any) => String(item.sku || '').trim()).filter((sku: string) => sku && sku.length <= 50);
+    for (let index = 0; index < skus.length; index += 5) {
+      const batch = skus.slice(index, index + 5);
+      const batchResults = await Promise.all(batch.map(async (sku) => {
+        const offersUrl = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/offer`);
+        offersUrl.searchParams.set('sku', sku);
+        offersUrl.searchParams.set('marketplace_id', marketplaceId);
+        offersUrl.searchParams.set('limit', '100');
+        offersUrl.searchParams.set('offset', '0');
+        const offersResponse = await fetch(offersUrl, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+        if (offersResponse.status === 404) return { sku, offers: [] as any[] };
+        if (!offersResponse.ok) throw new Error(`eBay offers API returned HTTP ${offersResponse.status} for an inventory SKU.`);
+        const offersPayload = await offersResponse.json() as { offers?: any[] };
+        return { sku, offers: Array.isArray(offersPayload.offers) ? offersPayload.offers : [] };
+      }));
+      offerResults.push(...batchResults);
+    }
+    const offersBySku = new Map(offerResults.map((entry) => [entry.sku, entry.offers]));
+    offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0);
+    const syncedAt = new Date().toISOString();
+    const rows = items.filter((item: any) => String(item.sku || '').trim()).map((item: any) => {
       const sku = String(item.sku || '').trim().slice(0, 128);
       const quantityValue = item.availability?.shipToLocationAvailability?.quantity;
+      const offers = offersBySku.get(sku) || [];
+      const listingStatuses = offers.map((offer: any) => String(offer.listingStatus || '').trim()).filter(Boolean);
       return {
         organization_id: account.organization_id,
         marketplace_account_id: account.id,
         data_environment: dataEnvironment,
         external_sku: sku,
         inventory_item: item,
-        offers: [],
+        offers,
         total_ship_to_location_quantity: Number.isFinite(Number(quantityValue)) ? Math.max(0, Math.trunc(Number(quantityValue))) : null,
+        listing_status: listingStatuses.includes('PUBLISHED') ? 'PUBLISHED' : (listingStatuses[0] || 'NOT_LISTED'),
         source_updated_at: item.product?.aspects?.updatedAt || null,
-        synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        synced_at: syncedAt,
+        updated_at: syncedAt,
       };
-    }).filter((row: any) => row.external_sku);
+    });
     if (rows.length) {
       const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
-      if (saveError) throw new Error('eBay inventory snapshots could not be saved.');
+      if (saveError) throw new Error('eBay inventory and listing snapshots could not be saved.');
     }
     offset += items.length;
     const total = Number(page.total ?? offset);
-    hasMore = items.length === 100 || offset < total;
+    hasMore = items.length === 25 || offset < total;
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
       organization_id: account.organization_id,
       marketplace_account_id: account.id,
@@ -326,7 +356,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
     if (checkpointSaveError) throw new Error('The eBay inventory checkpoint could not be saved.');
     if (!items.length || !hasMore || pages >= 5) break;
   } while (true);
-  return { fetched, pagesPending: hasMore };
+  return { fetched, offersFetched, pagesPending: hasMore };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
@@ -397,6 +427,44 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     });
   }
 
+
+  const listingsMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/listings$/);
+  if (listingsMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id').eq('id', listingsMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    const url = new URL(request.url);
+    const requestedLimit = Number(url.searchParams.get('limit') || 50);
+    const requestedOffset = Number(url.searchParams.get('offset') || 0);
+    const limit = Number.isSafeInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+    const offset = Number.isSafeInteger(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+    const admin = createServiceClient(env);
+    const { data, error, count } = await admin.from('marketplace_listing_snapshots')
+      .select('external_sku,inventory_item,offers,total_ship_to_location_quantity,listing_status,source_updated_at,synced_at', { count: 'exact' })
+      .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
+      .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    return json({
+      listings: (data || []).map((row: any) => ({
+        sku: row.external_sku,
+        title: row.inventory_item?.product?.title || '',
+        description: row.inventory_item?.product?.description || '',
+        imageUrls: row.inventory_item?.product?.imageUrls || [],
+        condition: row.inventory_item?.condition || '',
+        inventoryQuantity: row.total_ship_to_location_quantity,
+        listingStatus: row.listing_status || 'NOT_LISTED',
+        offers: Array.isArray(row.offers) ? row.offers : [],
+        sourceUpdatedAt: row.source_updated_at,
+        syncedAt: row.synced_at,
+      })),
+      total: count || 0,
+      limit,
+      offset,
+    });
+  }
 
   const syncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync$/);
   if (syncMatch && request.method === 'POST') {
@@ -630,6 +698,8 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
       updated_at: new Date(now).toISOString(),
     }).eq('id', oauthState.marketplace_account_id).eq('organization_id', oauthState.organization_id).eq('is_demo', false);
     if (accountError) throw new Error('The eBay seller account status could not be updated.');
+    // The five-minute scheduled sweep automatically discovers connected accounts
+    // whose last_sync_at is empty and queues their first complete sync.
     await admin.from('marketplace_integration_events').insert({
       organization_id: oauthState.organization_id,
       marketplace_account_id: oauthState.marketplace_account_id,
