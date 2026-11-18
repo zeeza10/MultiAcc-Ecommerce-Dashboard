@@ -224,8 +224,12 @@ Deno.serve(async (request: Request) => {
   // invitee submits the password form; this avoids redirect allowlist fallbacks
   // and prevents email link scanners from consuming the invitation token.
   const inviteUrl = new URL("/accept-invitation", "https://app.oriafuture.com");
-  inviteUrl.searchParams.set("token_hash", inviteTokenHash);
-  inviteUrl.searchParams.set("type", "invite");
+  // Put the single-use token in the URL fragment: browsers never send fragments
+  // in HTTP requests, access logs, or Referer headers.
+  inviteUrl.hash = new URLSearchParams({
+    token_hash: inviteTokenHash,
+    type: "invite",
+  }).toString();
   const actionLink = inviteUrl.toString();
 
   let resendResponse: Response;
