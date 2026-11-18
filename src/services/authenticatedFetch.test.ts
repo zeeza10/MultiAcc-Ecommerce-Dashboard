@@ -128,3 +128,24 @@ test('clears a definitively expired stored refresh session but preserves it on t
   );
   assert.equal(temporary.calls.signOut, 0);
 });
+
+test('shares one refresh operation across concurrent startup API requests', async () => {
+  let refreshCalls = 0;
+  const auth = {
+    getSession: async () => ({ data: { session: { access_token: 'old-token' } }, error: null }),
+    refreshSession: async () => {
+      refreshCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { data: { session: { access_token: 'new-token' } }, error: null };
+    },
+    signOut: async () => ({ error: null }),
+  };
+  const fetcher = async () => invalidSession();
+
+  await Promise.all([
+    fetchWithSessionRecovery(fetcher, auth, '/api/v1/config'),
+    fetchWithSessionRecovery(fetcher, auth, '/api/v1/notifications'),
+  ]);
+
+  assert.equal(refreshCalls, 1);
+});
