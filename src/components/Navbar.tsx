@@ -42,6 +42,7 @@ interface NavbarProps {
   onEnvironmentChange: (environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION') => void;
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
+  onSearchOpen: () => void;
   isMobileNavigationOpen: boolean;
   isDarkTheme: boolean;
   onToggleTheme: () => void;
@@ -72,6 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onEnvironmentChange,
   onStoreChange,
   onOpenNavigation,
+  onSearchOpen,
   isMobileNavigationOpen,
   isDarkTheme,
   onToggleTheme,
@@ -117,24 +119,26 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="hidden min-w-[260px] max-w-xl flex-1 items-center gap-2 xl:flex">
-          <div className="relative flex-1">
+        <div className="order-3 flex w-full min-w-0 items-center justify-center gap-2 xl:order-none xl:flex-1 xl:max-w-3xl">
+          <div className="relative min-w-0 flex-1 max-w-xl">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
+              onFocus={onSearchOpen}
+              onClick={onSearchOpen}
               placeholder="Global Search (Orders, SKUs, Tracking #, Buyers)..."
-              className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-md focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
-          <div className="w-32 shrink-0">
+          <div className="hidden w-28 shrink-0 2xl:block">
             <select value={selectedEnvironment} onChange={(e) => { onEnvironmentChange(e.target.value as any); onStoreChange && onStoreChange('ALL'); }} aria-label="Data environment" className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5">
               <option value="DEMO">Demo</option><option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
             </select>
           </div>
-          <div className="w-48 shrink-0">
+          <div className="hidden w-40 shrink-0 2xl:block">
             <select
               value={selectedStoreId}
               onChange={(e) => onStoreChange && onStoreChange(e.target.value)}
