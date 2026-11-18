@@ -165,6 +165,11 @@ export async function handleApiRequest(request: Request, env: WorkerEnv, createS
   }
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
 
+  if (url.pathname === '/api/v1/ebay/account-deletion-notification' && env.API_IP_RATE_LIMITER) {
+    const connectingIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const limited = await enforceRateLimit(env.API_IP_RATE_LIMITER, `ebay-deletion-webhook:${connectingIp}`, 'eBay deletion webhook');
+    if (limited) return limited;
+  }
   const deletionNotificationResponse = await handleEbayAccountDeletionNotification(request, env);
   if (deletionNotificationResponse) return deletionNotificationResponse;
 
