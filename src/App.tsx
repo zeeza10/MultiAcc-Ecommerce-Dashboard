@@ -467,6 +467,7 @@ export default function App() {
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
+              selectedEnvironment={selectedEnvironment}
               onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
             />
           )}
