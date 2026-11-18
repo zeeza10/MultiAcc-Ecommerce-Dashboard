@@ -34,21 +34,24 @@ test('eBay account deletion challenge fails closed without a valid token', async
   assert.equal(response.status, 503);
 });
 
-test('eBay notification signature validates against the exact serialized payload', () => {
+test('eBay SHA1 notification signature validates against the exact serialized payload', () => {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const payload = {
     metadata: { topic: 'MARKETPLACE_ACCOUNT_DELETION', schemaVersion: '1.0', deprecated: false },
     notification: { notificationId: 'test-notification-id', data: { userId: 'test-user-id' } },
   };
+  const pem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const signature = sign('sha1', Buffer.from(JSON.stringify(payload)), privateKey);
+  assert.equal(verifyEbayNotificationSignature(payload, signature.toString('base64'), pem, 'SHA1'), true);
+  assert.equal(verifyEbayNotificationSignature({ ...payload, changed: true }, signature.toString('base64'), pem, 'SHA1'), false);
+});
+
+test('eBay SHA256 notification signature remains supported', () => {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const payload = { metadata: { topic: 'MARKETPLACE_ACCOUNT_DELETION' }, notification: { notificationId: 'id' } };
+  const pem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
   const signature = sign('sha256', Buffer.from(JSON.stringify(payload)), privateKey);
-  assert.equal(
-    verifyEbayNotificationSignature(payload, signature.toString('base64'), publicKey.export({ type: 'spki', format: 'pem' }).toString()),
-    true,
-  );
-  assert.equal(
-    verifyEbayNotificationSignature({ ...payload, changed: true }, signature.toString('base64'), publicKey.export({ type: 'spki', format: 'pem' }).toString()),
-    false,
-  );
+  assert.equal(verifyEbayNotificationSignature(payload, signature.toString('base64'), pem, 'SHA256'), true);
 });
 
 test('POST rejects missing or malformed eBay signatures before any persistence', async () => {

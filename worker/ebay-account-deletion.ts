@@ -18,7 +18,12 @@ const json = (body: unknown, status = 200) => Response.json(body, {
   headers: { 'Cache-Control': 'no-store' },
 });
 
-type EbaySignatureHeader = { alg: string; kid: string; signature: string; digest: string };
+type EbaySignatureHeader = {
+  alg: string;
+  kid: string;
+  signature: string;
+  digest: 'SHA1' | 'SHA256';
+};
 type DeletionNotification = {
   metadata?: { topic?: string; schemaVersion?: string };
   notification?: {
@@ -31,7 +36,8 @@ function parseSignatureHeader(value: string): EbaySignatureHeader | null {
   if (!value || value.length > 8192) return null;
   try {
     const parsed = JSON.parse(atob(value)) as Record<string, unknown>;
-    if (parsed.alg !== 'ecdsa' || parsed.digest !== 'SHA256' ||
+    if (parsed.alg !== 'ecdsa' ||
+        (parsed.digest !== 'SHA1' && parsed.digest !== 'SHA256') ||
         typeof parsed.kid !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(parsed.kid) ||
         typeof parsed.signature !== 'string' || parsed.signature.length > 2048) return null;
     return parsed as unknown as EbaySignatureHeader;
@@ -40,17 +46,23 @@ function parseSignatureHeader(value: string): EbaySignatureHeader | null {
   }
 }
 
-/** eBay's Node SDK verifies JSON.stringify(payload) using the public key and SHA-256 digest. */
+/**
+ * Verify the exact JSON payload using the digest declared by eBay.
+ * eBay's notification SDK uses ssl3-sha1 (the SHA-1 signature digest);
+ * SHA-256 is also accepted for compatible notification headers.
+ */
 export function verifyEbayNotificationSignature(
   payload: unknown,
   signature: string,
   publicKeyPem: string,
+  digest: EbaySignatureHeader['digest'] = 'SHA1',
 ): boolean {
   if (!publicKeyPem.startsWith('-----BEGIN PUBLIC KEY-----') ||
       !publicKeyPem.includes('-----END PUBLIC KEY-----')) return false;
   try {
+    const algorithm = digest === 'SHA1' ? 'sha1' : 'sha256';
     return verifySignature(
-      'sha256',
+      algorithm,
       Buffer.from(JSON.stringify(payload), 'utf8'),
       publicKeyPem,
       Buffer.from(signature, 'base64'),
@@ -122,7 +134,7 @@ async function verifyWithConfiguredEnvironments(
   for (const environment of ['PRODUCTION', 'SANDBOX'] as const) {
     try {
       const key = await fetchEbayPublicKey(environment, header.kid, env);
-      if (key && verifyEbayNotificationSignature(payload, header.signature, key)) return true;
+      if (key && verifyEbayNotificationSignature(payload, header.signature, key, header.digest)) return true;
     } catch {
       // Continue to the other environment without leaking provider details.
     }
