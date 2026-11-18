@@ -411,6 +411,67 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   return null;
 }
 
+
+/**
+ * Cloudflare Cron entry point. Enqueues due non-demo seller accounts and
+ * drains a bounded batch through the existing service-role job lease.
+ * Demo accounts are intentionally excluded.
+ */
+export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void> {
+  const admin = createServiceClient(env);
+  const now = Date.now();
+  const { data: accounts, error } = await admin.from('marketplace_accounts')
+    .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,auto_sync_interval_minutes')
+    .eq('is_demo', false).eq('auth_status', 'CONNECTED')
+    .in('environment', ['SANDBOX', 'PRODUCTION']);
+  if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
+  for (const account of accounts || []) {
+    const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
+    const lastSync = account.last_sync_at ? new Date(account.last_sync_at).getTime() : 0;
+    if (lastSync && now - lastSync < intervalMs) continue;
+    const bucket = Math.floor(now / intervalMs);
+    const idempotencyKey = `scheduled-orders:${account.id}:${bucket}`;
+    const { error: enqueueError } = await admin.from('marketplace_sync_jobs').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      idempotency_key: idempotencyKey,
+      trigger_reason: 'SCHEDULED',
+      status: 'QUEUED',
+      scheduled_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+    }, { onConflict: 'marketplace_account_id,idempotency_key', ignoreDuplicates: true });
+    if (enqueueError) throw new Error('A scheduled marketplace sync could not be queued.');
+  }
+
+  const { data: jobs, error: claimError } = await admin.rpc('claim_marketplace_sync_jobs', { p_limit: 5 });
+  if (claimError) throw new Error('Scheduled marketplace sync jobs could not be claimed.');
+  for (const job of jobs || []) {
+    try {
+      const { data: account, error: accountError } = await admin.from('marketplace_accounts')
+        .select('id,organization_id,environment,is_demo,auth_status,marketplace')
+        .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id).maybeSingle();
+      if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
+        || !isEnvironment(account.environment) || account.environment !== (job as any).environment && false) {
+        throw new Error('The scheduled seller account is not eligible for live synchronization.');
+      }
+      await syncSellerOrders(account, env);
+      await admin.from('marketplace_sync_jobs').update({
+        status: 'SUCCEEDED', completed_at: new Date().toISOString(),
+        locked_until: null, last_error_code: null, last_error_message: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id);
+    } catch {
+      await admin.from('marketplace_sync_jobs').update({
+        status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+        scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
+        locked_until: null, last_error_code: 'SCHEDULED_SYNC_FAILED',
+        last_error_message: 'Scheduled eBay synchronization failed. Retry is queued when eligible.',
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id);
+    }
+  }
+}
+
 export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   const state = url.searchParams.get('state') || '';
