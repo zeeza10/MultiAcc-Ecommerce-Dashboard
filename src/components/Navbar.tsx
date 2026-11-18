@@ -43,6 +43,7 @@ interface NavbarProps {
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
   onSearchOpen: () => void;
+  searchDropdown?: React.ReactNode;
   isMobileNavigationOpen: boolean;
   isDarkTheme: boolean;
   onToggleTheme: () => void;
@@ -74,6 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onStoreChange,
   onOpenNavigation,
   onSearchOpen,
+  searchDropdown,
   isMobileNavigationOpen,
   isDarkTheme,
   onToggleTheme,
@@ -119,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="order-3 flex w-full min-w-0 items-center justify-center gap-2 xl:order-none xl:flex-1 xl:max-w-3xl">
-          <div className="relative min-w-0 flex-1 max-w-xl">
+        <div className="relative order-3 flex w-full min-w-0 flex-wrap items-center justify-end gap-2 xl:order-none xl:flex-nowrap xl:flex-1 xl:max-w-4xl">
+          <div className="relative min-w-0 w-full flex-1 max-w-md xl:absolute xl:left-1/2 xl:top-0 xl:w-[360px] xl:-translate-x-1/2 xl:flex-none">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -131,43 +133,51 @@ export const Navbar: React.FC<NavbarProps> = ({
               placeholder="Global Search (Orders, SKUs, Tracking #, Buyers)..."
               className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
+            {searchDropdown}
           </div>
 
-          <div className="hidden w-28 shrink-0 2xl:block">
-            <select value={selectedEnvironment} onChange={(e) => { onEnvironmentChange(e.target.value as any); onStoreChange && onStoreChange('ALL'); }} aria-label="Data environment" className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5">
-              <option value="DEMO">Demo</option><option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
-            </select>
-          </div>
-          <div className="hidden w-40 shrink-0 2xl:block">
+          <div className="w-48 sm:w-56 shrink-0">
             <select
               value={selectedStoreId}
-              onChange={(e) => onStoreChange && onStoreChange(e.target.value)}
-              title="Global Store Context Filter"
-              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              onChange={(e) => {
+                const accountId = e.target.value;
+                if (accountId === 'ALL') {
+                  onStoreChange && onStoreChange('ALL');
+                  return;
+                }
+                const account = marketplaceAccounts.find((item) => item.id === accountId);
+                if (account) {
+                  onEnvironmentChange(account.isDemo ? 'DEMO' : account.environment);
+                }
+                onStoreChange && onStoreChange(accountId);
+              }}
+              aria-label="Marketplace and seller account"
+              title="Select marketplace account by environment"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              <option value="ALL">All Accounts</option>
-              {selectedEnvironment === 'DEMO' && marketplaceAccounts.some((account) => account.isDemo) && (
-                <optgroup label="Demo Accounts — Presentation Only">
+              <option value="ALL">All Marketplace Accounts</option>
+              {marketplaceAccounts.some((account) => account.isDemo) && (
+                <optgroup label="DEMO ACCOUNTS">
                   {marketplaceAccounts.filter((account) => account.isDemo).map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {selectedEnvironment === 'SANDBOX' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
-                <optgroup label="eBay Sandbox — Testing Only">
+              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
+                <optgroup label="SANDBOX ACCOUNTS">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'SANDBOX').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {selectedEnvironment === 'PRODUCTION' && marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
-                <optgroup label="eBay Production — Live Business">
+              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
+                <optgroup label="PRODUCTION ACCOUNTS">
                   {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
                     <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
                   ))}
                 </optgroup>
               )}
-              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No seller accounts available</option>}
+              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No marketplace accounts available</option>}
             </select>
           </div>
         </div>

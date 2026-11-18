@@ -260,62 +260,9 @@ export default function App() {
     setGlobalSearch('');
   };
 
-  if (loading && !configLoaded) {
-    return (
-      <div className="workspace-loading min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-600" role="status" aria-live="polite">
-        <LoaderCircle className="h-9 w-9 animate-spin text-indigo-600" aria-hidden="true" />
-        <span className="text-sm font-medium">Loading your Oria Future workspace…</span>
-      </div>
-    );
-  }
-  if (!configLoaded) {
-    return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">
-      <p>{initError || 'Workspace configuration could not be loaded.'}</p>
-      <button onClick={initApp} className="px-4 py-2 rounded bg-indigo-600 text-white">Retry</button>
-    </div>;
-  }
-
-  return (
-    <div className="h-screen overflow-hidden bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Top Navigation */}
-      <Navbar
-        currentUser={currentUser}
-        organizationName={organizationName}
-        onSignOut={signOut}
-        config={config}
-        onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
-        notifications={notifications}
-        onDismissNotification={async (id) => {
-          await api.dismissNotification(id);
-          setNotifications(notifications.filter((n) => n.id !== id));
-        }}
-        onNavigate={handleNavigate}
-        onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
-        onOpenNewOrder={() => setShowNewOrderModal(true)}
-        onTriggerSync={handleTriggerSync}
-        isSyncing={isSyncing}
-        canSyncEbay={(permissions.includes('*') || permissions.includes('marketplace.manage')) && marketplaceIntegrationReady}
-        marketplaceAccounts={marketplaceAccounts}
-        canAdjustStock={permissions.includes('*') || permissions.includes('inventory.adjust')}
-        canCreateOrder={permissions.includes('*') || permissions.includes('orders.create')}
-        canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
-        globalSearch={globalSearch}
-        setGlobalSearch={setGlobalSearch}
-        onSearchOpen={() => setIsGlobalSearchOpen(true)}
-        selectedStoreId={selectedStoreId}
-        selectedEnvironment={selectedEnvironment}
-        onEnvironmentChange={setSelectedEnvironment}
-        onStoreChange={setSelectedStoreId}
-        onOpenNavigation={() => setIsMobileSidebarOpen((open) => !open)}
-        isMobileNavigationOpen={isMobileSidebarOpen}
-        isDarkTheme={isDarkTheme}
-        onToggleTheme={() => setIsDarkTheme((current) => !current)}
-      />
-
-
-      {/* Global Search Results Overlay (FR-SRCH-01) */}
-      {isGlobalSearchOpen && (
-        <div className="fixed left-1/2 top-[6.5rem] xl:top-[4.25rem] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-lg max-h-[60vh]">
+  const searchDropdown = (
+{isGlobalSearchOpen && (
+        <div className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
               {globalSearch.trim() ? `Search results for "${globalSearch}"` : "Quick search"}
@@ -378,6 +325,7 @@ export default function App() {
                       onClick={() => {
                         handleNavigate('products');
                         setGlobalSearch('');
+                        setIsGlobalSearchOpen(false);
                       }}
                       className="py-2 px-2 hover:bg-indigo-50 rounded cursor-pointer flex items-center justify-between"
                     >
@@ -397,6 +345,61 @@ export default function App() {
           )}
         </div>
       )}
+  );
+
+  if (loading && !configLoaded) {
+    return (
+      <div className="workspace-loading min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-600" role="status" aria-live="polite">
+        <LoaderCircle className="h-9 w-9 animate-spin text-indigo-600" aria-hidden="true" />
+        <span className="text-sm font-medium">Loading your Oria Future workspace…</span>
+      </div>
+    );
+  }
+  if (!configLoaded) {
+    return <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 text-slate-700">
+      <p>{initError || 'Workspace configuration could not be loaded.'}</p>
+      <button onClick={initApp} className="px-4 py-2 rounded bg-indigo-600 text-white">Retry</button>
+    </div>;
+  }
+
+  return (
+    <div className="h-screen overflow-hidden bg-slate-100 flex flex-col font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Top Navigation */}
+      <Navbar
+        currentUser={currentUser}
+        organizationName={organizationName}
+        onSignOut={signOut}
+        config={config}
+        onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
+        notifications={notifications}
+        onDismissNotification={async (id) => {
+          await api.dismissNotification(id);
+          setNotifications(notifications.filter((n) => n.id !== id));
+        }}
+        onNavigate={handleNavigate}
+        onOpenNewAdjustment={() => setShowNewAdjustmentModal(true)}
+        onOpenNewOrder={() => setShowNewOrderModal(true)}
+        onTriggerSync={handleTriggerSync}
+        isSyncing={isSyncing}
+        canSyncEbay={(permissions.includes('*') || permissions.includes('marketplace.manage')) && marketplaceIntegrationReady}
+        marketplaceAccounts={marketplaceAccounts}
+        canAdjustStock={permissions.includes('*') || permissions.includes('inventory.adjust')}
+        canCreateOrder={permissions.includes('*') || permissions.includes('orders.create')}
+        canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
+        globalSearch={globalSearch}
+        setGlobalSearch={setGlobalSearch}
+        onSearchOpen={() => setIsGlobalSearchOpen(true)}
+        searchDropdown={searchDropdown}
+        selectedStoreId={selectedStoreId}
+        selectedEnvironment={selectedEnvironment}
+        onEnvironmentChange={setSelectedEnvironment}
+        onStoreChange={setSelectedStoreId}
+        onOpenNavigation={() => setIsMobileSidebarOpen((open) => !open)}
+        isMobileNavigationOpen={isMobileSidebarOpen}
+        isDarkTheme={isDarkTheme}
+        onToggleTheme={() => setIsDarkTheme((current) => !current)}
+      />
+
 
       {/* Main Layout Area */}
       <div className="flex-1 min-h-0 flex w-full max-w-none mx-auto overflow-hidden">
