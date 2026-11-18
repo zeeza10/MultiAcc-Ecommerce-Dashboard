@@ -100,11 +100,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-xs">
+    <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
       {/* Main Navigation Bar */}
-      <div className="w-full px-2.5 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4">
+      <div className="mx-auto flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-5 xl:px-6">
         {/* Brand / Logo */}
-        <div className="flex min-w-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
+        <div className="flex min-w-0 shrink-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             O
@@ -117,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="flex-1 max-w-lg items-center gap-2 hidden md:flex">
+        <div className="hidden min-w-[260px] max-w-xl flex-1 items-center gap-2 xl:flex">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
         {/* Action Controls & Role Switcher */}
-        <div className="flex shrink-0 items-center space-x-1 sm:space-x-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2 xl:gap-3">
           <button
             type="button"
             onClick={onToggleTheme}
@@ -280,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3 rounded-lg border border-gray-200 bg-gray-50 px-2 sm:px-3 py-1.5">
+          <div className="flex max-w-full shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 sm:gap-2 sm:px-3">
             <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-xs">{currentUser.name.charAt(0).toUpperCase()}</div>
             <div className="hidden sm:block text-left">
               <div className="text-xs font-semibold text-gray-900">{currentUser.name}</div>
