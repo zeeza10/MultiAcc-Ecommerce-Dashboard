@@ -17,6 +17,7 @@ import { resolveEffectivePermissions } from './permission-overrides';
 import { enforceRateLimit } from './rate-limits';
 import { readVerifiedJwtAssurance } from './platform-admin';
 import { handleEbayOAuthCallback } from './routes/marketplace';
+import { handleEbayAccountDeletionNotification } from './ebay-account-deletion';
 
 const validRoles = new Set(['SUPER_ADMIN', 'OPS_MANAGER', 'WAREHOUSE_STAFF', 'FINANCE_USER', 'CLIENT_USER', 'VIEWER']);
 
@@ -163,6 +164,9 @@ export async function handleApiRequest(request: Request, env: WorkerEnv, createS
     return json({ success: true, message: 'MultiAcc Backend Worker is running', platform: 'Cloudflare Workers' });
   }
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
+
+  const deletionNotificationResponse = await handleEbayAccountDeletionNotification(request, env);
+  if (deletionNotificationResponse) return deletionNotificationResponse;
 
   const path = url.pathname.slice('/api/v1'.length).replace(/\/$/, '') || '/';
   if (path === '/ebay/oauth/callback' && request.method === 'GET') {
