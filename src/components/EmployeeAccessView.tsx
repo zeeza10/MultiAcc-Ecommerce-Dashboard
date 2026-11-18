@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, KeyRound, Mail, Plus, RefreshCw, Shield, ShieldCheck, UserMinus, Users, XCircle } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle2, Clock3, KeyRound, Mail, Plus, RefreshCw, Shield, ShieldCheck, UserMinus, Users, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,8 @@ type Permission = { id: string; code: string; description: string };
 type Member = {
   user_id: string; email: string | null; full_name: string; is_active: boolean;
   joined_at: string; role_id: string; role_code: string; role_name: string;
+  status?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+  onboarding_completed_at?: string | null; archived_at?: string | null;
   permission_overrides?: { code: string; effect: 'GRANT' | 'DENY' }[];
 };
 type Invitation = {
@@ -217,9 +219,31 @@ export const EmployeeAccessView: React.FC = () => {
         p_organization_id: organizationId, p_user_id: member.user_id, p_is_active: active,
       });
       if (updateError) throw updateError;
-      setNotice(active ? 'Employee access restored.' : 'Employee suspended. Workspace API access is now denied, including existing signed-in sessions.');
+      const { data: notification, error: notificationError } = await supabase.functions.invoke('notify-employee-access-change', {
+        body: { organizationId, userId: member.user_id, state: active ? 'restored' : 'suspended' },
+      });
+      const stateMessage = active ? 'Employee access restored.' : 'Employee suspended. Workspace API access is now denied.';
+      if (notificationError || !notification?.success) {
+        setNotice(`${stateMessage} However, the notification email could not be confirmed: ${notificationError?.message || notification?.error || 'Please retry the notification.'}`);
+      } else {
+        setNotice(`${stateMessage} Branded notification email accepted by Resend.`);
+      }
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Employee access could not be updated.'); }
+    finally { setSaving(false); }
+  };
+
+  const archiveMember = async (member: Member) => {
+    if (!window.confirm(`Archive ${member.full_name || member.email || 'this employee'}? Their access will be blocked, but their account and business history will be retained. Permanent deletion is not available.`)) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const { error: archiveError } = await supabase.rpc('archive_org_member', {
+        p_organization_id: organizationId, p_user_id: member.user_id,
+      });
+      if (archiveError) throw archiveError;
+      setNotice('Employee archived. Account and historical records have been retained.');
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Employee could not be archived.'); }
     finally { setSaving(false); }
   };
 
@@ -280,7 +304,7 @@ export const EmployeeAccessView: React.FC = () => {
               <label className="text-xs font-semibold text-slate-600">Assign role<select required value={inviteRole} onChange={e=>setInviteRole(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}{role.code==='SUPER_ADMIN'?' — full organization access (MFA required)':''}</option>)}</select></label>
               <div className="flex items-end"><button disabled={saving || !inviteRole} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"><Mail className="h-4 w-4" />{saving?'Sending…':'Send invitation'}</button></div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">The employee receives a secure Oria Future account invitation email. New accounts are linked to this organization and the selected role after invitation creation.</p>
+            <p className="mt-3 text-xs text-slate-500">The employee remains Pending until the password is set and they complete their first successful portal sign-in. Only then is workspace access activated.</p>
           </form>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -291,10 +315,10 @@ export const EmployeeAccessView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {access.members.map(member=><tr key={member.user_id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3"><div className="font-semibold text-slate-900">{member.full_name || 'Unnamed employee'}</div><div className="text-xs text-slate-500">{member.email || 'Email unavailable'}</div></td>
-                    <td className="px-4 py-3"><select disabled={saving || !member.is_active || member.user_id===user.id} value={member.role_id} onChange={e=>void changeRole(member,e.target.value)} className="max-w-[220px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></td>
+                    <td className="px-4 py-3"><select disabled={saving || member.status!=='ACTIVE' || member.user_id===user.id} value={member.role_id} onChange={e=>void changeRole(member,e.target.value)} className="max-w-[220px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(member.joined_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${member.is_active?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{member.is_active?<CheckCircle2 className="h-3 w-3"/>:<XCircle className="h-3 w-3"/>}{member.is_active?'Active':'Suspended'}</span></td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id || member.role_code==='SUPER_ADMIN'} title={member.role_code==='SUPER_ADMIN'?'Super Admin has protected organization-wide access':''} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button><button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,!member.is_active)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.is_active?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.is_active?<><UserMinus className="h-3.5 w-3.5"/>Suspend & revoke</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button></div></td>
+                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${member.status==='ACTIVE'?'bg-emerald-50 text-emerald-700':member.status==='PENDING'?'bg-amber-50 text-amber-700':member.status==='ARCHIVED'?'bg-slate-100 text-slate-600':'bg-rose-50 text-rose-700'}`}>{member.status==='ACTIVE'?<CheckCircle2 className="h-3 w-3"/>:member.status==='PENDING'?<Clock3 className="h-3 w-3"/>:<XCircle className="h-3 w-3"/>}{member.status || (member.is_active?'Active':'Suspended')}</span></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id || member.role_code==='SUPER_ADMIN' || member.status!=='ACTIVE'} title={member.role_code==='SUPER_ADMIN'?'Super Admin has protected organization-wide access':''} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button>{member.status==='ACTIVE'||member.status==='SUSPENDED'?<button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,member.status==='SUSPENDED')} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.status==='ACTIVE'?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.status==='ACTIVE'?<><UserMinus className="h-3.5 w-3.5"/>Suspend</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button>:null}{member.status!=='PENDING'&&member.status!=='ARCHIVED'&&member.role_code!=='SUPER_ADMIN'&&member.user_id!==user.id?<button disabled={saving} onClick={()=>void archiveMember(member)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Archive className="h-3.5 w-3.5"/>Archive</button>:null}</div></td>
                   </tr>)}
                   {!access.members.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No employee memberships found.</td></tr>}
                 </tbody>
