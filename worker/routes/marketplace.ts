@@ -698,27 +698,8 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
       updated_at: new Date(now).toISOString(),
     }).eq('id', oauthState.marketplace_account_id).eq('organization_id', oauthState.organization_id).eq('is_demo', false);
     if (accountError) throw new Error('The eBay seller account status could not be updated.');
-    // Queue the first full import immediately after OAuth. The durable cron worker
-    // drains this job; it imports orders plus inventory items, offers, listing status and quantities.
-    const { error: initialSyncQueueError } = await admin.from('marketplace_sync_jobs').upsert({
-      organization_id: oauthState.organization_id,
-      marketplace_account_id: oauthState.marketplace_account_id,
-      idempotency_key: `initial-full-sync:${oauthState.marketplace_account_id}`,
-      trigger_reason: 'MANUAL',
-      status: 'QUEUED',
-      scheduled_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'marketplace_account_id,idempotency_key', ignoreDuplicates: true });
-    if (initialSyncQueueError) {
-      // The scheduled sweep also discovers connected accounts with no successful sync.
-      await admin.from('marketplace_integration_events').insert({
-        organization_id: oauthState.organization_id,
-        marketplace_account_id: oauthState.marketplace_account_id,
-        event_type: 'INITIAL_SYNC_QUEUE_WARNING', severity: 'WARNING',
-        message: 'The initial sync could not be queued immediately; the scheduled sync will retry discovery.',
-        metadata: {},
-      });
-    }
+    // The five-minute scheduled sweep automatically discovers connected accounts
+    // whose last_sync_at is empty and queues their first complete sync.
     await admin.from('marketplace_integration_events').insert({
       organization_id: oauthState.organization_id,
       marketplace_account_id: oauthState.marketplace_account_id,
