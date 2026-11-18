@@ -11,6 +11,7 @@ import {
   CheckCircle,
   ExternalLink,
   Menu,
+  X,
   Moon,
   Sun,
 } from 'lucide-react';
@@ -39,6 +40,7 @@ interface NavbarProps {
   selectedStoreId?: string;
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
+  isMobileNavigationOpen: boolean;
   isDarkTheme: boolean;
   onToggleTheme: () => void;
 }
@@ -66,6 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedStoreId = 'ALL',
   onStoreChange,
   onOpenNavigation,
+  isMobileNavigationOpen,
   isDarkTheme,
   onToggleTheme,
 }) => {
@@ -97,17 +100,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Main Navigation Bar */}
       <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand / Logo */}
-        <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer min-w-0" onClick={() => onNavigate('dashboard')}>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label="Open navigation menu" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"><Menu className="h-5 w-5" /></button>
+        <div className="flex min-w-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             O
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-gray-900 text-lg tracking-tight">Oria Future</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                v0.1
-              </span>
+            <div className="flex min-w-0 items-center space-x-2">
+              <span className="whitespace-nowrap font-bold text-gray-900 text-lg tracking-tight">Oria Future</span>
             </div>
             <p className="hidden sm:block text-[11px] text-gray-500 leading-none">E-Commerce &amp; 3PL Operating Platform</p>
           </div>

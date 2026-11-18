@@ -154,12 +154,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {isMobileOpen && <button type="button" aria-label="Close navigation overlay" onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,320px)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out lg:sticky lg:top-0 lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16" : "lg:w-64"}`}>
+      {isMobileOpen && <button type="button" aria-label="Close navigation overlay" onClick={onCloseMobile} className="fixed inset-x-0 top-14 bottom-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" /> }
+      <aside id="oria-mobile-navigation" aria-label="Primary navigation" className={`fixed left-0 top-14 bottom-0 z-50 flex ${isCollapsed ? "w-20" : "w-[min(86vw,320px)]"} flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:bottom-auto lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16" : "lg:w-64"}`}>
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
         {!isCollapsed && <span>Navigation</span>}
-        <button type="button" onClick={onCloseMobile} aria-label="Close navigation" className="ml-auto rounded-md p-1.5 text-slate-500 hover:bg-slate-200 lg:hidden">✕</button>
-        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
         
@@ -186,14 +185,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={item.id}
                       onClick={() => { onNavigate(item.id); onCloseMobile(); }}
                       title={isCollapsed ? item.label : undefined}
-                      className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between"} px-3 py-2 rounded-md transition font-medium ${
+                      className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between"} ${isCollapsed ? "px-2 py-3" : "px-3 py-2"} rounded-md transition font-medium ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-xs'
                           : 'text-gray-700 hover:bg-gray-200/70 hover:text-gray-900'
                       }`}
                     >
                       <div className="flex items-center space-x-2.5 truncate">
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
+                        <Icon className={`${isCollapsed ? "h-5 w-5" : "h-4 w-4"} shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
                         {!isCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
 
