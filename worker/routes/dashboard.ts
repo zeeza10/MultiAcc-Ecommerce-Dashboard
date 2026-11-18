@@ -6,6 +6,9 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
   if (path === '/dashboard/kpis' && request.method === 'GET') {
     const period = url.searchParams.get('period') || '30D';
     const accountId = url.searchParams.get('accountId');
+    const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
+    if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
+    const dataEnvironment = requestedEnvironment;
     const now = new Date();
     const start = new Date(now);
     if (period === '7D') start.setDate(start.getDate() - 7);
@@ -20,6 +23,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       .from('orders')
       .select('id,status,total_minor,currency,created_at,marketplace_account_id')
       .eq('organization_id', auth.organizationId)
+      .eq('data_environment', dataEnvironment)
       .gte('created_at', start.toISOString());
     if (accountId && accountId !== 'ALL') ordersQuery = ordersQuery.eq('marketplace_account_id', accountId);
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) ordersQuery = ordersQuery.eq('client_3pl_id', auth.user.clientId);
@@ -29,7 +33,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       ordersQuery,
       canViewInventory && !storeScoped
         ? (() => {
-            let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold,cost_price_minor').eq('organization_id', auth.organizationId);
+            let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold,cost_price_minor') .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
             if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) query = query.eq('client_3pl_id', auth.user.clientId).eq('owner_type', 'CLIENT');
             return query;
           })()
@@ -89,7 +93,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       const productResult = productIds.length
         ? await auth.repositoryContext.supabase.from('products')
             .select('id,currency,low_stock_threshold,cost_price_minor')
-            .eq('organization_id', auth.organizationId).in('id', productIds)
+            .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment).in('id', productIds)
         : { data: [], error: null };
       if (productResult.error) throw productResult.error;
       products = productResult.data || [];
@@ -132,6 +136,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       }));
     }
 
+    const environmentProductIds = new Set(products.map((product: any) => product.id));
+    balances = balances.filter((balance: any) => environmentProductIds.has(balance.productId));
     const orders = ordersResult.data || [];
     const activeOrders = orders.filter(row => !['CANCELLED', 'VOID', 'REFUNDED'].includes(String(row.status).toUpperCase()));
     const pendingOrders = orders.filter(row => ['NEW', 'PENDING', 'CONFIRMED', 'ALLOCATED', 'PICKED', 'PACKED'].includes(String(row.status).toUpperCase()));
@@ -218,17 +224,21 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const since = new Date();
     since.setDate(since.getDate() - 6);
     const accountId = url.searchParams.get('accountId');
+    const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
+    if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
+    const dataEnvironment = requestedEnvironment;
     const storeScoped = Boolean(accountId && accountId !== 'ALL');
     const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
     let chartOrdersQuery = auth.repositoryContext.supabase.from('orders')
       .select('id,status,total_minor,currency,created_at')
       .eq('organization_id', auth.organizationId)
+      .eq('data_environment', dataEnvironment)
       .gte('created_at', since.toISOString());
     if (accountId && accountId !== 'ALL') chartOrdersQuery = chartOrdersQuery.eq('marketplace_account_id', accountId);
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) {
       chartOrdersQuery = chartOrdersQuery.eq('client_3pl_id', auth.user.clientId);
     }
-    const [ordersResult, balances] = await Promise.all([
+    const [ordersResult, balances, environmentProducts] = await Promise.all([
       chartOrdersQuery,
       canViewInventory && !storeScoped
         ? new SupabaseInventoryRepository(auth.repositoryContext).listBalances({
@@ -236,9 +246,11 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
             onlyClientProducts: auth.user.role === 'CLIENT_USER',
           })
         : Promise.resolve([]),
+      canViewInventory ? auth.repositoryContext.supabase.from('products').select('id').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment) : Promise.resolve({ data: [], error: null }),
     ]);
     if (ordersResult.error) throw new Error('Dashboard chart records could not be loaded.');
-    let chartBalances: any[] = balances || [];
+    const environmentProductIds = new Set((environmentProducts.data || []).map((row: any) => row.id));
+    let chartBalances: any[] = (balances || []).filter((row: any) => environmentProductIds.has(row.productId));
     if (storeScoped && canViewInventory) {
       const { data: allocations, error: allocationError } = await auth.repositoryContext.supabase
         .from('marketplace_inventory_allocations')
