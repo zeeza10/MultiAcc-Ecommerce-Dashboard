@@ -621,6 +621,7 @@ export default function App() {
         currentUser={currentUser}
         config={config}
         selectedStoreId={selectedStoreId}
+        selectedEnvironment={selectedEnvironment}
         onSuccess={() => {
           if (activeTab === 'orders') {
             window.location.reload();
