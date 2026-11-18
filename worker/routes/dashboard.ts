@@ -8,7 +8,16 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const accountId = url.searchParams.get('accountId');
     const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
     if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
-    const dataEnvironment = requestedEnvironment;
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = requestedEnvironment as 'DEMO' | 'SANDBOX' | 'PRODUCTION';
+    if (accountId && accountId !== 'ALL') {
+      const { data: selectedAccount, error: selectedAccountError } = await auth.repositoryContext.supabase
+        .from('marketplace_accounts').select('id,is_demo,environment')
+        .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+      if (selectedAccountError) throw selectedAccountError;
+      if (!selectedAccount) return json({ error: 'The selected marketplace account was not found.' }, 404);
+      const accountEnvironment = selectedAccount.is_demo ? 'DEMO' : selectedAccount.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+      if (accountEnvironment !== dataEnvironment) return json({ error: 'The selected account does not belong to this data environment.' }, 400);
+    }
     const now = new Date();
     const start = new Date(now);
     if (period === '7D') start.setDate(start.getDate() - 7);
@@ -226,7 +235,16 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const accountId = url.searchParams.get('accountId');
     const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
     if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
-    const dataEnvironment = requestedEnvironment;
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = requestedEnvironment as 'DEMO' | 'SANDBOX' | 'PRODUCTION';
+    if (accountId && accountId !== 'ALL') {
+      const { data: selectedAccount, error: selectedAccountError } = await auth.repositoryContext.supabase
+        .from('marketplace_accounts').select('id,is_demo,environment')
+        .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+      if (selectedAccountError) throw selectedAccountError;
+      if (!selectedAccount) return json({ error: 'The selected marketplace account was not found.' }, 404);
+      const accountEnvironment = selectedAccount.is_demo ? 'DEMO' : selectedAccount.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+      if (accountEnvironment !== dataEnvironment) return json({ error: 'The selected account does not belong to this data environment.' }, 400);
+    }
     const storeScoped = Boolean(accountId && accountId !== 'ALL');
     const canViewInventory = auth.permissions.has('*') || auth.permissions.has('inventory.view');
     let chartOrdersQuery = auth.repositoryContext.supabase.from('orders')
@@ -256,7 +274,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
         .from('marketplace_inventory_allocations')
         .select('allocated_quantity,reserved_quantity')
         .eq('organization_id', auth.organizationId)
-        .eq('marketplace_account_id', accountId);
+        .eq('marketplace_account_id', accountId)
+        .in('product_id', [...environmentProductIds]);
       if (allocationError) throw allocationError;
       chartBalances = (allocations || []).map(row => ({
         onHand: Number(row.allocated_quantity || 0),
