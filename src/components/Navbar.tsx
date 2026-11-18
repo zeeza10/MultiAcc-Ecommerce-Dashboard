@@ -102,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-xs">
       {/* Main Navigation Bar */}
-      <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="w-full px-2.5 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4">
         {/* Brand / Logo */}
         <div className="flex min-w-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
@@ -113,7 +113,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex min-w-0 items-center space-x-2">
               <span className="whitespace-nowrap font-bold text-gray-900 text-lg tracking-tight">Oria Future</span>
             </div>
-            <p className="hidden sm:block text-[11px] text-gray-500 leading-none">E-Commerce &amp; 3PL Operating Platform</p>
           </div>
         </div>
 
@@ -171,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
         {/* Action Controls & Role Switcher */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        <div className="flex shrink-0 items-center space-x-1 sm:space-x-3">
           <button
             type="button"
             onClick={onToggleTheme}
@@ -288,7 +287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="text-[10px] text-gray-500">{currentUser.email}</div>
             </div>
             <span className="hidden sm:inline-flex">{getRoleBadge(currentUser.role)}</span>
-            <button onClick={onSignOut} className="ml-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">Sign out</button>
+            <button onClick={onSignOut} className="ml-0.5 rounded-md px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs font-semibold text-slate-600 hover:bg-slate-200">Sign out</button>
           </div>
         </div>
       </div>
