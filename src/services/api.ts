@@ -90,19 +90,20 @@ export const api = {
   // Auth
 
   // Dashboard
-  getKPIs: (period = '30D', accountId?: string) => {
-    let url = `/dashboard/kpis?period=${encodeURIComponent(period)}`;
+  getKPIs: (period = '30D', accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => {
+    let url = `/dashboard/kpis?period=${encodeURIComponent(period)}&environment=${environment}`;
     if (accountId && accountId !== 'ALL') url += `&accountId=${encodeURIComponent(accountId)}`;
     return request<{ kpis: any; userRole: string }>(url);
   },
-  getCharts: (accountId?: string) => request<any>(`/dashboard/charts${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getCharts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<any>(`/dashboard/charts?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Orders
-  getOrders: (params: { status?: string; accountId?: string; search?: string } = {}) => {
+  getOrders: (params: { status?: string; accountId?: string; search?: string; environment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}) => {
     const q = new URLSearchParams();
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
     if (params.accountId && params.accountId !== 'ALL') q.set('accountId', params.accountId);
     if (params.search) q.set('search', params.search);
+    if (params.environment) q.set('environment', params.environment);
     return request<{ orders: Order[] }>(`/orders?${q.toString()}`);
   },
   getOrder: (id: string) => request<{ order: Order; histories: any[] }>(`/orders/${id}`),
@@ -118,7 +119,7 @@ export const api = {
     }),
 
   // Products
-  getProducts: (accountId?: string) => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  getProducts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
   createProduct: (payload: any, accountId?: string) =>
     request<{ product: Product }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
