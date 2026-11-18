@@ -238,6 +238,7 @@ Deno.serve(async (request: Request) => {
   inviteUrl.hash = new URLSearchParams({
     token_hash: inviteTokenHash,
     type: "invite",
+    invitation_id: invite.id,
   }).toString();
   const actionLink = inviteUrl.toString();
 
