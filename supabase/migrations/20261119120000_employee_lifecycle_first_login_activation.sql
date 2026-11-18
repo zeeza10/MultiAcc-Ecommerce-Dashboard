@@ -58,17 +58,17 @@ begin
     order by created_at desc limit 1 for update;
 
     if found then
-      insert into public.organization_members(
+      insert into public.organization_members as existing_member(
         organization_id,user_id,role_id,is_active,invited_by,onboarding_completed_at,archived_at,archived_by
       ) values (
         v_invitation.organization_id,new.id,v_invitation.role_id,false,v_invitation.invited_by,null,null,null
       )
       on conflict(organization_id,user_id) do update
         set role_id = excluded.role_id,
-            is_active = case when public.organization_members.onboarding_completed_at is null
-              then false else public.organization_members.is_active end,
+            is_active = case when existing_member.onboarding_completed_at is null
+              then false else existing_member.is_active end,
             invited_by = excluded.invited_by
-        where public.organization_members.archived_at is null;
+        where existing_member.archived_at is null;
 
       update public.user_invitations set accepted_at = now()
       where id = v_invitation.id and accepted_at is null;
