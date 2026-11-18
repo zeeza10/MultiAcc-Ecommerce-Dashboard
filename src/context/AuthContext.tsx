@@ -307,7 +307,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // until its internal auth lock has been released.
       window.setTimeout(() => {
         if (!alive || eventGeneration !== authEventGeneration.current) return;
-        void loadAccount(nextSession);
+        void (async () => {
+          // A first-login activation is granted only after Supabase emitted SIGNED_IN.
+          // The database RPC independently validates auth.uid(), session_id and password setup.
+          if (event === 'SIGNED_IN' && nextSession) {
+            const { error: activationError } = await supabase.rpc('activate_org_member_after_first_login');
+            if (activationError) {
+              setError('Your sign-in succeeded, but first-login workspace activation could not be verified. Please retry or contact your administrator.');
+              setAccountState('error');
+              setLoading(false);
+              return;
+            }
+          }
+          await loadAccount(nextSession);
+        })();
       }, 0);
     });
 
@@ -370,10 +383,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!updateError) {
           setPassword('');
           setInviteConfirmPassword('');
-          await loadAccount(activeSession, true);
+          setEmail(activeSession.user.email || email);
           setInviteSetupActive(false);
+          setMode('login');
           window.history.replaceState({}, '', '/');
-          setMessage('Your account password is set. Opening your workspace…');
+          // Password creation completes invitation setup, but does not activate
+          // membership. Require a separate, explicit portal sign-in to create
+          // the first eligible session and activate workspace access.
+          const { error: signOutError } = await supabase.auth.signOut();
+          if (signOutError) return { error: signOutError };
+          setMessage('Your password has been created. Please sign in with your new password to activate your workspace access.');
         }
         return { error: updateError };
       });
