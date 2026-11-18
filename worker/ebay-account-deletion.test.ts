@@ -34,24 +34,22 @@ test('eBay account deletion challenge fails closed without a valid token', async
   assert.equal(response.status, 503);
 });
 
-test('eBay SHA1 notification signature validates against the exact serialized payload', () => {
+test('eBay SHA1 notification signature validates against the exact raw request body', () => {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const payload = {
-    metadata: { topic: 'MARKETPLACE_ACCOUNT_DELETION', schemaVersion: '1.0', deprecated: false },
-    notification: { notificationId: 'test-notification-id', data: { userId: 'test-user-id' } },
-  };
+  const rawPayload = '{\n  "metadata": { "topic": "MARKETPLACE_ACCOUNT_DELETION", "schemaVersion": "1.0", "deprecated": false },\n  "notification": { "notificationId": "test-notification-id", "data": { "userId": "test-user-id" } }\n}';
   const pem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
-  const signature = sign('sha1', Buffer.from(JSON.stringify(payload)), privateKey);
-  assert.equal(verifyEbayNotificationSignature(payload, signature.toString('base64'), pem, 'SHA1'), true);
-  assert.equal(verifyEbayNotificationSignature({ ...payload, changed: true }, signature.toString('base64'), pem, 'SHA1'), false);
+  const signature = sign('sha1', Buffer.from(rawPayload, 'utf8'), privateKey);
+  assert.equal(verifyEbayNotificationSignature(rawPayload, signature.toString('base64'), pem, 'SHA1'), true);
+  assert.equal(verifyEbayNotificationSignature(JSON.stringify(JSON.parse(rawPayload)), signature.toString('base64'), pem, 'SHA1'), false);
 });
+
 
 test('eBay SHA256 notification signature remains supported', () => {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const payload = { metadata: { topic: 'MARKETPLACE_ACCOUNT_DELETION' }, notification: { notificationId: 'id' } };
   const pem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
   const signature = sign('sha256', Buffer.from(JSON.stringify(payload)), privateKey);
-  assert.equal(verifyEbayNotificationSignature(payload, signature.toString('base64'), pem, 'SHA256'), true);
+  assert.equal(verifyEbayNotificationSignature(JSON.stringify(payload), signature.toString('base64'), pem, 'SHA256'), true);
 });
 
 test('POST rejects missing or malformed eBay signatures before any persistence', async () => {

@@ -52,7 +52,7 @@ function parseSignatureHeader(value: string): EbaySignatureHeader | null {
  * SHA-256 is also accepted for compatible notification headers.
  */
 export function verifyEbayNotificationSignature(
-  payload: unknown,
+  rawPayload: string,
   signature: string,
   publicKeyPem: string,
   digest: EbaySignatureHeader['digest'] = 'SHA1',
@@ -63,7 +63,7 @@ export function verifyEbayNotificationSignature(
     const algorithm = digest === 'SHA1' ? 'sha1' : 'sha256';
     return verifySignature(
       algorithm,
-      Buffer.from(JSON.stringify(payload), 'utf8'),
+      Buffer.from(rawPayload, 'utf8'),
       publicKeyPem,
       Buffer.from(signature, 'base64'),
     );
@@ -126,7 +126,7 @@ async function fetchEbayPublicKey(
 }
 
 async function verifyWithConfiguredEnvironments(
-  payload: unknown,
+  rawPayload: string,
   header: EbaySignatureHeader,
   env: WorkerEnv,
 ): Promise<boolean> {
@@ -134,7 +134,7 @@ async function verifyWithConfiguredEnvironments(
   for (const environment of ['PRODUCTION', 'SANDBOX'] as const) {
     try {
       const key = await fetchEbayPublicKey(environment, header.kid, env);
-      if (key && verifyEbayNotificationSignature(payload, header.signature, key, header.digest)) return true;
+      if (key && verifyEbayNotificationSignature(rawPayload, header.signature, key, header.digest)) return true;
     } catch {
       // Continue to the other environment without leaking provider details.
     }
@@ -188,7 +188,7 @@ export async function handleEbayAccountDeletionNotification(
       return json({ error: 'The notification payload does not match the account-deletion schema.' }, 400);
     }
 
-    if (!await verifyWithConfiguredEnvironments(payload, signatureHeader, env)) {
+    if (!await verifyWithConfiguredEnvironments(rawBody, signatureHeader, env)) {
       return json({ error: 'The eBay notification signature could not be verified.' }, 412);
     }
     if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY || !env.EBAY_TOKEN_ENCRYPTION_KEY) {
