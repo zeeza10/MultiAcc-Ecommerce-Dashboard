@@ -52,13 +52,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   currentUser,
   permissions,
-  config,
   unreadAlertCount,
   pendingExceptionsCount,
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const currentPhase = config.activeReleasePhase;
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Effective permissions already combine role defaults with Super Admin's
