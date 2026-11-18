@@ -121,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="order-3 flex w-full min-w-0 items-center justify-center gap-2 xl:order-none xl:flex-1 xl:max-w-4xl">
-          <div className="relative min-w-0 flex-1 max-w-md">
+        <div className="relative order-3 flex w-full min-w-0 items-center justify-end gap-2 xl:order-none xl:flex-1 xl:max-w-4xl">
+          <div className="relative min-w-0 w-full flex-1 max-w-md xl:absolute xl:left-1/2 xl:top-0 xl:w-[360px] xl:-translate-x-1/2 xl:flex-none">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
