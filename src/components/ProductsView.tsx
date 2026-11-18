@@ -18,6 +18,7 @@ interface ProductsViewProps {
   currentUser: User;
   config: SystemConfig;
   selectedStoreId: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   initialFilter?: any;
 }
 
@@ -27,6 +28,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   currentUser,
   config,
   selectedStoreId,
+  selectedEnvironment,
   initialFilter,
 }) => {
   const [products, setProducts] = useState<any[]>([]);
@@ -49,14 +51,14 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   useEffect(() => {
     loadProducts();
-  }, [currentUser.id, selectedStoreId]);
+  }, [currentUser.id, selectedStoreId, selectedEnvironment]);
 
   const loadProducts = async () => {
     setLoading(true);
     setProducts([]);
     try {
       const [res, clientRes] = await Promise.all([
-        api.getProducts(selectedStoreId),
+        api.getProducts(selectedStoreId, selectedEnvironment),
         api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setProducts(res.products || []);
@@ -98,7 +100,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         reorderLevel: reorder,
         ownerType: currentUser.role === 'CLIENT_USER' ? 'CLIENT' : 'OPERATOR',
         ownerId: currentUser.role === 'CLIENT_USER' ? currentUser.clientId : 'operator',
-      }, selectedStoreId);
+      }, selectedStoreId, selectedEnvironment);
 
       setShowAddModal(false);
       // Reset form
