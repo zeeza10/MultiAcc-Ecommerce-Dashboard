@@ -94,9 +94,9 @@ Cloudflare Worker
   └─ Supabase PostgreSQL (caller-scoped access + RLS)
 ```
 
-The Worker entry point is worker/index.ts; authentication and dispatch are in worker/api.ts; domain handlers are under worker/routes/. Browser business requests should use src/services/api.ts and the browser-safe Supabase client in src/lib/supabase.ts.
+The Worker entry point is worker/index.ts; authentication and dispatch are in worker/api.ts; domain handlers are under worker/routes/. Browser business requests should use src/services/api.ts and the browser-safe Supabase client in src/lib/supabase.ts. Production HTTPS responses include a restrictive Content Security Policy; inline scripts and inline style blocks are not permitted.
 
-The repository also contains a legacy Express application (server.ts and server/), retained during incremental migration. Do not assume every legacy Express workflow has already moved to Workers. New production functionality should follow the Worker + Supabase architecture unless a documented decision says otherwise.
+The repository also contains a legacy Express application (server.ts and server/), retained only for migration compatibility. It is not used by the Cloudflare Worker production runtime, is disabled unless `ENABLE_EXPRESS_COMPAT_SERVER=true` is explicitly set for local development, and binds only to `127.0.0.1`. New production functionality must follow the Worker + Supabase architecture.
 
 ### Architecture rules
 
@@ -172,7 +172,7 @@ Populate only the local values required by your setup. Never commit .env, .dev.v
 | npm run cf:dev | Wrangler local Worker development |
 | npm run cf:typegen | Generate Cloudflare environment types |
 | npm run deploy | Build and deploy with Wrangler (authorized maintainers only) |
-| npm start | Build and start legacy Express compatibility server |
+| npm start | Build and run the Cloudflare Worker locally through Wrangler |
 
 ## Environment configuration
 
