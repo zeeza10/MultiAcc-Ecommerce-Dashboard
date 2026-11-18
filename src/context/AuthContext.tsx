@@ -467,7 +467,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {inviteSetupActive
-              ? inviteStatus === 'accepted' ? 'This invitation has already been completed and your workspace account is active. You do not need to set up your account again.'
+              ? inviteStatus === 'accepted' ? 'This invitation and password setup are complete. Sign in with your new password to activate your workspace access.'
                 : inviteStatus === 'checking' ? 'Please wait while we securely check the invitation status.'
                 : inviteStatus === 'unavailable' ? 'We could not verify this invitation right now. Please try again.'
                 : inviteStatus === 'invalid' ? 'This invitation is expired, revoked, or no longer valid. Ask your Super Admin to send a new invitation.'
@@ -486,7 +486,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="space-y-4">
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800" role="status">
                 <div className="font-semibold">Account setup complete</div>
-                <p className="mt-1">Your password has already been created. This invitation link cannot be used again.</p>
+                <p className="mt-1">Your password has already been created. This invitation link cannot be used again. Sign in with your existing account to activate workspace access.</p>
               </div>
               <a href="/" className="block w-full rounded-lg bg-indigo-600 py-3 text-center text-sm font-semibold text-white">Continue to sign in</a>
             </div>
