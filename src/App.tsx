@@ -90,6 +90,9 @@ export default function App() {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(() =>
     readWorkspacePreference<string>(organizationId, 'selected-store', 'ALL')
   );
+  const [selectedEnvironment, setSelectedEnvironment] = useState<'DEMO' | 'SANDBOX' | 'PRODUCTION'>(() =>
+    readWorkspacePreference<'DEMO' | 'SANDBOX' | 'PRODUCTION'>(organizationId, 'selected-environment', 'SANDBOX')
+  );
   const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
   const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -131,6 +134,10 @@ export default function App() {
   }, [selectedStoreId, organizationId]);
 
   useEffect(() => {
+    window.localStorage.setItem(`oriafuture:${organizationId}:selected-environment`, JSON.stringify(selectedEnvironment));
+  }, [selectedEnvironment, organizationId]);
+
+  useEffect(() => {
     initApp();
   }, []);
 
@@ -145,8 +152,8 @@ export default function App() {
         const canViewOrders = permissions.includes('*') || permissions.includes('orders.view');
         const canViewProducts = permissions.includes('*') || permissions.includes('products.view');
         const [ordRes, prodRes] = await Promise.all([
-          canViewOrders ? api.getOrders({ search: globalSearch, accountId: selectedStoreId }) : Promise.resolve({ orders: [] }),
-          canViewProducts ? api.getProducts(selectedStoreId) : Promise.resolve({ products: [] }),
+          canViewOrders ? api.getOrders({ search: globalSearch, accountId: selectedStoreId, environment: selectedEnvironment }) : Promise.resolve({ orders: [] }),
+          canViewProducts ? api.getProducts(selectedStoreId, selectedEnvironment) : Promise.resolve({ products: [] }),
         ]);
         const s = globalSearch.toLowerCase();
         const matchedProds = prodRes.products.filter(
@@ -162,7 +169,7 @@ export default function App() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [globalSearch, permissions, selectedStoreId]);
+  }, [globalSearch, permissions, selectedStoreId, selectedEnvironment]);
 
   const initApp = async () => {
     setLoading(true);
@@ -174,18 +181,15 @@ export default function App() {
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
       const accounts = accountsRes.accounts || [];
-      const preferredAccount = accounts.find((account) => account.isDemo)
-        || accounts.find((account) => !account.isDemo && account.environment === 'SANDBOX')
-        || accounts.find((account) => !account.isDemo && account.environment === 'PRODUCTION');
-      const savedAccountIsAvailable = accounts.some((account) => account.id === selectedStoreId);
-      const activeAccountId = savedAccountIsAvailable ? selectedStoreId : preferredAccount?.id;
+      const savedAccountIsAvailable = selectedStoreId === 'ALL' || accounts.some((account) => account.id === selectedStoreId);
+      const activeAccountId = savedAccountIsAvailable ? selectedStoreId : 'ALL';
       setConfig(cfgRes.config);
       setConfigLoaded(true);
       setInitError('');
       setNotifications(notifRes.notifications);
       setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
-      if (!savedAccountIsAvailable && preferredAccount) setSelectedStoreId(preferredAccount.id);
+      if (!savedAccountIsAvailable) setSelectedStoreId('ALL');
       const excRes = canViewMarketplace && activeAccountId
         ? await api.getExceptions(activeAccountId)
         : { exceptions: [] };
@@ -285,6 +289,8 @@ export default function App() {
         globalSearch={globalSearch}
         setGlobalSearch={setGlobalSearch}
         selectedStoreId={selectedStoreId}
+        selectedEnvironment={selectedEnvironment}
+        onEnvironmentChange={setSelectedEnvironment}
         onStoreChange={setSelectedStoreId}
         onOpenNavigation={() => setIsMobileSidebarOpen((open) => !open)}
         isMobileNavigationOpen={isMobileSidebarOpen}
