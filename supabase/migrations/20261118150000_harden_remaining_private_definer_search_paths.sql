@@ -13,6 +13,6 @@ ALTER FUNCTION private.handle_new_auth_user() SET search_path = '';
 ALTER FUNCTION private.is_org_member(uuid) SET search_path = '';
 ALTER FUNCTION private.process_workspace_return_disposition(uuid, uuid, jsonb, boolean, text) SET search_path = '';
 ALTER FUNCTION private.receive_workspace_purchase_order(uuid, uuid, jsonb, text, text) SET search_path = '';
-ALTER FUNCTION private.submit_stock_adjustment(uuid, uuid, integer, text, text, text, text) SET search_path = '';
+ALTER FUNCTION private.submit_stock_adjustment(uuid, uuid, uuid, integer, text, text, text) SET search_path = '';
 ALTER FUNCTION private.transition_workspace_order(uuid, uuid, text, jsonb) SET search_path = '';
 ALTER FUNCTION private.update_workspace_order(uuid, uuid, jsonb) SET search_path = '';
