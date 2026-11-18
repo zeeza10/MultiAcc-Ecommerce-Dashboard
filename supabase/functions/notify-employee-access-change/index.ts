@@ -9,7 +9,7 @@ function corsHeadersForInvitation(origin: string | null): Record<string, string>
 }
 async function exceedsInvitationBodyLimit(request: Request, maximumBytes: number): Promise<boolean> {
   const declaredLength = request.headers.get("Content-Length");
-  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > maximumBytes)) return true;
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maximumBytes)) return true;
   if (!request.body) return false;
   const reader = request.clone().body?.getReader();
   if (!reader) return false;
@@ -20,7 +20,6 @@ async function exceedsInvitationBodyLimit(request: Request, maximumBytes: number
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const SENDER = "Oria Future HR <hr@oriafuture.com>";
-const APP_NAME = "Oria Future";
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -71,7 +70,10 @@ Deno.serve(async (request: Request) => {
   if (callerError || !callerData.user) return Response.json({ error: "Invalid session" }, { status: 401, headers: cors });
 
   const body = await request.json().catch(() => null) as { organizationId?: string; userId?: string; state?: "suspended" | "restored" } | null;
-  if (!body?.organizationId || !body.userId || !["suspended", "restored"].includes(body.state || "")) {
+  const state = body?.state;
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!body?.organizationId || !body.userId || !uuidPattern.test(body.organizationId) || !uuidPattern.test(body.userId)
+    || (state !== "suspended" && state !== "restored")) {
     return Response.json({ error: "Missing or invalid employee access notification details" }, { status: 400, headers: cors });
   }
 
@@ -86,7 +88,7 @@ Deno.serve(async (request: Request) => {
     .from("organization_members").select("user_id,is_active,archived_at")
     .eq("organization_id", body.organizationId).eq("user_id", body.userId).maybeSingle();
   if (memberError || !member || member.archived_at) return Response.json({ error: "Employee record could not be verified" }, { status: 404, headers: cors });
-  const expectedActive = body.state === "restored";
+  const expectedActive = state === "restored";
   if (member.is_active !== expectedActive) return Response.json({ error: "Employee access state changed; notification was not sent." }, { status: 409, headers: cors });
   const { data: profile, error: profileError } = await admin.from("profiles").select("email,full_name").eq("id", body.userId).maybeSingle();
   if (profileError || !profile?.email) return Response.json({ error: "Employee email address is unavailable" }, { status: 422, headers: cors });
@@ -94,7 +96,7 @@ Deno.serve(async (request: Request) => {
   const { data: organization, error: organizationError } = await admin.from("organizations").select("name").eq("id", body.organizationId).maybeSingle();
   if (organizationError || !organization?.name) return Response.json({ error: "Organization details could not be verified" }, { status: 502, headers: cors });
 
-  const { subject, html, text } = renderEmail(profile.full_name || "", body.state, organization.name);
+  const { subject, html, text } = renderEmail(profile.full_name || "", state, organization.name);
   let response: Response;
   try {
     response = await fetch(RESEND_ENDPOINT, {
@@ -107,7 +109,7 @@ Deno.serve(async (request: Request) => {
     await admin.from("audit_logs").insert({
       organization_id: body.organizationId, actor_id: callerData.user.id,
       action: "EMPLOYEE_ACCESS_EMAIL_FAILED", entity: "organization_members", entity_id: body.userId,
-      after_snapshot: { state: body.state, recipient: email, provider: "resend" },
+      after_snapshot: { state, recipient: email, provider: "resend" },
       notes: "Resend did not confirm the access notification request",
     });
     return Response.json({ error: "Employee access was updated, but Resend could not confirm the notification email. Please retry the notification." }, { status: 502, headers: cors });
