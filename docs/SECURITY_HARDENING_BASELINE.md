@@ -39,6 +39,9 @@ Verified against the Production project:
 - No public views or Storage buckets currently exist.
 - The seven public organization-administration RPCs are now `SECURITY INVOKER` wrappers with an empty search path. Their unchanged privileged implementations live in the non-exposed `private` schema as `SECURITY DEFINER` functions with an empty search path. Super Admin assignment and invitation remain protected by AAL2 checks. `anon` and `PUBLIC` have no execute grants on these functions.
 - The eBay credential-save RPC is service-role-only. The legacy RPC signature has been removed and the new signature requires a recent server verification timestamp.
+- eBay application Client ID, Client Secret and RuName are stored only in ciphertext columns (`client_id_ciphertext`, `client_secret_ciphertext`, `ru_name_ciphertext`); the readable Client ID field is masked only.
+- Seller access and refresh tokens are stored in ciphertext columns (`access_token_ciphertext`, `refresh_token_ciphertext`); there are no plaintext token columns.
+- All three credential/token tables (`platform_integration_credentials`, `platform_integration_audit`, `marketplace_credentials`) have RLS enabled, no `anon` or `authenticated` SELECT grants, and `service_role`-only SELECT access.
 - Existing eBay app credentials remain encrypted but are intentionally marked unverified until replaced through the eBay verification flow.
 
 Outstanding Auth item: Supabase Leaked Password Protection is disabled. The current Supabase organization is on the Free plan; Supabase documents this feature as available on Pro and above. Enable it after upgrading the project/organization to a supporting plan. Do not weaken other Auth controls to compensate.
