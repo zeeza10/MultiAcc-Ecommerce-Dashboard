@@ -81,6 +81,7 @@ export default function App() {
     }
   });
   const [globalSearch, setGlobalSearch] = useState('');
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<{ orders: Order[]; products: Product[] }>({
     orders: [],
     products: [],
@@ -292,6 +293,7 @@ export default function App() {
         canManageSettings={permissions.includes('*') || permissions.includes('settings.manage')}
         globalSearch={globalSearch}
         setGlobalSearch={setGlobalSearch}
+        onSearchOpen={() => setIsGlobalSearchOpen(true)}
         selectedStoreId={selectedStoreId}
         selectedEnvironment={selectedEnvironment}
         onEnvironmentChange={setSelectedEnvironment}
@@ -304,20 +306,21 @@ export default function App() {
 
 
       {/* Global Search Results Overlay (FR-SRCH-01) */}
-      {globalSearch.trim() && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-gray-200 z-50 p-4 max-h-[70vh] overflow-y-auto">
+      {isGlobalSearchOpen && (
+        <div className="fixed left-1/2 top-[4.25rem] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-lg max-h-[60vh]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              Global Search Results for "{globalSearch}"
+              Search results for "{globalSearch}"
             </span>
             <button
-              onClick={() => setGlobalSearch('')}
-              className="text-xs text-gray-400 hover:text-gray-700"
+              onClick={() => setIsGlobalSearchOpen(false)}
+              className="rounded-md px-2 py-1 text-xs text-gray-400 hover:bg-slate-100 hover:text-gray-700"
             >
-              Close [ESC]
+              Close
             </button>
           </div>
 
+          {globalSearch.trim() ? (
           <div className="space-y-4 text-xs">
             {/* Orders matches */}
             <div>
@@ -380,6 +383,9 @@ export default function App() {
               )}
             </div>
           </div>
+          ) : (
+            <p className="px-2 py-4 text-center text-xs text-slate-500">Search orders, products, SKUs, or tracking numbers.</p>
+          )}
         </div>
       )}
 
