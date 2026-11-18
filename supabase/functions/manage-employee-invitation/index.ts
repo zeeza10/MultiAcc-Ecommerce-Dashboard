@@ -176,7 +176,10 @@ Deno.serve(async (request: Request) => {
       organization_id: body.organizationId,
       user_id: existing.id,
       role_id: invite.role_id,
-      is_active: true,
+      is_active: false,
+      onboarding_completed_at: null,
+      archived_at: null,
+      archived_by: null,
       invited_by: callerData.user.id,
     }, { onConflict: "organization_id,user_id" });
     if (memberError) return Response.json({ error: "Existing account could not be linked to this organization" }, { status: 502, headers: cors });
@@ -185,9 +188,9 @@ Deno.serve(async (request: Request) => {
     await admin.from("audit_logs").insert({
       organization_id: body.organizationId, actor_id: callerData.user.id,
       action: "EMPLOYEE_ADDED_EXISTING_ACCOUNT", entity: "organization_members", entity_id: existing.id,
-      after_snapshot: { email, role_id: invite.role_id }, notes: "Existing verified account added to organization",
+      after_snapshot: { email, role_id: invite.role_id }, notes: "Existing verified account linked as Pending; access activates only after the next successful portal sign-in",
     });
-    return Response.json({ success: true, existingAccount: true, message: "Existing verified account added to the organization." }, { headers: cors });
+    return Response.json({ success: true, existingAccount: true, message: "Existing verified account linked. The employee remains Pending until their next successful portal sign-in." }, { headers: cors });
   }
 
   if (!resendApiKey) {
