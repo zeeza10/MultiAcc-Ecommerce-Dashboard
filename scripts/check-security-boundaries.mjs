@@ -24,7 +24,6 @@ const forbiddenClientMarkers = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'EBAY_TOKEN_ENCRYPTION_KEY',
   'PLATFORM_SUPER_ADMIN_USER_IDS',
-  'sb_secret_',
 ];
 function walk(dir) {
   const files = [];
@@ -35,12 +34,22 @@ function walk(dir) {
   }
   return files;
 }
+const forbiddenCredentialPatterns = [
+  { pattern: /sb_secret_[A-Za-z0-9_-]{20,}/g, label: 'Supabase secret key value' },
+  { pattern: /eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}/g, label: 'JWT credential value' },
+];
 for (const root of ['src', 'dist']) {
   for (const path of walk(root)) {
     const content = readFileSync(path, 'utf8');
     const marker = forbiddenClientMarkers.find(value => content.includes(value));
     if (marker) {
       throw new Error(`Private credential marker "${marker}" found in client artifact: ${relative('.', path)}`);
+    }
+    for (const { pattern, label } of forbiddenCredentialPatterns) {
+      pattern.lastIndex = 0;
+      if (pattern.test(content)) {
+        throw new Error(`${label} found in client artifact: ${relative('.', path)}`);
+      }
     }
   }
 }
