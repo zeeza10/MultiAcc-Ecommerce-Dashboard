@@ -17,6 +17,7 @@ interface InventoryViewProps {
   currentUser: User;
   config: SystemConfig;
   selectedStoreId: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   onOpenNewAdjustment: () => void;
 }
 
@@ -24,6 +25,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   currentUser,
   config,
   selectedStoreId,
+  selectedEnvironment,
   onOpenNewAdjustment,
 }) => {
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
@@ -35,7 +37,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   useEffect(() => {
     loadInventoryData();
-  }, [currentUser.id, selectedStoreId]);
+  }, [currentUser.id, selectedStoreId, selectedEnvironment]);
 
   const loadInventoryData = async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setLedger([]);
     try {
       const [balRes, ledRes, clientRes] = await Promise.all([
-        api.getBalances(selectedStoreId), api.getStockLedger(selectedStoreId),
+        api.getBalances(selectedStoreId, selectedEnvironment), api.getStockLedger(selectedStoreId, selectedEnvironment),
         api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
       ]);
       setBalances(balRes.balances);
