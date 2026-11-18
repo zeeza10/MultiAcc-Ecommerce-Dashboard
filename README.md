@@ -94,7 +94,7 @@ Cloudflare Worker
   └─ Supabase PostgreSQL (caller-scoped access + RLS)
 ```
 
-The Worker entry point is worker/index.ts; authentication and dispatch are in worker/api.ts; domain handlers are under worker/routes/. Browser business requests should use src/services/api.ts and the browser-safe Supabase client in src/lib/supabase.ts.
+The Worker entry point is worker/index.ts; authentication and dispatch are in worker/api.ts; domain handlers are under worker/routes/. Browser business requests should use src/services/api.ts and the browser-safe Supabase client in src/lib/supabase.ts. Production HTTPS responses include a restrictive Content Security Policy; inline scripts are not permitted.
 
 The repository also contains a legacy Express application (server.ts and server/), retained only for migration compatibility. It is not used by the Cloudflare Worker production entry point, is disabled by default, and refuses to bind to public network interfaces. New production functionality must follow the Worker + Supabase architecture.
 
