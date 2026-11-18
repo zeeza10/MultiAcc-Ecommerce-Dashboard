@@ -28,38 +28,34 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { notifyApiLoading } from './loadingEvents';
+import { fetchWithSessionRecovery } from './authenticatedFetch';
 
-
-async function getVerifiedAccessToken(): Promise<string> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error('Your sign-in session could not be refreshed. Please sign in again.');
-  if (!data.session?.access_token) throw new Error('Your session has expired. Please sign in again.');
-  return data.session.access_token;
-}
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   notifyApiLoading(1);
   try {
-  const accessToken = await getVerifiedAccessToken();
+    const headers = new Headers(options.headers || {});
+    const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
+    if (organizationId) headers.set('X-Organization-Id', organizationId);
+    if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
+      headers.set('Content-Type', 'application/json');
+    }
 
-  const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${accessToken}`);
-  const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
-  if (organizationId) headers.set('X-Organization-Id', organizationId);
-  if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const response = await fetch(`/api/v1${endpoint}`, { ...options, headers });
-  const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('application/json') ? await response.json() : null;
-  if (!response.ok) {
-    throw new Error(payload?.error || `API request failed (${response.status}).`);
-  }
-  if (!contentType.includes('application/json')) {
-    throw new Error('The authenticated API service is unavailable. Demo/local fallback is disabled.');
-  }
-  return payload as T;
+    const response = await fetchWithSessionRecovery(
+      fetch,
+      supabase.auth,
+      `/api/v1${endpoint}`,
+      { ...options, headers },
+    );
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json') ? await response.json() : null;
+    if (!response.ok) {
+      throw new Error(payload?.error || `API request failed (${response.status}).`);
+    }
+    if (!contentType.includes('application/json')) {
+      throw new Error('The authenticated API service is unavailable. Demo/local fallback is disabled.');
+    }
+    return payload as T;
   } finally {
     notifyApiLoading(-1);
   }
@@ -68,19 +64,23 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 async function requestBlob(endpoint: string): Promise<Blob> {
   notifyApiLoading(1);
   try {
-  const accessToken = await getVerifiedAccessToken();
-  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
-  const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
-  if (organizationId) headers.set('X-Organization-Id', organizationId);
-  const response = await fetch(`/api/v1${endpoint}`, { headers });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error || `Report export failed (${response.status}).`);
-  }
-  if (!(response.headers.get('content-type') || '').includes('text/csv')) {
-    throw new Error('The report export did not return a CSV file.');
-  }
-  return response.blob();
+    const headers = new Headers();
+    const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
+    if (organizationId) headers.set('X-Organization-Id', organizationId);
+    const response = await fetchWithSessionRecovery(
+      fetch,
+      supabase.auth,
+      `/api/v1${endpoint}`,
+      { headers },
+    );
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || `Report export failed (${response.status}).`);
+    }
+    if (!(response.headers.get('content-type') || '').includes('text/csv')) {
+      throw new Error('The report export did not return a CSV file.');
+    }
+    return response.blob();
   } finally {
     notifyApiLoading(-1);
   }
