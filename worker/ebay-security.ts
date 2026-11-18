@@ -68,13 +68,97 @@ export function ebayAuthUrl(environment: EbayEnvironment): string {
   return environment === 'SANDBOX' ? 'https://auth.sandbox.ebay.com/oauth2/authorize' : 'https://auth.ebay.com/oauth2/authorize';
 }
 
+
+export class EbayCredentialVerificationError extends Error {
+  constructor(
+    message: string,
+    readonly code: 'EBAY_CREDENTIALS_REJECTED' | 'EBAY_VERIFICATION_UNAVAILABLE' | 'EBAY_INVALID_TOKEN_RESPONSE',
+    readonly httpStatus: number,
+  ) {
+    super(message);
+    this.name = 'EbayCredentialVerificationError';
+  }
+}
+
+/**
+ * Verifies the application keypair against the selected eBay environment.
+ * The short-lived application token is intentionally discarded and never logged or persisted.
+ */
+export async function verifyEbayApplicationCredentials(
+  environment: EbayEnvironment,
+  clientId: string,
+  clientSecret: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const form = new URLSearchParams({
+      grant_type: 'client_credentials',
+      scope: 'https://api.ebay.com/oauth/api_scope',
+    });
+    let response: Response;
+    try {
+      response = await fetchImpl(`${ebayBaseUrl(environment)}/identity/v1/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: form,
+        signal: controller.signal,
+      });
+    } catch {
+      throw new EbayCredentialVerificationError(
+        'eBay credential verification is temporarily unavailable. No credentials were saved; please retry.',
+        'EBAY_VERIFICATION_UNAVAILABLE',
+        503,
+      );
+    }
+
+    if (response.status === 400 || response.status === 401 || (response.status >= 400 && response.status < 500 && response.status !== 429)) {
+      throw new EbayCredentialVerificationError(
+        'eBay did not accept this application keypair for the selected environment. Check the Client ID, Client Secret and Sandbox/Production selection. Nothing was saved.',
+        'EBAY_CREDENTIALS_REJECTED',
+        422,
+      );
+    }
+    if (!response.ok) {
+      throw new EbayCredentialVerificationError(
+        'eBay credential verification is temporarily unavailable. No credentials were saved; please retry.',
+        'EBAY_VERIFICATION_UNAVAILABLE',
+        503,
+      );
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    const token = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    if (typeof token.access_token !== 'string' || !token.access_token || typeof token.expires_in !== 'number' || !Number.isFinite(token.expires_in) || token.expires_in <= 0) {
+      throw new EbayCredentialVerificationError(
+        'eBay returned an unexpected verification response. No credentials were saved.',
+        'EBAY_INVALID_TOKEN_RESPONSE',
+        502,
+      );
+    }
+    // Deliberately do not return, log, or persist the application access token.
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function getPlatformCredentials(env: WorkerEnv, environment: EbayEnvironment): Promise<EbayPlatformCredentials | null> {
   const admin = createServiceClient(env);
   const { data, error } = await admin.from('platform_integration_credentials')
-    .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext,credential_version')
+    .select('client_id_ciphertext,client_secret_ciphertext,ru_name_ciphertext,credential_version,credentials_verified_at')
     .eq('provider', 'EBAY').eq('environment', environment).maybeSingle();
   if (error) throw new Error('eBay application credentials could not be loaded.');
-  if (!data) return null;
+  if (!data || !data.credentials_verified_at) return null;
   const [clientId, clientSecret, ruName] = await Promise.all([
     decryptEbayValue(data.client_id_ciphertext, env),
     decryptEbayValue(data.client_secret_ciphertext, env),
