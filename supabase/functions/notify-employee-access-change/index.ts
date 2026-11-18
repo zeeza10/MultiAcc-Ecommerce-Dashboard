@@ -1,6 +1,22 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.102.0";
-import { corsHeadersForInvitation, isAllowedInvitationOrigin, exceedsInvitationBodyLimit } from "../manage-employee-invitation/request-guards.ts";
+const ALLOWED_ORIGINS = new Set(["https://app.oriafuture.com", "http://localhost:5173", "http://127.0.0.1:5173"]);
+function isAllowedInvitationOrigin(origin: string | null): boolean { return origin === null || ALLOWED_ORIGINS.has(origin); }
+function corsHeadersForInvitation(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Max-Age": "86400", "Cache-Control": "no-store", "Vary": "Origin" };
+  if (origin && ALLOWED_ORIGINS.has(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
+}
+async function exceedsInvitationBodyLimit(request: Request, maximumBytes: number): Promise<boolean> {
+  const declaredLength = request.headers.get("Content-Length");
+  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > maximumBytes)) return true;
+  if (!request.body) return false;
+  const reader = request.clone().body?.getReader();
+  if (!reader) return false;
+  let total = 0;
+  try { while (true) { const { done, value } = await reader.read(); if (done) return false; total += value.byteLength; if (total > maximumBytes) { await reader.cancel(); return true; } } }
+  finally { reader.releaseLock(); }
+}
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const SENDER = "Oria Future HR <hr@oriafuture.com>";
