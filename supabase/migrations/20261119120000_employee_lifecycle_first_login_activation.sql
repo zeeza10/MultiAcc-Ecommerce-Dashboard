@@ -43,7 +43,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_invitation public.user_invitations%rowtype;
 begin
