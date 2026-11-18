@@ -36,7 +36,7 @@ function walk(dir) {
 }
 const forbiddenCredentialPatterns = [
   { pattern: /sb_secret_[A-Za-z0-9_-]{20,}/g, label: 'Supabase secret key value' },
-  { pattern: /eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}/g, label: 'JWT credential value' },
+  { pattern: /eyJ[A-Za-z0-9_-]{20,}[.][A-Za-z0-9_-]{20,}[.][A-Za-z0-9_-]{20,}/g, label: 'JWT credential value' },
 ];
 for (const root of ['src', 'dist']) {
   for (const path of walk(root)) {
