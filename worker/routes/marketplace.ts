@@ -4,7 +4,7 @@ import { json } from '../http';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
   createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials,
-  hashEbayState, ebayAuthUrl, ebayBaseUrl, sanitizeEbayError,
+  hashEbayState, ebayAuthUrl, ebayBaseUrl, sanitizeEbayError, verifyEbayApplicationCredentials, EbayCredentialVerificationError,
   type EbayEnvironment,
 } from '../ebay-security';
 
@@ -44,14 +44,14 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
 
   if (request.method === 'GET') {
     const { data, error } = await admin.from('platform_integration_credentials')
-      .select('environment,client_id_masked,credential_version,updated_at')
+      .select('environment,client_id_masked,credential_version,updated_at,credentials_verified_at')
       .eq('provider', 'EBAY').order('environment');
     if (error) throw new Error('eBay integration configuration could not be loaded.');
     const byEnvironment = new Map((data || []).map((row: any) => [row.environment, row]));
     return json({
       environments: ['SANDBOX', 'PRODUCTION'].map((environment) => {
         const row: any = byEnvironment.get(environment);
-        return { environment, configured: Boolean(row), clientIdMasked: row?.client_id_masked || '', credentialVersion: row?.credential_version || 0, updatedAt: row?.updated_at || null };
+        return { environment, configured: Boolean(row), credentialsVerified: Boolean(row?.credentials_verified_at), credentialsVerifiedAt: row?.credentials_verified_at || null, clientIdMasked: row?.client_id_masked || '', credentialVersion: row?.credential_version || 0, updatedAt: row?.updated_at || null };
       }),
       productionOAuthEnabled: env.EBAY_PRODUCTION_OAUTH_ENABLED === 'true',
       encryptionReady: Boolean(env.EBAY_TOKEN_ENCRYPTION_KEY),
@@ -97,6 +97,14 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
   if (!/^[A-Za-z0-9._-]+$/.test(clientId) || !/^[A-Za-z0-9_-]+$/.test(ruName)) {
     return json({ error: 'The eBay Client ID or RuName format is invalid.' }, 400);
   }
+  try {
+    await verifyEbayApplicationCredentials(environment, clientId, clientSecret);
+  } catch (error) {
+    if (error instanceof EbayCredentialVerificationError) {
+      return json({ error: error.message, code: error.code }, error.httpStatus);
+    }
+    return json({ error: 'eBay credential verification is temporarily unavailable. No credentials were saved; please retry.' }, 503);
+  }
   const [clientIdCiphertext, clientSecretCiphertext, ruNameCiphertext] = await Promise.all([
     encryptEbayValue(clientId, env), encryptEbayValue(clientSecret, env), encryptEbayValue(ruName, env),
   ]);
@@ -113,7 +121,7 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
     const conflict = /version conflict/i.test(error.message || '');
     return json({ error: conflict ? 'Credentials were updated by another administrator. Reload and try again.' : 'eBay credentials could not be saved securely.' }, conflict ? 409 : 400);
   }
-  return json({ success: true, result: Array.isArray(data) ? data[0] : data });
+  return json({ success: true, credentialsVerified: true, sellerAuthorization: 'PENDING', result: Array.isArray(data) ? data[0] : data });
 }
 
 
