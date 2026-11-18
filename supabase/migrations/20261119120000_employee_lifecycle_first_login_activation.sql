@@ -163,7 +163,7 @@ create or replace function public.set_org_member_active(
 ) returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   v_actor uuid := auth.uid();
