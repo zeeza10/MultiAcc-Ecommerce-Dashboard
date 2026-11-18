@@ -11,7 +11,7 @@ The following rules are active and scoped only to `app.oriafuture.com` so unrela
 - Cloudflare Managed Free Ruleset is executed for the dashboard hostname.
 - TLS 1.0 and TLS 1.1 connections are blocked for the dashboard hostname.
 - HTTP requests are redirected to HTTPS while preserving the original path and query.
-- The Worker emits HSTS on HTTPS responses, plus `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a restrictive Permissions Policy.
+- The Worker emits HSTS and an enforced restrictive Content Security Policy on HTTPS responses, plus `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a restrictive Permissions Policy. Inline scripts and inline style blocks are not allowed; PDF report CSS is served from the same origin.
 - API responses use `Cache-Control: no-store`.
 - Worker rate limits are configured for IP traffic, reads, writes, and invitations.
 
@@ -39,7 +39,7 @@ Verified against the Production project:
 - No public views or Storage buckets currently exist.
 - The seven public organization-administration RPCs are now `SECURITY INVOKER` wrappers with an empty search path. Their unchanged privileged implementations live in the non-exposed `private` schema as `SECURITY DEFINER` functions with an empty search path. Super Admin assignment and invitation remain protected by AAL2 checks. `anon` and `PUBLIC` have no execute grants on these functions.
 - The eBay credential-save RPC is service-role-only. The legacy RPC signature has been removed and the new signature requires a recent server verification timestamp.
-- eBay application Client ID, Client Secret and RuName are stored only in ciphertext columns (`client_id_ciphertext`, `client_secret_ciphertext`, `ru_name_ciphertext`); the readable Client ID field is masked only.
+- eBay application Client ID, Client Secret and RuName are stored only in ciphertext columns (`client_id_ciphertext`, `client_secret_ciphertext`, `ru_name_ciphertext`); the readable Client ID field is masked only. The current Sandbox application keypair has a successful eBay verification timestamp; seller OAuth authorization remains a separate per-account state. Production application credentials are not configured.
 - Seller access and refresh tokens are stored in ciphertext columns (`access_token_ciphertext`, `refresh_token_ciphertext`); there are no plaintext token columns.
 - All three credential/token tables (`platform_integration_credentials`, `platform_integration_audit`, `marketplace_credentials`) have RLS enabled, no `anon` or `authenticated` SELECT grants, and `service_role`-only SELECT access.
 - Existing eBay app credentials remain encrypted but are intentionally marked unverified until replaced through the eBay verification flow.
@@ -72,6 +72,10 @@ The seven public organization-administration RPCs have been encapsulated by migr
 
 There are now 33 `SECURITY DEFINER` functions in the non-exposed `private` schema (26 pre-existing implementations/helpers plus the seven encapsulated organization-administration RPC bodies). Authenticated users have no `CREATE` privilege in either `public` or `private`, and `anon` has no `USAGE` on `private`. Twenty-two pre-existing private functions use the legacy fixed `public, private, pg_temp` search path; because application roles cannot create objects in either schema and `pg_temp` is last, this is not currently an attacker-controlled search-path injection path. Converting those remaining bodies to an empty search path requires a function-by-function qualification review and is tracked as a separate safe hardening pass rather than rewriting 22 production functions blindly.
 
+## Additional private function hardening
+
+A reviewed additive migration (`20261118142500_harden_private_definer_search_paths`) pins ten additional private `SECURITY DEFINER` functions to an empty `search_path`. Their application tables and helper functions are schema-qualified. The change is prepared in the current security PR and will be applied only after CI and merge. The remaining legacy private functions retain `pg_temp` last and run in schemas where application roles cannot create objects.
+
 ## Express compatibility server containment
 
 The legacy Express server is not the Cloudflare production API runtime. It is now disabled unless `ENABLE_EXPRESS_COMPAT_SERVER=true` is explicitly set for local development. When explicitly enabled:
@@ -102,8 +106,8 @@ Outstanding repository control: the current GitHub Free plan does not allow repo
 3. Enable GitHub code-scanning alert upload when repository entitlement supports it; review CodeQL findings, not only workflow completion.
 4. Consider a Cloudflare plan with the full managed WAF/OWASP ruleset if the dashboard's threat model and budget require it.
 5. Review the Worker compatibility date and update it in a separate tested change.
-6. Add a Content Security Policy in report-only mode, inventorying all legitimate browser connections first, then enforce it after testing.
-7. Run an authenticated end-to-end Sandbox eBay test using valid credentials entered only in the dashboard. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
+6. Review production CSP behavior and refine the policy only if a legitimate required browser origin is identified.
+7. Complete an authenticated end-to-end Sandbox seller OAuth and order-import acceptance test. A successful application-token check does not mean a seller has authorized the app; seller OAuth consent remains a separate state.
 8. Maintain tested backups and a documented recovery/credential-rotation procedure.
 
 ## Change safety
