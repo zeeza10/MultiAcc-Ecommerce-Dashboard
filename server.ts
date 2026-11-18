@@ -1,14 +1,4 @@
-import 'dotenv/config';
-import express from 'express';
-import { createServer as createViteServer } from 'vite';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { apiRouter } from './server/routes';
-
-import fs from 'fs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import type { Request, Response, NextFunction } from 'express';
 
 /**
  * Per-process IP rate limiter for the Express compatibility server.
@@ -20,7 +10,7 @@ function createIpRateLimiter(maxRequests: number, windowMs: number) {
   const clients = new Map<string, { count: number; resetAt: number }>();
   const maxTrackedClients = 10_000;
 
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
     const clientIp = req.socket.remoteAddress || 'unknown';
     let entry = clients.get(clientIp);
@@ -61,6 +51,18 @@ function createIpRateLimiter(maxRequests: number, windowMs: number) {
 }
 
 async function startServer() {
+  // Load the legacy runtime only after the explicit local opt-in guard passes.
+  await import('dotenv/config');
+  const [{ default: express }, { createServer: createViteServer }, { apiRouter }, fs, path, url] = await Promise.all([
+    import('express'),
+    import('vite'),
+    import('./server/routes'),
+    import('node:fs'),
+    import('node:path'),
+    import('node:url'),
+  ]);
+  const __filename = url.fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
   const app = express();
   const port = 3000;
   // This compatibility process is local-only and must never be exposed as a public API.
