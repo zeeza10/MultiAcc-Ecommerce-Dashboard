@@ -152,20 +152,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {isMobileOpen && <button type="button" aria-label="Close navigation overlay" onClick={onCloseMobile} className="fixed inset-x-0 top-14 bottom-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" /> }
-      <aside id="oria-mobile-navigation" aria-label="Primary navigation" className={`fixed left-0 top-14 bottom-0 z-50 flex ${isCollapsed ? "w-20" : "w-[min(86vw,320px)]"} flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:bottom-auto lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16" : "lg:w-64"}`}>
-      <div className="hidden lg:flex items-center justify-end border-b border-slate-200 bg-slate-50 px-3 py-2">
-        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <aside id="oria-mobile-navigation" aria-label="Primary navigation" className={`fixed left-0 top-14 bottom-0 z-50 flex ${isCollapsed ? "w-20" : "w-[min(86vw,320px)]"} shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[width,transform] duration-200 ease-out lg:sticky lg:top-0 lg:bottom-auto lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16 lg:flex-[0_0_4rem]" : "lg:w-64 lg:flex-[0_0_16rem]"}`}>
+      <div className="hidden lg:flex h-12 shrink-0 items-center justify-center border-b border-slate-200 bg-slate-50 px-2 py-2">
+        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 sm:px-3 lg:px-2 space-y-4 sm:space-y-5 text-xs">
+      <nav className={`flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain py-3 space-y-4 sm:space-y-5 text-xs ${isCollapsed ? "px-1.5" : "px-2.5 sm:px-3 lg:px-2"}`}>
         {navGroups.map((group) => {
           const visibleItems = group.items.filter(isAllowedForRole);
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={group.title}>
+            <div key={group.title} className="min-w-0">
               {!isCollapsed && <div className="px-3 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                 {group.title}
               </div>}
@@ -179,15 +179,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={item.id}
                       onClick={() => { onNavigate(item.id); onCloseMobile(); }}
                       title={isCollapsed ? item.label : undefined}
-                      className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between"} ${isCollapsed ? "px-2 py-3" : "px-3 py-2"} rounded-md transition font-medium ${
+                      aria-label={item.label}
+                      aria-current={isActive ? "page" : undefined}
+                      className={`w-full min-w-0 min-h-10 flex items-center ${isCollapsed ? "justify-center px-0 py-2" : "justify-between px-3 py-2"} rounded-lg transition-colors duration-150 font-medium ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-xs'
                           : 'text-gray-700 hover:bg-gray-200/70 hover:text-gray-900'
                       }`}
                     >
-                      <div className="flex items-center space-x-2.5 truncate">
-                        <Icon className={`${isCollapsed ? "h-5 w-5" : "h-4 w-4"} shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
-                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      <div className={`flex min-w-0 items-center ${isCollapsed ? "justify-center" : "gap-2.5"}`}>
+                        <Icon aria-hidden="true" className={`h-5 w-5 shrink-0 ${isActive ? "text-white" : "text-gray-500"}`} />
+                        {!isCollapsed && <span className="min-w-0 truncate text-left">{item.label}</span>}
                       </div>
 
                       {!isCollapsed && <div className="flex items-center space-x-1 shrink-0">
