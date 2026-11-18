@@ -128,6 +128,38 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
 }
 
 
+class EbayOrdersApiError extends Error {
+  constructor(
+    readonly httpStatus: number,
+    readonly providerCode: string | null,
+    readonly providerMessage: string,
+  ) {
+    super('eBay order API returned HTTP ' + httpStatus
+      + (providerCode ? ' (code ' + providerCode + ')' : '')
+      + (providerMessage ? ': ' + providerMessage : '.'));
+    this.name = 'EbayOrdersApiError';
+  }
+}
+
+async function readEbayOrdersApiError(response: Response): Promise<EbayOrdersApiError> {
+  let payload: any = null;
+  try { payload = await response.json(); } catch { /* Provider may return a non-JSON error body. */ }
+  const first = Array.isArray(payload?.errors) ? payload.errors[0] : null;
+  const rawCode = first?.errorId ?? first?.code ?? payload?.errorId ?? payload?.code;
+  const providerCode = rawCode === undefined || rawCode === null ? null : String(rawCode).slice(0, 32);
+  const rawMessage = typeof first?.message === 'string' ? first.message
+    : typeof first?.longMessage === 'string' ? first.longMessage
+    : typeof payload?.message === 'string' ? payload.message : '';
+  // Provider text is diagnostic only. Strip control characters and credential-like values.
+  const providerMessage = rawMessage
+    .replace(/[\r\n\t\u0000-\u001f\u007f]/g, ' ')
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(/(access_token|refresh_token|client_secret|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[REDACTED]')
+    .replace(/https?:\/\/[^\s]+/gi, '[URL]')
+    .slice(0, 240);
+  return new EbayOrdersApiError(response.status, providerCode, providerMessage);
+}
+
 function moneyMinor(value: unknown): number {
   const parsed = typeof value === 'string' || typeof value === 'number' ? Number(value) : 0;
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
@@ -209,7 +241,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
       endpoint.searchParams.set('limit', '200'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`eBay order API returned HTTP ${response.status}.`);
+      if (!response.ok) throw await readEbayOrdersApiError(response);
       const page = await response.json() as { orders?: any[]; total?: number };
       const orders = Array.isArray(page.orders) ? page.orders : [];
       total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; pages++;
@@ -259,8 +291,33 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
     await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
     return { imported, skipped, exceptions, fetched };
   } catch (error) {
-    await admin.from('marketplace_sync_runs').update({ completed_at: new Date().toISOString(), status: 'FAILED', last_error_code: 'EBAY_ORDER_SYNC_FAILED', last_error_message: 'eBay order synchronization failed.', retryable: true, attempt_count: 1 }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_status: 'FAILED', last_sync_message: 'eBay order synchronization failed. Check the integration events and try again.' }).eq('id', account.id);
+    const providerError = error instanceof EbayOrdersApiError ? error : null;
+    const safeMessage = providerError
+      ? providerError.message.slice(0, 320)
+      : 'eBay order synchronization failed. Check the integration events and try again.';
+    const safeCode = providerError?.providerCode
+      ? ('EBAY_API_' + providerError.providerCode).slice(0, 64)
+      : 'EBAY_ORDER_SYNC_FAILED';
+    await admin.from('marketplace_sync_runs').update({
+      completed_at: new Date().toISOString(), status: 'FAILED',
+      last_error_code: safeCode, last_error_message: safeMessage,
+      retryable: true, attempt_count: 1,
+    }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({
+      last_sync_status: 'FAILED', last_sync_message: safeMessage,
+    }).eq('id', account.id);
+    await admin.from('marketplace_integration_events').insert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR',
+      error_code: safeCode, message: safeMessage,
+      metadata: providerError ? {
+        httpStatus: providerError.httpStatus,
+        providerCode: providerError.providerCode,
+        environment: account.environment,
+        endpoint: 'sell/fulfillment/v1/order',
+      } : { environment: account.environment },
+    });
     throw error;
   }
 }
