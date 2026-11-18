@@ -25,8 +25,9 @@ Verified binding types:
 - `EBAY_TOKEN_ENCRYPTION_KEY`: `secret_text`
 - `PLATFORM_SUPER_ADMIN_USER_IDS`: `secret_text`
 - `SUPABASE_PUBLISHABLE_KEY`: `plain_text` (intended for public clients)
+- `SUPABASE_URL`: `plain_text` (public project endpoint)
 
-Private keys and tokens must never be placed in `wrangler.jsonc`, Vite variables, browser bundles, GitHub source, or logs.
+The Supabase publishable key and project URL are intentionally public browser configuration, not private credentials. They cannot be hidden from a browser that connects directly to Supabase; database safety therefore depends on RLS, grants, and authenticated authorization. The secret key, token-encryption key, and platform-admin identifiers are stored as Cloudflare `secret_text` bindings. Private keys and tokens must never be placed in browser bundles, GitHub source, or logs.
 
 ## Supabase database and Auth
 
@@ -34,18 +35,56 @@ Verified against the Production project:
 
 - All 62 tables in the exposed `public` schema have RLS enabled.
 - The `anon` role has zero direct table grants in `public`.
-- The `platform_integration_credentials` and `platform_integration_audit` tables have RLS enabled, no client policies, and are granted only to `service_role` as intended for server-only data.
+- The `platform_integration_credentials` and `platform_integration_audit` tables have RLS enabled, no browser grants, and explicit restrictive deny policies for `anon` and `authenticated`; server access remains `service_role` only.
 - No public views or Storage buckets currently exist.
-- The seven organization access `SECURITY DEFINER` functions callable by `authenticated` have a fixed empty search path and enforce the caller's active organization Super Admin membership; Super Admin role assignment/invitation is protected by AAL2 checks.
+- The seven public organization-access `SECURITY DEFINER` RPCs callable by `authenticated` have a fixed empty search path and explicit caller/organization authorization checks. Super Admin assignment and invitation are protected by AAL2 checks. `anon` and `PUBLIC` have no execute grants on public `SECURITY DEFINER` functions. These seven authenticated RPCs are intentionally retained because the app uses them for guarded organization administration; the Supabase linter still flags the pattern for manual review.
 - The eBay credential-save RPC is service-role-only. The legacy RPC signature has been removed and the new signature requires a recent server verification timestamp.
 - Existing eBay app credentials remain encrypted but are intentionally marked unverified until replaced through the eBay verification flow.
 
 Outstanding Auth item: Supabase Leaked Password Protection is disabled. The current Supabase organization is on the Free plan; Supabase documents this feature as available on Pro and above. Enable it after upgrading the project/organization to a supporting plan. Do not weaken other Auth controls to compensate.
 
+## Database hardening completed on 2026-11-18
+
+Production migration `20261118090917_database_fk_index_rls_hardening` was applied and verified:
+
+- 149 foreign-key constraints were audited; all 95 previously uncovered foreign keys now have leading-column supporting indexes. A repeat audit reports **0 uncovered foreign keys**.
+- All 62 public tables still have RLS enabled; no public table was left without RLS.
+- The two server-only platform integration tables now have explicit restrictive deny policies for browser roles.
+- Three RLS initialization-plan warnings were resolved by evaluating `auth.uid()` through a scalar subquery.
+- Four duplicate permissive-policy overlaps were removed by splitting write permissions from read permissions. The previous read/write authorization semantics were preserved, and the repeat audit reports zero duplicate permissive-policy groups.
+- No business rows were deleted or rewritten.
+- Supabase now reports 114 unused indexes. This is not a reason to drop them blindly: the database is very small, usage statistics are newly initialized, and many of the new indexes exist specifically to support foreign-key maintenance. Review again after real workload and query-statistics accumulation.
+
+### Privileged function review
+
+The seven public organization-administration `SECURITY DEFINER` functions are still flagged by Supabase because authenticated users can invoke them. They are intentional application RPCs, not unrestricted admin backdoors:
+
+- All have an empty fixed search path.
+- All deny unauthenticated callers and check the caller's active organization Super Admin membership, except the boolean helper which returns only the caller's own membership status.
+- Granting a Super Admin role requires AAL2.
+- Inviting a Super Admin is independently checked by a database trigger requiring AAL2.
+- Last-active-Super-Admin safeguards and audit logging are present on role/member changes.
+- No `anon` or `PUBLIC` execute grant exists on public `SECURITY DEFINER` functions.
+
+There are also 26 `SECURITY DEFINER` functions in the non-exposed `private` schema. Authenticated users have no `CREATE` privilege in either `public` or `private`, and `anon` has no `USAGE` on `private`. Twenty-two private functions use the legacy fixed `public, private, pg_temp` search path; because application roles cannot create objects in either schema and `pg_temp` is last, this is not currently an attacker-controlled search-path injection path. Converting these bodies to an empty search path requires a function-by-function qualification review and is tracked as a separate safe hardening pass rather than changing 26 production functions blindly.
+
+## Express compatibility server containment
+
+The legacy Express server is not the Cloudflare production API runtime. It is now disabled unless `ENABLE_EXPRESS_COMPAT_SERVER=true` is explicitly set for local development. When explicitly enabled:
+
+- It binds only to `127.0.0.1`; `HOST` cannot expose it on a public interface.
+- A global per-process IP limiter runs before JSON parsing and static-file handling.
+- JSON request bodies are strict and limited to 64 KiB.
+- API responses are marked `Cache-Control: no-store`.
+- The Express `X-Powered-By` header is disabled.
+- The existing API-specific limiter remains in place.
+
+A CI security-boundary check verifies the opt-in/loopback/body-limit controls and scans browser source/build artifacts for private credential markers.
+
 ## GitHub repository and CI
 
 - Repository visibility is private.
-- Pull-request CI runs migration consistency, UI invariants, TypeScript checks, Worker tests, local Worker smoke tests, production build, Cloudflare dry-run, and production dependency audit.
+- Pull-request CI runs migration consistency, UI invariants, TypeScript checks, Worker tests, local Worker smoke tests, production build, Cloudflare dry-run, security-boundary checks, and production dependency audit.
 - Gitleaks scans full Git history; the latest scan passed.
 - CodeQL analysis runs, but SARIF upload is disabled because GitHub code scanning is not enabled for this private repository.
 - Dependabot is already configured for weekly npm and GitHub Actions updates.
@@ -65,4 +104,4 @@ Outstanding repository control: the current GitHub Free plan does not allow repo
 
 ## Change safety
 
-No production business rows were deleted or rewritten by this hardening work. The eBay migration adds a nullable verification timestamp and replaces only the credential-save RPC signature; existing encrypted credentials are retained.
+No production business rows were deleted or rewritten by this hardening work. The eBay migration adds a nullable verification timestamp and replaces only the credential-save RPC signature; existing encrypted credentials are retained. The database FK/RLS migration adds supporting indexes and adjusts policies only; it does not change business data.
