@@ -2,6 +2,16 @@
 -- Email confirmation happens during verifyOtp and is not proof that setup was completed.
 drop trigger if exists on_auth_user_invitation_accepted on auth.users;
 
+-- Correct records created by the previous email-confirmation trigger when the
+-- invitee confirmed the email but never completed password creation.
+update public.user_invitations i
+set accepted_at = null
+from auth.users u
+where lower(i.email) = lower(u.email)
+  and i.accepted_at is not null
+  and coalesce(u.encrypted_password, '') = ''
+  and i.revoked_at is null;
+
 create or replace function public.mark_org_invitation_accepted_after_password_setup()
 returns trigger
 language plpgsql
