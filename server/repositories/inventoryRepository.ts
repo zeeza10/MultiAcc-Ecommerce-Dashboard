@@ -121,7 +121,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     };
   }
 
-  async listBalances(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<StockBalance[]> {
+  async listBalances(options: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}): Promise<StockBalance[]> {
     const products = await this.products.listForOrganization(options);
     if (products.length === 0) return [];
 
