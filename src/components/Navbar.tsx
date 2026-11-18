@@ -43,6 +43,7 @@ interface NavbarProps {
   onStoreChange?: (storeId: string) => void;
   onOpenNavigation: () => void;
   onSearchOpen: () => void;
+  searchDropdown?: React.ReactNode;
   isMobileNavigationOpen: boolean;
   isDarkTheme: boolean;
   onToggleTheme: () => void;
@@ -74,6 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onStoreChange,
   onOpenNavigation,
   onSearchOpen,
+  searchDropdown,
   isMobileNavigationOpen,
   isDarkTheme,
   onToggleTheme,
@@ -119,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="order-3 flex w-full min-w-0 items-center justify-center gap-2 xl:order-none xl:flex-1 xl:max-w-3xl">
-          <div className="relative min-w-0 flex-1 max-w-xl">
+        <div className="order-3 flex w-full min-w-0 items-center justify-center gap-2 xl:order-none xl:flex-1 xl:max-w-4xl">
+          <div className="relative min-w-0 flex-1 max-w-md">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -131,14 +133,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               placeholder="Global Search (Orders, SKUs, Tracking #, Buyers)..."
               className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
+            {searchDropdown}
           </div>
 
-          <div className="hidden w-28 shrink-0 2xl:block">
+          <div className="w-28 shrink-0">
             <select value={selectedEnvironment} onChange={(e) => { onEnvironmentChange(e.target.value as any); onStoreChange && onStoreChange('ALL'); }} aria-label="Data environment" className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-md px-2 py-1.5">
               <option value="DEMO">Demo</option><option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
             </select>
           </div>
-          <div className="hidden w-40 shrink-0 2xl:block">
+          <div className="w-40 shrink-0">
             <select
               value={selectedStoreId}
               onChange={(e) => onStoreChange && onStoreChange(e.target.value)}
