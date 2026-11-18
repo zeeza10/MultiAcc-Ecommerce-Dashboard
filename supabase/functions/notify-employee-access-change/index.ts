@@ -83,14 +83,14 @@ Deno.serve(async (request: Request) => {
   if (adminMembershipError || !adminMembership) return Response.json({ error: "Only this organization Super Admin can send employee access notifications" }, { status: 403, headers: cors });
 
   const { data: member, error: memberError } = await admin
-    .from("organization_members").select("user_id,is_active,archived_at,profiles!inner(email,full_name)")
+    .from("organization_members").select("user_id,is_active,archived_at")
     .eq("organization_id", body.organizationId).eq("user_id", body.userId).maybeSingle();
   if (memberError || !member || member.archived_at) return Response.json({ error: "Employee record could not be verified" }, { status: 404, headers: cors });
   const expectedActive = body.state === "restored";
   if (member.is_active !== expectedActive) return Response.json({ error: "Employee access state changed; notification was not sent." }, { status: 409, headers: cors });
-  const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-  const email = profile?.email;
-  if (!email) return Response.json({ error: "Employee email address is unavailable" }, { status: 422, headers: cors });
+  const { data: profile, error: profileError } = await admin.from("profiles").select("email,full_name").eq("id", body.userId).maybeSingle();
+  if (profileError || !profile?.email) return Response.json({ error: "Employee email address is unavailable" }, { status: 422, headers: cors });
+  const email = profile.email;
   const { data: organization, error: organizationError } = await admin.from("organizations").select("name").eq("id", body.organizationId).maybeSingle();
   if (organizationError || !organization?.name) return Response.json({ error: "Organization details could not be verified" }, { status: 502, headers: cors });
 
