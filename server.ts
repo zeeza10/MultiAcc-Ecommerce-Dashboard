@@ -98,6 +98,9 @@ async function startServer() {
     }));
 
     // Static html and roots must never be cached to prevent stale clients
+    // The createIpRateLimiter middleware above is applied before this handler.
+    // CodeQL does not model this in-house limiter, so suppress its duplicate alert here.
+    // codeql[js/missing-rate-limiting]
     app.use(express.static(clientPath, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
