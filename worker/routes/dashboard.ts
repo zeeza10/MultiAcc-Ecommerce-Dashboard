@@ -45,10 +45,10 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
           })
         : Promise.resolve([]),
       !storeScoped && auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
-        ? auth.repositoryContext.supabase.from('invoices').select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date').eq('organization_id', auth.organizationId)
+        ? auth.repositoryContext.supabase.from('invoices').select('invoice_type,recipient_type,total_minor,paid_amount_minor,currency,status,issue_date').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment)
         : Promise.resolve({ data: [], error: null }),
       !storeScoped && auth.user.role !== 'CLIENT_USER' && (auth.permissions.has('*') || auth.permissions.has('finance.view'))
-        ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId)
+        ? auth.repositoryContext.supabase.from('expenses').select('amount_minor,currency,status').eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment)
         : Promise.resolve({ data: [], error: null }),
       settingsQuery,
       storeScoped
