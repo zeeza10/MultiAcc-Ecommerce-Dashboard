@@ -7,9 +7,15 @@ const invalidSession = () => new Response(
   { status: 401, headers: { 'Content-Type': 'application/json' } },
 );
 
-function makeAuthPort(overrides: Record<string, unknown> = {}) {
+type TestAuthPort = {
+  getSession: () => Promise<{ data: { session: { access_token: string } | null }; error: unknown | null }>;
+  refreshSession: () => Promise<{ data: { session: { access_token: string } | null }; error: unknown | null }>;
+  signOut: (options: { scope: 'local' }) => Promise<unknown>;
+};
+
+function makeAuthPort(overrides: Partial<TestAuthPort> = {}) {
   const calls = { refreshSession: 0, signOut: 0, signOutScope: '' };
-  const auth = {
+  const auth: TestAuthPort = {
     getSession: async () => ({ data: { session: { access_token: 'old-token' } }, error: null }),
     refreshSession: async () => {
       calls.refreshSession += 1;
@@ -20,8 +26,8 @@ function makeAuthPort(overrides: Record<string, unknown> = {}) {
       calls.signOutScope = options.scope;
       return { error: null };
     },
-    ...overrides,
   };
+  Object.assign(auth, overrides);
   return { auth, calls };
 }
 
@@ -89,4 +95,36 @@ test('clears only the local session if the refreshed token is also rejected', as
   assert.equal(calls.refreshSession, 1);
   assert.equal(calls.signOut, 1);
   assert.equal(calls.signOutScope, 'local');
+});
+
+test('returns to the signed-out flow when no session exists at API startup', async () => {
+  const { auth, calls } = makeAuthPort({
+    getSession: async () => ({ data: { session: null }, error: null }),
+  });
+  await assert.rejects(
+    fetchWithSessionRecovery(async () => new Response('{}'), auth, '/api/v1/config'),
+    /Your session has expired/,
+  );
+  assert.equal(calls.signOut, 1);
+  assert.equal(calls.signOutScope, 'local');
+});
+
+test('clears a definitively expired stored refresh session but preserves it on transient auth errors', async () => {
+  const expired = makeAuthPort({
+    getSession: async () => ({ data: { session: null }, error: { status: 400, code: 'refresh_token_not_found' } }),
+  });
+  await assert.rejects(
+    fetchWithSessionRecovery(async () => new Response('{}'), expired.auth, '/api/v1/config'),
+    /Your session has expired/,
+  );
+  assert.equal(expired.calls.signOut, 1);
+
+  const temporary = makeAuthPort({
+    getSession: async () => ({ data: { session: null }, error: { message: 'network unavailable' } }),
+  });
+  await assert.rejects(
+    fetchWithSessionRecovery(async () => new Response('{}'), temporary.auth, '/api/v1/config'),
+    /session has been preserved/,
+  );
+  assert.equal(temporary.calls.signOut, 0);
 });
