@@ -3,15 +3,15 @@ import { join, relative } from 'node:path';
 
 const server = readFileSync('server.ts', 'utf8');
 const requiredServerControls = [
-  [/ENABLE_EXPRESS_COMPAT_SERVER !== 'true'/, 'Express compatibility server must be opt-in'],
-  [/const host = '127\\.0\\.0\\.1'/, 'Express compatibility server must bind to loopback only'],
-  [/createIpRateLimiter\\(300, 60_000\\)/, 'Express compatibility server must have a global IP limiter'],
-  [/express\\.json\\(\\{ limit: '64kb', strict: true \\}\\)/, 'Express JSON bodies must be bounded and strict'],
+  ["ENABLE_EXPRESS_COMPAT_SERVER !== 'true'", 'Express compatibility server must be opt-in'],
+  ["const host = '127.0.0.1'", 'Express compatibility server must bind to loopback only'],
+  ['createIpRateLimiter(300, 60_000)', 'Express compatibility server must have a global IP limiter'],
+  ["express.json({ limit: '64kb', strict: true })", 'Express JSON bodies must be bounded and strict'],
 ];
-for (const [pattern, message] of requiredServerControls) {
-  if (!pattern.test(server)) throw new Error(message);
+for (const [marker, message] of requiredServerControls) {
+  if (!server.includes(marker)) throw new Error(message);
 }
-if (/process\\.env\\.HOST/.test(server)) {
+if (server.includes('process.env.HOST')) {
   throw new Error('Express compatibility server must not accept a configurable public bind host');
 }
 
