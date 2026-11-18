@@ -30,12 +30,16 @@ Deno.serve(async (request: Request) => {
     return Response.json({ error: "Method not allowed" }, { status: 405, headers });
   }
 
-  const contentLength = Number(request.headers.get("Content-Length") || "0");
-  if (!Number.isFinite(contentLength) || contentLength > 2048) {
+  const rawBody = await request.text();
+  if (new TextEncoder().encode(rawBody).byteLength > 2048) {
     return Response.json({ error: "Request body is too large" }, { status: 413, headers });
   }
-
-  const body = await request.json().catch(() => null) as { invitationId?: string } | null;
+  let body: { invitationId?: string } | null = null;
+  try {
+    body = JSON.parse(rawBody) as { invitationId?: string };
+  } catch {
+    return Response.json({ status: "invalid" }, { status: 200, headers });
+  }
   const invitationId = body?.invitationId?.trim() || "";
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(invitationId)) {
     return Response.json({ status: "invalid" }, { status: 200, headers });
