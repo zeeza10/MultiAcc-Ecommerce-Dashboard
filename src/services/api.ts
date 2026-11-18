@@ -107,8 +107,8 @@ export const api = {
     return request<{ orders: Order[] }>(`/orders?${q.toString()}`);
   },
   getOrder: (id: string) => request<{ order: Order; histories: any[] }>(`/orders/${id}`),
-  createOrder: (payload: any, accountId?: string) =>
-    request<{ order: Order }>(`/orders${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
+  createOrder: (payload: any, accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') =>
+    request<{ order: Order }>(`/orders?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
