@@ -16,7 +16,8 @@
     "cf:typegen": "wrangler types",
     "test": "tsx --test worker/*.test.ts",
     "check:migrations": "node scripts/verify-migrations.mjs",
-    "check:demo-finance": "node scripts/verify-demo-finance-seed.mjs"
+    "check:demo-finance": "node scripts/verify-demo-finance-seed.mjs",
+    "check:security-boundaries": "node scripts/check-security-boundaries.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
