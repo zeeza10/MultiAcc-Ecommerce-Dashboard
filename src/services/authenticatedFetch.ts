@@ -8,6 +8,17 @@ type AuthSessionPort = {
 
 const INVALID_SESSION_MESSAGE = 'Your session is invalid or expired. Please sign in again.';
 
+let refreshInFlight: Promise<Awaited<ReturnType<AuthSessionPort['refreshSession']>>> | null = null;
+
+function refreshSessionSingleFlight(auth: AuthSessionPort) {
+  if (!refreshInFlight) {
+    refreshInFlight = auth.refreshSession().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 async function isInvalidSessionResponse(response: Response): Promise<boolean> {
   if (response.status !== 401) return false;
   try {
@@ -72,7 +83,7 @@ export async function fetchWithSessionRecovery(
 
   let refreshed: Awaited<ReturnType<AuthSessionPort['refreshSession']>>;
   try {
-    refreshed = await auth.refreshSession();
+    refreshed = await refreshSessionSingleFlight(auth);
   } catch {
     throw new Error('Authentication service is temporarily unavailable. Your session has been preserved. Please retry.');
   }
