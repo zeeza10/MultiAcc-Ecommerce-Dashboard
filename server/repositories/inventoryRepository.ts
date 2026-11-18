@@ -170,7 +170,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     return [...balances.values()];
   }
 
-  async listLedger(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<StockLedgerEntry[]> {
+  async listLedger(options: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}): Promise<StockLedgerEntry[]> {
     const products = await this.products.listForOrganization(options);
     if (products.length === 0) return [];
 
@@ -205,7 +205,7 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     });
   }
 
-  async listAdjustments(options: { client3plId?: string; onlyClientProducts?: boolean } = {}): Promise<StockAdjustment[]> {
+  async listAdjustments(options: { client3plId?: string; onlyClientProducts?: boolean; dataEnvironment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}): Promise<StockAdjustment[]> {
     const products = await this.products.listForOrganization(options);
     if (products.length === 0) return [];
 
