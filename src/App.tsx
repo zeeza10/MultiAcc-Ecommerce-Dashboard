@@ -286,7 +286,8 @@ export default function App() {
         setGlobalSearch={setGlobalSearch}
         selectedStoreId={selectedStoreId}
         onStoreChange={setSelectedStoreId}
-        onOpenNavigation={() => setIsMobileSidebarOpen(true)}
+        onOpenNavigation={() => setIsMobileSidebarOpen((open) => !open)}
+        isMobileNavigationOpen={isMobileSidebarOpen}
         isDarkTheme={isDarkTheme}
         onToggleTheme={() => setIsDarkTheme((current) => !current)}
       />
@@ -581,6 +582,10 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <footer className="flex h-8 shrink-0 items-center justify-center border-t border-slate-200 bg-white/80 px-3 text-[10px] font-medium tracking-wide text-slate-500">
+        Oria Future <span className="mx-1.5 text-slate-300">·</span> Beta Version 1.0
+      </footer>
 
       {/* Global Modals */}
       <NewAdjustmentModal
