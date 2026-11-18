@@ -429,6 +429,44 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
 
+  const listingsMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/listings$/);
+  if (listingsMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id').eq('id', listingsMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    const url = new URL(request.url);
+    const requestedLimit = Number(url.searchParams.get('limit') || 50);
+    const requestedOffset = Number(url.searchParams.get('offset') || 0);
+    const limit = Number.isSafeInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+    const offset = Number.isSafeInteger(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+    const admin = createServiceClient(env);
+    const { data, error, count } = await admin.from('marketplace_listing_snapshots')
+      .select('external_sku,inventory_item,offers,total_ship_to_location_quantity,listing_status,source_updated_at,synced_at', { count: 'exact' })
+      .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
+      .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    return json({
+      listings: (data || []).map((row: any) => ({
+        sku: row.external_sku,
+        title: row.inventory_item?.product?.title || '',
+        description: row.inventory_item?.product?.description || '',
+        imageUrls: row.inventory_item?.product?.imageUrls || [],
+        condition: row.inventory_item?.condition || '',
+        inventoryQuantity: row.total_ship_to_location_quantity,
+        listingStatus: row.listing_status || 'NOT_LISTED',
+        offers: Array.isArray(row.offers) ? row.offers : [],
+        sourceUpdatedAt: row.source_updated_at,
+        syncedAt: row.synced_at,
+      })),
+      total: count || 0,
+      limit,
+      offset,
+    });
+  }
+
   const syncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync$/);
   if (syncMatch && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
