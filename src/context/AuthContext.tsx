@@ -60,8 +60,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(() => {
     if (window.location.pathname !== '/accept-invitation') return null;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('type') === 'invite' ? params.get('token_hash') : null;
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    if (fragmentParams.get('type') === 'invite') return fragmentParams.get('token_hash');
+    return queryParams.get('type') === 'invite' ? queryParams.get('token_hash') : null;
   });
   const [inviteConfirmPassword, setInviteConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -75,8 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // memory only and is submitted to Supabase only when the invitee sets a password.
   useLayoutEffect(() => {
     if (window.location.pathname !== '/accept-invitation') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('token_hash') || params.has('type')) {
+    const queryParams = new URLSearchParams(window.location.search);
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (queryParams.has('token_hash') || queryParams.has('type')
+      || fragmentParams.has('token_hash') || fragmentParams.has('type')) {
       window.history.replaceState({}, '', '/accept-invitation');
     }
   }, []);
