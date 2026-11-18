@@ -178,7 +178,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       key={item.id}
                       onClick={() => { onNavigate(item.id); onCloseMobile(); }}
-                      title={isCollapsed ? item.label : undefined}\n                      aria-label={item.label}\n                      aria-current={isActive ? "page" : undefined}
+                      title={isCollapsed ? item.label : undefined}
+                      aria-label={item.label}
+                      aria-current={isActive ? "page" : undefined}
                       className={`w-full min-w-0 min-h-10 flex items-center ${isCollapsed ? "justify-center px-0 py-2" : "justify-between px-3 py-2"} rounded-lg transition-colors duration-150 font-medium ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-xs'
