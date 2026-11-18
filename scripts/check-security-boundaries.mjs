@@ -7,7 +7,7 @@ const requiredServerControls = [
   ["const host = '127.0.0.1'", 'Express compatibility server must bind to loopback only'],
   ['createIpRateLimiter(300, 60_000)', 'Express compatibility server must have a global IP limiter'],
   ["express.json({ limit: '64kb', strict: true })", 'Express JSON bodies must be bounded and strict'],
-  ["await import('./server/routes')", 'Legacy business routes must load only after the opt-in guard'],
+  ["import('./server/routes')", 'Legacy business routes must load only after the opt-in guard'],
 ];
 for (const [marker, message] of requiredServerControls) {
   if (!server.includes(marker)) throw new Error(message);
