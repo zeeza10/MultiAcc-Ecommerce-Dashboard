@@ -123,6 +123,9 @@ async function startServer() {
       },
     }));
 
+    // The SPA fallback sends index.html and is protected by the per-IP limiter below.
+    // CodeQL does not model this in-house Express middleware, so suppress only this route.
+    // codeql[js/missing-rate-limiting]
     app.get('*', createIpRateLimiter(60, 60_000), (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
