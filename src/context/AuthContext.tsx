@@ -58,6 +58,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       || hashParams.get('type') === 'invite'
       || queryParams.get('type') === 'invite';
   });
+  const [invitationId] = useState<string | null>(() => {
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    return fragmentParams.get('invitation_id') || queryParams.get('invitation_id');
+  });
+  const [inviteStatus, setInviteStatus] = useState<'checking' | 'pending' | 'accepted' | 'invalid' | 'unavailable'>(() => {
+    const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    return fragmentParams.has('invitation_id') || queryParams.has('invitation_id') ? 'checking' : 'pending';
+  });
+  const [inviteStatusAttempt, setInviteStatusAttempt] = useState(0);
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(() => {
     // Email clients and auth redirects can preserve the invitation token while
     // normalizing the callback path. Read the token from either URL location;
@@ -68,6 +79,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return queryParams.get('type') === 'invite' ? queryParams.get('token_hash') : null;
   });
   const [inviteConfirmPassword, setInviteConfirmPassword] = useState('');
+
+  useEffect(() => {
+    if (!inviteSetupActive || !invitationId) return;
+    let active = true;
+    setInviteStatus('checking');
+    supabase.functions.invoke('check-employee-invitation', { body: { invitationId } })
+      .then(({ data, error: statusError }) => {
+        if (!active) return;
+        if (statusError) {
+          setInviteStatus('unavailable');
+          return;
+        }
+        setInviteStatus(data?.status === 'accepted' ? 'accepted'
+          : data?.status === 'pending' ? 'pending' : 'invalid');
+      })
+      .catch(() => { if (active) setInviteStatus('unavailable'); });
+    return () => { active = false; };
+  }, [inviteSetupActive, invitationId, inviteStatusAttempt]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -82,7 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const isInvitationCallback = window.location.pathname === '/accept-invitation'
       || queryParams.get('type') === 'invite'
-      || fragmentParams.get('type') === 'invite';
+      || fragmentParams.get('type') === 'invite'
+      || queryParams.has('invitation_id')
+      || fragmentParams.has('invitation_id');
     if (!isInvitationCallback) return;
 
     // Normalize every recognized invitation callback to the dedicated route,
@@ -411,11 +442,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="mb-7">
           <div className="text-xs font-bold tracking-[0.25em] text-indigo-600 uppercase">Oria Future</div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">
-            {inviteSetupActive ? 'Set up your account' : accountState === 'error' && signedInWithoutWorkspace ? 'Unable to verify workspace access' : signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
+            {inviteSetupActive ? inviteStatus === 'accepted' ? 'Your account is already set up' : inviteStatus === 'checking' ? 'Checking invitation…' : 'Set up your account' : accountState === 'error' && signedInWithoutWorkspace ? 'Unable to verify workspace access' : signedInWithoutWorkspace ? 'Workspace access required' : mode === 'login' ? 'Welcome back' : 'Reset your password'}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {inviteSetupActive
-              ? session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : pendingInviteToken ? 'Create a password to continue. Your one-time invitation will be verified securely when you submit this form.' : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
+              ? inviteStatus === 'accepted' ? 'This invitation has already been completed and your workspace account is active. You do not need to set up your account again.'
+                : inviteStatus === 'checking' ? 'Please wait while we securely check the invitation status.'
+                : inviteStatus === 'unavailable' ? 'We could not verify this invitation right now. Please try again.'
+                : inviteStatus === 'invalid' ? 'This invitation is expired, revoked, or no longer valid. Ask your Super Admin to send a new invitation.'
+                : session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : pendingInviteToken ? 'Create a password to continue. Your one-time invitation will be verified securely when you submit this form.' : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
               : signedInWithoutWorkspace
                 ? accountState === 'error' ? 'Workspace access could not be verified. Your access has not been assumed or granted. Retry the check or contact your administrator.' : 'This account has no active organization membership. Contact your organization administrator.'
                 : 'Secure sign-in to your Oria Future workspace.'}
@@ -426,7 +461,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         {message && <div role="status" className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">{message}</div>}
 
         {inviteSetupActive ? (
-          session || pendingInviteToken ? (
+          inviteStatus === 'accepted' ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800" role="status">
+                <div className="font-semibold">Account setup complete</div>
+                <p className="mt-1">Your password has already been created. This invitation link cannot be used again.</p>
+              </div>
+              <a href="/" className="block w-full rounded-lg bg-indigo-600 py-3 text-center text-sm font-semibold text-white">Continue to sign in</a>
+            </div>
+          ) : inviteStatus === 'checking' ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">Checking whether this invitation has already been used…</div>
+          ) : inviteStatus === 'unavailable' ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">Invitation status could not be checked. No password changes have been made.</p>
+              <button type="button" onClick={() => setInviteStatusAttempt(value => value + 1)} className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white">Retry verification</button>
+              <a href="/" className="block text-center text-sm text-slate-500">Return to sign in</a>
+            </div>
+          ) : inviteStatus === 'invalid' ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">This invitation is expired, revoked, or invalid. Contact your organization administrator for a new invitation.</p>
+              <a href="/" className="block w-full rounded-lg border border-slate-300 py-3 text-center text-sm font-semibold text-slate-700">Return to sign in</a>
+            </div>
+          ) : session || pendingInviteToken ? (
             <form onSubmit={submit} className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
                 New password
