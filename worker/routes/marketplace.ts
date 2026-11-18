@@ -182,8 +182,16 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
 }
 async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,watermark_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
+  if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
+  const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
+  const since = typeof savedCursor.since === 'string'
+    ? savedCursor.since
+    : new Date(checkpoint?.watermark_at ? new Date(checkpoint.watermark_at).getTime() - 3 * 86400000 : Date.now() - 730 * 86400000).toISOString();
+  const filterField = checkpoint?.watermark_at && !savedCursor.since ? 'lastmodifieddate' : 'creationdate';
+  let resumeOffset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
     admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
@@ -196,15 +204,15 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING' }).select('id').single();
   if (runError || !run) throw new Error('A marketplace sync run could not be started.');
   try {
-    let offset = 0, total = 0;
+    let offset = resumeOffset, total = 0, pages = 0, hasMore = false;
     do {
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
-      endpoint.searchParams.set('limit', '100'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `creationdate:[${since}..]`);
+      endpoint.searchParams.set('limit', '200'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw new Error(`eBay order API returned HTTP ${response.status}.`);
       const page = await response.json() as { orders?: any[]; total?: number };
       const orders = Array.isArray(page.orders) ? page.orders : [];
-      total = Number(page.total || orders.length); fetched += orders.length;
+      total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; pages++;
       for (const order of orders) {
         const externalId = typeof order.orderId === 'string' ? order.orderId : '';
         if (!externalId) continue;
@@ -234,10 +242,19 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
         else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
       }
       offset += orders.length;
-      if (!orders.length || offset >= total || offset >= 1000) break;
+      hasMore = orders.length === 200 || offset < total;
+      await admin.from('marketplace_sync_checkpoints').upsert({
+        organization_id: account.organization_id, marketplace_account_id: account.id,
+        resource_type: 'ORDERS', data_environment: dataEnvironment,
+        cursor_state: hasMore ? { since, offset } : {},
+        watermark_at: hasMore ? (checkpoint?.watermark_at || null) : new Date().toISOString(),
+        last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
+        consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
+      }, { onConflict: 'marketplace_account_id,resource_type' });
+      if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
-    const finished = new Date().toISOString(), status = exceptions ? 'PARTIAL' : 'COMPLETED';
-    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`, attempt_count: 1, retryable: false }).eq('id', run.id);
+    const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
+    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
     return { imported, skipped, exceptions, fetched };
   } catch (error) {
