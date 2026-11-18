@@ -120,8 +120,8 @@ export const api = {
 
   // Products
   getProducts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ products: (Product & { stockOnHand: number; stockReserved: number; stockAvailable: number; stockIncoming: number; stockDamaged: number })[] }>(`/products?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createProduct: (payload: any, accountId?: string) =>
-    request<{ product: Product }>(`/products${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, {
+  createProduct: (payload: any, accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') =>
+    request<{ product: Product }>(`/products?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
