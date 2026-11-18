@@ -63,9 +63,17 @@ function createIpRateLimiter(maxRequests: number, windowMs: number) {
 async function startServer() {
   const app = express();
   const port = 3000;
+  // This compatibility process is local-only and must never be exposed as a public API.
+  app.disable('x-powered-by');
+  app.use(createIpRateLimiter(300, 60_000));
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   const distPath = path.resolve(__dirname, 'dist');
 
-  app.use(express.json());
+  // Parse only bounded JSON, after the request limiter has already run.
+  app.use(express.json({ limit: '64kb', strict: true }));
 
   // Mount health check endpoint
   app.get('/api/health', (_req, res) => {
@@ -86,10 +94,6 @@ async function startServer() {
   const hasDist = fs.existsSync(path.resolve(clientPath, 'index.html'));
 
   if (hasDist) {
-    // Static file serving performs filesystem reads; apply an IP limiter before
-    // Express static middleware so assets and index.html are not an unmetered path.
-    app.use(createIpRateLimiter(600, 60_000));
-
     // Ultra-fast instant static serving (zero bundle delay)
     // Assets with content hashes can be cached safely
     app.use('/assets', express.static(path.resolve(clientPath, 'assets'), {
@@ -126,13 +130,23 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  const host = process.env.HOST || '127.0.0.1';
+  // Never allow HOST/forwarded-header configuration to expose this legacy server.
+  const host = '127.0.0.1';
   app.listen(port, host, () => {
     console.log(`OriaFuture server is active on http://${host}:${port} [hasDist: ${hasDist}]`);
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (process.env.ENABLE_EXPRESS_COMPAT_SERVER !== 'true') {
+  console.error(
+    'Express compatibility server is disabled by default. ' +
+    'For local-only development, explicitly set ENABLE_EXPRESS_COMPAT_SERVER=true.',
+  );
+  process.exitCode = 1;
+} else {
+  startServer().catch((err) => {
+    // Avoid dumping request/configuration data or credentials into process logs.
+    console.error('Express compatibility server failed to start.');
+    process.exitCode = 1;
+  });
+}
