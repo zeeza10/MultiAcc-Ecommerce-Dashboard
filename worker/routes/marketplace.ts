@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
+import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -13,6 +14,7 @@ const OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
+  'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
 ];
 
 function isEnvironment(value: unknown): value is EbayEnvironment {
@@ -446,6 +448,9 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     if (!token.access_token || !token.refresh_token || !Number.isFinite(token.expires_in) || !Number.isFinite(token.refresh_token_expires_in)) {
       return returnUrl('invalid_token_response');
     }
+    // Capture eBay's immutable public user ID while the delegated token is available.
+    // This is required to map future account-deletion notifications without relying on mutable usernames.
+    const sellerIdentity = await fetchEbaySellerIdentity(oauthState.environment, token.access_token);
     const [accessCiphertext, refreshCiphertext] = await Promise.all([
       encryptEbayValue(token.access_token, env), encryptEbayValue(token.refresh_token, env),
     ]);
@@ -470,6 +475,8 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
     }, { onConflict: 'marketplace_account_id' });
     if (credentialError) throw new Error('Encrypted eBay seller credentials could not be stored.');
     const { error: accountError } = await admin.from('marketplace_accounts').update({
+      ebay_user_id: sellerIdentity.userId,
+      seller_username: sellerIdentity.username,
       auth_status: 'CONNECTED', token_expires_at: accessExpiresAt,
       last_sync_status: 'NOT_SYNCED', last_sync_message: 'eBay seller authorization completed. Initial order sync is pending.',
       updated_at: new Date(now).toISOString(),
