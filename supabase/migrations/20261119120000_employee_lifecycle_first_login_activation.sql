@@ -42,8 +42,8 @@ create or replace function public.mark_org_invitation_accepted_after_password_se
 returns trigger
 language plpgsql
 security definer
-set search_path = public, auth, pg_temp
-as $$
+set search_path = ''
+as $
 declare
   v_invitation public.user_invitations%rowtype;
 begin
