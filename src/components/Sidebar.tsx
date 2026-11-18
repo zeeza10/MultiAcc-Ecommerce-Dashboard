@@ -20,7 +20,6 @@ import {
   History,
   Settings,
   Boxes,
-  Lock,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -53,13 +52,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   currentUser,
   permissions,
-  config,
   unreadAlertCount,
   pendingExceptionsCount,
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const currentPhase = config.activeReleasePhase;
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Effective permissions already combine role defaults with Super Admin's
@@ -156,15 +153,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {isMobileOpen && <button type="button" aria-label="Close navigation overlay" onClick={onCloseMobile} className="fixed inset-x-0 top-14 bottom-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" /> }
       <aside id="oria-mobile-navigation" aria-label="Primary navigation" className={`fixed left-0 top-14 bottom-0 z-50 flex ${isCollapsed ? "w-20" : "w-[min(86vw,320px)]"} flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:bottom-auto lg:z-20 lg:min-h-screen lg:translate-x-0 lg:shadow-none ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} ${isCollapsed ? "lg:w-16" : "lg:w-64"}`}>
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-        {!isCollapsed && <span>Navigation</span>}
-        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="ml-auto rounded-md p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <div className="hidden lg:flex items-center justify-end border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <button type="button" onClick={() => setIsCollapsed((value) => !value)} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} title={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
-        
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-3 space-y-5 text-xs">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 sm:px-3 lg:px-2 space-y-4 sm:space-y-5 text-xs">
         {navGroups.map((group) => {
           const visibleItems = group.items.filter(isAllowedForRole);
           if (visibleItems.length === 0) return null;
@@ -178,7 +173,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {visibleItems.map((item) => {
                   const isActive = activeTab === item.id;
                   const Icon = item.icon;
-                  const isFuturePhase = currentPhase === 'P1' && item.phase !== 'P1';
 
                   return (
                     <button
@@ -209,18 +203,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </span>
                         )}
 
-                        {isFuturePhase && (
-                          <span
-                            title={`Scheduled in ${item.phase}. Available for preview or unlock in Settings.`}
-                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                              isActive
-                                ? 'bg-indigo-700 text-indigo-100'
-                                : 'bg-slate-200 text-slate-600 border border-slate-300'
-                            }`}
-                          >
-                            {item.phase}
-                          </span>
-                        )}
                       </div>}
                     </button>
                   );
@@ -231,16 +213,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Role and Isolation Footer */}
-      <div className="p-3 border-t border-gray-200 bg-white/70 text-[11px] text-gray-500">
-        <div className={`flex items-center ${isCollapsed ? "justify-center" : "space-x-1.5"} font-medium text-gray-700`} title={isCollapsed ? "Role Isolation Active" : undefined}>
-          <Lock className="w-3.5 h-3.5 text-indigo-600" />
-          {!isCollapsed && <span>Role Isolation Active</span>}
-        </div>
-        {!isCollapsed && <p className="mt-0.5 text-[10px] text-gray-400">
-          Enforced server-side. Append-only ledgers active.
-        </p>}
-      </div>
       </aside>
     </>
   );

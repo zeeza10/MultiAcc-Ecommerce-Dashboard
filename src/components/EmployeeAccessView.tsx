@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Archive, CheckCircle2, Clock3, KeyRound, Mail, Plus, RefreshCw, Shield, ShieldCheck, UserMinus, Users, XCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Archive, CheckCircle2, Clock3, KeyRound, Mail, Plus, RefreshCw, Shield, ShieldCheck, UserMinus, Users, X, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,17 @@ export const EmployeeAccessView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; description: string; confirmLabel: string; tone: 'primary' | 'danger'; busyLabel: string } | null>(null);
+  const confirmResolver = useRef<((confirmed: boolean) => void) | null>(null);
+  const askConfirmation = (dialog: NonNullable<typeof confirmDialog>) => new Promise<boolean>(resolve => {
+    confirmResolver.current = resolve;
+    setConfirmDialog(dialog);
+  });
+  const closeConfirmation = (confirmed: boolean) => {
+    confirmResolver.current?.(confirmed);
+    confirmResolver.current = null;
+    setConfirmDialog(null);
+  };
 
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -197,7 +208,7 @@ export const EmployeeAccessView: React.FC = () => {
         return;
       }
     }
-    if (!window.confirm(`Change ${member.full_name || member.email || 'this employee'}'s role?`)) return;
+    if (!(await askConfirmation({ title: 'Update employee role?', description: `The role assigned to ${member.full_name || member.email || 'this employee'} will change. This action will be recorded in Access History.`, confirmLabel: 'Update role', tone: 'primary', busyLabel: 'Updating…' }))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: changeError } = await supabase.rpc('assign_org_member_role', {
@@ -211,8 +222,7 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const setMemberActive = async (member: Member, active: boolean) => {
-    const action = active ? 'reactivate' : 'suspend and immediately block workspace API access for';
-    if (!window.confirm(`Are you sure you want to ${action} ${member.full_name || member.email || 'this employee'}?`)) return;
+    if (!(await askConfirmation({ title: active ? 'Restore employee access?' : 'Suspend employee?', description: active ? `Workspace access will be restored for ${member.full_name || member.email || 'this employee'}.` : ` ${member.full_name || member.email || 'This employee'} will immediately lose workspace API access. Their account and history will be retained.`, confirmLabel: active ? 'Restore access' : 'Suspend employee', tone: active ? 'primary' : 'danger', busyLabel: active ? 'Restoring…' : 'Suspending…' }))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: updateError } = await supabase.rpc('set_org_member_active', {
@@ -234,7 +244,7 @@ export const EmployeeAccessView: React.FC = () => {
   };
 
   const archiveMember = async (member: Member) => {
-    if (!window.confirm(`Archive ${member.full_name || member.email || 'this employee'}? Their access will be blocked, but their account and business history will be retained. Permanent deletion is not available.`)) return;
+    if (!(await askConfirmation({ title: 'Archive this employee?', description: `Access for ${member.full_name || member.email || 'this employee'} will be blocked. Their account and historical business records will be retained. Permanent deletion is not available.`, confirmLabel: 'Archive employee', tone: 'danger', busyLabel: 'Archiving…' }))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: archiveError } = await supabase.rpc('archive_org_member', {
@@ -243,12 +253,15 @@ export const EmployeeAccessView: React.FC = () => {
       if (archiveError) throw archiveError;
       setNotice('Employee archived. Account and historical records have been retained.');
       await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Employee could not be archived.'); }
+    } catch (cause) {
+      const failure = cause as { message?: string; details?: string; hint?: string; code?: string };
+      setError([failure.message || 'Employee could not be archived.', failure.details, failure.hint, failure.code ? `Code: ${failure.code}` : undefined].filter(Boolean).join(' · '));
+    }
     finally { setSaving(false); }
   };
 
   const revokeInvitation = async (invitation: Invitation) => {
-    if (!window.confirm(`Revoke the pending invitation for ${invitation.email}?`)) return;
+    if (!(await askConfirmation({ title: 'Revoke invitation?', description: `The pending invitation sent to ${invitation.email} will no longer be usable.`, confirmLabel: 'Revoke invitation', tone: 'danger', busyLabel: 'Revoking…' }))) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const { error: revokeError } = await supabase.from('user_invitations')
@@ -317,7 +330,7 @@ export const EmployeeAccessView: React.FC = () => {
                     <td className="px-4 py-3"><div className="font-semibold text-slate-900">{member.full_name || 'Unnamed employee'}</div><div className="text-xs text-slate-500">{member.email || 'Email unavailable'}</div></td>
                     <td className="px-4 py-3"><select disabled={saving || member.status!=='ACTIVE' || member.user_id===user.id} value={member.role_id} onChange={e=>void changeRole(member,e.target.value)} className="max-w-[220px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">{access.roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(member.joined_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${member.status==='ACTIVE'?'bg-emerald-50 text-emerald-700':member.status==='PENDING'?'bg-amber-50 text-amber-700':member.status==='ARCHIVED'?'bg-slate-100 text-slate-600':'bg-rose-50 text-rose-700'}`}>{member.status==='ACTIVE'?<CheckCircle2 className="h-3 w-3"/>:member.status==='PENDING'?<Clock3 className="h-3 w-3"/>:<XCircle className="h-3 w-3"/>}{member.status==='PENDING'?'Pending':member.status==='ACTIVE'?'Active':member.status==='ARCHIVED'?'Archived':member.status==='SUSPENDED'?'Suspended':member.is_active?'Active':'Suspended'}</span></td>
+                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold tracking-wide ${member.status==='ACTIVE'?'border-emerald-200 bg-emerald-50 text-emerald-700':member.status==='PENDING'?'border-amber-200 bg-amber-50 text-amber-700':member.status==='ARCHIVED'?'border-slate-200 bg-slate-100 text-slate-600':'border-rose-200 bg-rose-50 text-rose-700'}`}>{member.status==='ACTIVE'?<span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]"/>:member.status==='PENDING'?<span className="h-2 w-2 rounded-full bg-amber-500"/>:member.status==='ARCHIVED'?<Archive className="h-3.5 w-3.5"/>:<span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.12)]"/>}{member.status==='PENDING'?'Pending':member.status==='ACTIVE'?'Active':member.status==='ARCHIVED'?'Archived':member.status==='SUSPENDED'?'Suspended':member.is_active?'Active':'Suspended'}</span></td>
                     <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button disabled={saving || member.user_id===user.id || member.role_code==='SUPER_ADMIN' || member.status!=='ACTIVE'} title={member.role_code==='SUPER_ADMIN'?'Super Admin has protected organization-wide access':''} onClick={()=>openMemberPermissions(member)} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-40">View / edit access</button>{member.status==='ACTIVE'||member.status==='SUSPENDED'?<button disabled={saving || member.user_id===user.id} onClick={()=>void setMemberActive(member,member.status==='SUSPENDED')} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${member.status==='ACTIVE'?'border-rose-200 text-rose-700 hover:bg-rose-50':'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>{member.status==='ACTIVE'?<><UserMinus className="h-3.5 w-3.5"/>Suspend</>:<><CheckCircle2 className="h-3.5 w-3.5"/>Reactivate</>}</button>:null}{member.status!=='PENDING'&&member.status!=='ARCHIVED'&&member.role_code!=='SUPER_ADMIN'&&member.user_id!==user.id?<button disabled={saving} onClick={()=>void archiveMember(member)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Archive className="h-3.5 w-3.5"/>Archive</button>:null}</div></td>
                   </tr>)}
                   {!access.members.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No employee memberships found.</td></tr>}
@@ -392,6 +405,27 @@ export const EmployeeAccessView: React.FC = () => {
             {access.history.map(item=><div key={item.id} className="px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-bold text-indigo-700">{item.action.replace(/_/g,' ')}</span><span className="text-xs text-slate-400">{new Date(item.created_at).toLocaleString()}</span></div><div className="mt-1 text-sm text-slate-800">{item.entity} · {item.entity_id}</div>{item.notes&&<div className="mt-0.5 text-xs text-slate-500">{item.notes}</div>}</div>)}
             {!access.history.length&&<div className="px-4 py-8 text-center text-sm text-slate-500">No access changes recorded yet.</div>}
           </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saving) closeConfirmation(false); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="employee-confirm-title" aria-describedby="employee-confirm-description" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl shadow-slate-950/25">
+            <div className="flex items-start gap-4 p-6">
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${confirmDialog.tone === 'danger' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                {confirmDialog.tone === 'danger' ? <AlertTriangle className="h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 id="employee-confirm-title" className="text-lg font-bold tracking-tight text-slate-900">{confirmDialog.title}</h2>
+                <p id="employee-confirm-description" className="mt-2 text-sm leading-6 text-slate-600">{confirmDialog.description}</p>
+              </div>
+              <button type="button" aria-label="Close confirmation" disabled={saving} onClick={() => closeConfirmation(false)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-4 sm:flex-row sm:justify-end">
+              <button type="button" disabled={saving} onClick={() => closeConfirmation(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={saving} onClick={() => closeConfirmation(true)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${confirmDialog.tone === 'danger' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/15' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/15'}`}>{saving ? confirmDialog.busyLabel : confirmDialog.confirmLabel}</button>
+            </div>
+          </section>
         </div>
       )}
     </div>
