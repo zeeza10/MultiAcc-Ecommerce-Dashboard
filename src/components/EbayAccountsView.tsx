@@ -358,7 +358,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       title={!integrationReady ? integrationMessage : acc.environment === 'PRODUCTION' && !productionOAuthEnabled ? 'Production keyset is not yet activated by eBay.' : undefined}
                       className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Renew OAuth
+                      {acc.authStatus === 'CONNECTED' ? 'Reconnect eBay Account' : 'Connect eBay Account'}
                     </button>
 
                     <button
@@ -401,7 +401,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                   </tr>
                                 ))}
                                 {!(listingSnapshots[acc.id] || []).length && (
-                                  <tr><td colSpan={5} className="p-3 text-center text-slate-500">No synced inventory yet. Run Sync All Data after connecting.</td></tr>
+                                  <tr><td colSpan={5} className="p-3 text-center text-slate-500">No synced inventory yet. Use “Sync Orders + Inventory” after connecting. The first automatic sync also starts on the next scheduled run (within about 5 minutes).</td></tr>
                                 )}
                               </tbody>
                             </table>
