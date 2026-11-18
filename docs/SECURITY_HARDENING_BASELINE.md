@@ -37,7 +37,7 @@ Verified against the Production project:
 - The `anon` role has zero direct table grants in `public`.
 - The `platform_integration_credentials` and `platform_integration_audit` tables have RLS enabled, no browser grants, and explicit restrictive deny policies for `anon` and `authenticated`; server access remains `service_role` only.
 - No public views or Storage buckets currently exist.
-- The seven public organization-access `SECURITY DEFINER` RPCs callable by `authenticated` have a fixed empty search path and explicit caller/organization authorization checks. Super Admin assignment and invitation are protected by AAL2 checks. `anon` and `PUBLIC` have no execute grants on public `SECURITY DEFINER` functions. These seven authenticated RPCs are intentionally retained because the app uses them for guarded organization administration; the Supabase linter still flags the pattern for manual review.
+- The seven public organization-administration RPCs are now `SECURITY INVOKER` wrappers with an empty search path. Their unchanged privileged implementations live in the non-exposed `private` schema as `SECURITY DEFINER` functions with an empty search path. Super Admin assignment and invitation remain protected by AAL2 checks. `anon` and `PUBLIC` have no execute grants on these functions.
 - The eBay credential-save RPC is service-role-only. The legacy RPC signature has been removed and the new signature requires a recent server verification timestamp.
 - Existing eBay app credentials remain encrypted but are intentionally marked unverified until replaced through the eBay verification flow.
 
@@ -45,7 +45,7 @@ Outstanding Auth item: Supabase Leaked Password Protection is disabled. The curr
 
 ## Database hardening completed on 2026-11-18
 
-Production migration `20261118090917_database_fk_index_rls_hardening` was applied and verified:
+Production migrations `20261118090917_database_fk_index_rls_hardening` and `20261118091705_encapsulate_org_admin_definer_rpcs` were applied and verified:
 
 - 149 foreign-key constraints were audited; all 95 previously uncovered foreign keys now have leading-column supporting indexes. A repeat audit reports **0 uncovered foreign keys**.
 - All 62 public tables still have RLS enabled; no public table was left without RLS.
@@ -57,16 +57,17 @@ Production migration `20261118090917_database_fk_index_rls_hardening` was applie
 
 ### Privileged function review
 
-The seven public organization-administration `SECURITY DEFINER` functions are still flagged by Supabase because authenticated users can invoke them. They are intentional application RPCs, not unrestricted admin backdoors:
+The seven public organization-administration RPCs have been encapsulated by migration `20261118091705_encapsulate_org_admin_definer_rpcs`. Their public PostgREST names and arguments remain unchanged, but the public wrappers are `SECURITY INVOKER`; the privileged bodies are stored in the non-exposed `private` schema:
 
-- All have an empty fixed search path.
-- All deny unauthenticated callers and check the caller's active organization Super Admin membership, except the boolean helper which returns only the caller's own membership status.
+- Public wrappers and the seven private implementations all have an empty fixed search path.
+- The private implementations deny unauthenticated callers and check the caller's active organization Super Admin membership, except the boolean helper which returns only the caller's own membership status.
 - Granting a Super Admin role requires AAL2.
 - Inviting a Super Admin is independently checked by a database trigger requiring AAL2.
 - Last-active-Super-Admin safeguards and audit logging are present on role/member changes.
-- No `anon` or `PUBLIC` execute grant exists on public `SECURITY DEFINER` functions.
+- No `anon` or `PUBLIC` execute grant exists on the public RPCs or the new private implementations.
+- A live SQL smoke test under the `authenticated` role confirmed the public helper returns false for a non-member and unauthorized role assignment is rejected.
 
-There are also 26 `SECURITY DEFINER` functions in the non-exposed `private` schema. Authenticated users have no `CREATE` privilege in either `public` or `private`, and `anon` has no `USAGE` on `private`. Twenty-two private functions use the legacy fixed `public, private, pg_temp` search path; because application roles cannot create objects in either schema and `pg_temp` is last, this is not currently an attacker-controlled search-path injection path. Converting these bodies to an empty search path requires a function-by-function qualification review and is tracked as a separate safe hardening pass rather than changing 26 production functions blindly.
+There are now 33 `SECURITY DEFINER` functions in the non-exposed `private` schema (26 pre-existing implementations/helpers plus the seven encapsulated organization-administration RPC bodies). Authenticated users have no `CREATE` privilege in either `public` or `private`, and `anon` has no `USAGE` on `private`. Twenty-two pre-existing private functions use the legacy fixed `public, private, pg_temp` search path; because application roles cannot create objects in either schema and `pg_temp` is last, this is not currently an attacker-controlled search-path injection path. Converting those remaining bodies to an empty search path requires a function-by-function qualification review and is tracked as a separate safe hardening pass rather than rewriting 22 production functions blindly.
 
 ## Express compatibility server containment
 
