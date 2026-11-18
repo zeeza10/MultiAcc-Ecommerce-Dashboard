@@ -318,7 +318,7 @@ export default function App() {
         <div className="fixed left-1/2 top-[6.5rem] xl:top-[4.25rem] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-lg max-h-[60vh]">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              Search results for "{globalSearch}"
+              {globalSearch.trim() ? `Search results for "${globalSearch}"` : "Quick search"}
             </span>
             <button
               onClick={() => setIsGlobalSearchOpen(false)}
@@ -345,6 +345,7 @@ export default function App() {
                       onClick={() => {
                         handleNavigate('orders');
                         setGlobalSearch('');
+                        setIsGlobalSearchOpen(false);
                       }}
                       className="py-2 px-2 hover:bg-indigo-50 rounded cursor-pointer flex items-center justify-between"
                     >
