@@ -325,6 +325,7 @@ export default function App() {
                       onClick={() => {
                         handleNavigate('products');
                         setGlobalSearch('');
+                        setIsGlobalSearchOpen(false);
                       }}
                       className="py-2 px-2 hover:bg-indigo-50 rounded cursor-pointer flex items-center justify-between"
                     >
