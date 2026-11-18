@@ -243,7 +243,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
       }
       offset += orders.length;
       hasMore = orders.length === 200 || offset < total;
-      await admin.from('marketplace_sync_checkpoints').upsert({
+      const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
         resource_type: 'ORDERS', data_environment: dataEnvironment,
         cursor_state: hasMore ? { since, offset, filterField } : {},
@@ -251,11 +251,12 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
         last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
         consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'marketplace_account_id,resource_type' });
+      if (checkpointSaveError) throw new Error('The eBay order sync checkpoint could not be saved.');
       if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
     const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
     await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
     return { imported, skipped, exceptions, fetched };
   } catch (error) {
     await admin.from('marketplace_sync_runs').update({ completed_at: new Date().toISOString(), status: 'FAILED', last_error_code: 'EBAY_ORDER_SYNC_FAILED', last_error_message: 'eBay order synchronization failed.', retryable: true, attempt_count: 1 }).eq('id', run.id);
