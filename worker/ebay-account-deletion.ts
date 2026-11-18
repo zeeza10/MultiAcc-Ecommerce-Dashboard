@@ -3,7 +3,7 @@
  * GET validates endpoint ownership; POST verifies eBay's ECC signature and
  * durably queues an encrypted notification for a separately audited deletion workflow.
  */
-import { verify as verifySignature } from 'node:crypto';
+import { createVerify } from 'node:crypto';
 import {
   createServiceClient, encryptEbayValue, getPlatformCredentials, ebayBaseUrl,
   type EbayEnvironment,
@@ -12,11 +12,6 @@ import type { WorkerEnv } from './types';
 
 export const EBAY_ACCOUNT_DELETION_ENDPOINT =
   'https://app.oriafuture.com/api/v1/ebay/account-deletion-notification';
-
-const json = (body: unknown, status = 200) => Response.json(body, {
-  status,
-  headers: { 'Cache-Control': 'no-store' },
-});
 
 type EbaySignatureHeader = {
   alg: string;
@@ -35,6 +30,7 @@ type DeletionNotification = {
 function parseSignatureHeader(value: string): EbaySignatureHeader | null {
   if (!value || value.length > 8192) return null;
   try {
+    // eBay SDK: Base64-decode the header, then parse its JSON document.
     const parsed = JSON.parse(atob(value)) as Record<string, unknown>;
     if (parsed.alg !== 'ecdsa' ||
         (parsed.digest !== 'SHA1' && parsed.digest !== 'SHA256') ||
@@ -46,27 +42,28 @@ function parseSignatureHeader(value: string): EbaySignatureHeader | null {
   }
 }
 
-/**
- * Verify the exact JSON payload using the digest declared by eBay.
- * eBay's notification SDK uses ssl3-sha1 (the SHA-1 signature digest);
- * SHA-256 is also accepted for compatible notification headers.
- */
+/** Match eBay's Node SDK: verify JSON.stringify(parsedMessage) with SHA-1. */
 export function verifyEbayNotificationSignature(
-  rawPayload: string,
+  message: unknown,
   signature: string,
   publicKeyPem: string,
   digest: EbaySignatureHeader['digest'] = 'SHA1',
 ): boolean {
-  if (!publicKeyPem.startsWith('-----BEGIN PUBLIC KEY-----') ||
+  if (typeof message !== 'object' || message === null ||
+      typeof publicKeyPem !== 'string' ||
+      !publicKeyPem.includes('-----BEGIN PUBLIC KEY-----') ||
       !publicKeyPem.includes('-----END PUBLIC KEY-----')) return false;
   try {
-    const algorithm = digest === 'SHA1' ? 'sha1' : 'sha256';
-    return verifySignature(
-      algorithm,
-      Buffer.from(rawPayload, 'utf8'),
-      publicKeyPem,
-      Buffer.from(signature, 'base64'),
-    );
+    // The official SDK formats PEM by placing line breaks around the key body.
+    const normalizedPem = publicKeyPem
+      .replace(/-----BEGIN PUBLIC KEY-----\s*/g, '-----BEGIN PUBLIC KEY-----\n')
+      .replace(/\s*-----END PUBLIC KEY-----/g, '\n-----END PUBLIC KEY-----');
+    // eBay's SDK uses crypto.createVerify('ssl3-sha1'); SHA-1 is the
+    // corresponding digest supported by the Worker Node-crypto compatibility layer.
+    const verifier = createVerify(digest === 'SHA1' ? 'sha1' : 'sha256');
+    verifier.update(JSON.stringify(message));
+    verifier.end();
+    return verifier.verify(normalizedPem, signature, 'base64');
   } catch {
     return false;
   }
@@ -111,7 +108,9 @@ async function fetchEbayPublicKey(
     );
     if (!keyResponse.ok) return null;
     const keyData = await keyResponse.json() as { key?: string };
-    if (typeof keyData.key !== 'string' || !keyData.key.includes('-----BEGIN PUBLIC KEY-----')) return null;
+    if (typeof keyData.key !== 'string' ||
+        !keyData.key.includes('-----BEGIN PUBLIC KEY-----') ||
+        !keyData.key.includes('-----END PUBLIC KEY-----')) return null;
     if (publicKeyCache.size >= 100) {
       const oldestKey = publicKeyCache.keys().next().value;
       if (oldestKey) publicKeyCache.delete(oldestKey);
@@ -126,15 +125,15 @@ async function fetchEbayPublicKey(
 }
 
 async function verifyWithConfiguredEnvironments(
-  rawPayload: string,
+  message: DeletionNotification,
   header: EbaySignatureHeader,
   env: WorkerEnv,
 ): Promise<boolean> {
-  // The same callback can be registered against Sandbox and Production keysets.
+  // Production is checked first; Sandbox is retained for separately registered test keysets.
   for (const environment of ['PRODUCTION', 'SANDBOX'] as const) {
     try {
       const key = await fetchEbayPublicKey(environment, header.kid, env);
-      if (key && verifyEbayNotificationSignature(rawPayload, header.signature, key, header.digest)) return true;
+      if (key && verifyEbayNotificationSignature(message, header.signature, key, header.digest)) return true;
     } catch {
       // Continue to the other environment without leaking provider details.
     }
@@ -188,7 +187,8 @@ export async function handleEbayAccountDeletionNotification(
       return json({ error: 'The notification payload does not match the account-deletion schema.' }, 400);
     }
 
-    if (!await verifyWithConfiguredEnvironments(rawBody, signatureHeader, env)) {
+    // IMPORTANT: eBay's official Node SDK signs JSON.stringify(req.body), not raw HTTP bytes.
+    if (!await verifyWithConfiguredEnvironments(payload, signatureHeader, env)) {
       return json({ error: 'The eBay notification signature could not be verified.' }, 412);
     }
     if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY || !env.EBAY_TOKEN_ENCRYPTION_KEY) {
@@ -207,8 +207,6 @@ export async function handleEbayAccountDeletionNotification(
         received_at: new Date().toISOString(),
       }, { onConflict: 'notification_id', ignoreDuplicates: true });
       if (error) return json({ error: 'The verified notification could not be durably queued.' }, 503);
-      // Acknowledge only after verified, encrypted, idempotent persistence.
-      // Actual account-data erasure remains a separately controlled workflow.
       return new Response(null, { status: 202, headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return json({ error: 'The verified notification could not be durably queued.' }, 503);
@@ -220,3 +218,8 @@ export async function handleEbayAccountDeletionNotification(
     headers: { Allow: 'GET, POST', 'Cache-Control': 'no-store' },
   });
 }
+
+const json = (body: unknown, status = 200) => Response.json(body, {
+  status,
+  headers: { 'Cache-Control': 'no-store' },
+});
