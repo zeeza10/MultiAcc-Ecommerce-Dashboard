@@ -368,7 +368,7 @@ apiRouter.get('/products', async (req: Request, res: Response) => {
     const repository = new SupabaseProductRepository(context);
     const isClientUser = user.role === 'CLIENT_USER';
     const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
-    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX';
+    let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'PRODUCTION';
     if (accountId && accountId !== 'ALL') {
       const { data: account, error: accountError } = await context.supabase
         .from('marketplace_accounts').select('id,is_demo,environment')

@@ -10,7 +10,7 @@ async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' |
     if (data?.data_environment) return data.data_environment;
   }
   const accountId = url.searchParams.get('accountId');
-  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  if (!accountId || accountId === 'ALL') return 'PRODUCTION';
   const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
     .select('id,is_demo,environment').eq('id', accountId)
     .eq('organization_id', auth.organizationId).maybeSingle();

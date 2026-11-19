@@ -96,10 +96,10 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [newAccountName, setNewAccountName] = useState('');
   const [newMarketplace, setNewMarketplace] = useState<'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'>('EBAY_UK');
-  const [newEnvironment, setNewEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
+  const newEnvironment = 'PRODUCTION' as const;
   const [accountSaving, setAccountSaving] = useState(false);
   const [integrationConfig, setIntegrationConfig] = useState<any>(null);
-  const [credentialEnvironment, setCredentialEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
+  const credentialEnvironment = 'PRODUCTION' as const;
   const [clientIdInput, setClientIdInput] = useState('');
   const [clientSecretInput, setClientSecretInput] = useState('');
   const [ruNameInput, setRuNameInput] = useState('');
@@ -117,19 +117,22 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       const [accRes, excRes, prodRes, eventRes] = await Promise.all([
         api.getEbayAccounts(selectedStoreId),
         api.getExceptions(selectedStoreId),
-        api.getProducts(),
+        api.getProducts(selectedStoreId, 'PRODUCTION'),
         api.getEbayIntegrationEvents(selectedStoreId),
       ]);
-      setAccounts(accRes.accounts);
+      const liveAccounts = (accRes.accounts || []).filter((account: any) => !account.isDemo && account.environment === 'PRODUCTION');
+      const liveAccountIds = new Set(liveAccounts.map((account: any) => account.id));
+      const isLiveAccountRecord = (record: any) => liveAccountIds.has(record.accountId || record.marketplaceAccountId);
+      setAccounts(liveAccounts);
       setIntegrationReady(accRes.integrationReady);
       setProductionOAuthEnabled(accRes.productionOAuthEnabled);
       setIntegrationMessage(accRes.integrationMessage);
       if (currentUser.role === 'SUPER_ADMIN') {
         try { setIntegrationConfig(await api.getEbayIntegrationConfig()); } catch { setIntegrationConfig(null); }
       }
-      setRecentSyncs(accRes.recentSyncs);
-      setIntegrationEvents(eventRes.events);
-      setExceptions(excRes.exceptions);
+      setRecentSyncs((accRes.recentSyncs || []).filter(isLiveAccountRecord));
+      setIntegrationEvents((eventRes.events || []).filter(isLiveAccountRecord));
+      setExceptions((excRes.exceptions || []).filter(isLiveAccountRecord));
       setProducts(prodRes.products);
       if (prodRes.products.length > 0) {
         setTargetProductId(prodRes.products[0].id);
@@ -280,16 +283,13 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           <p className="text-xs text-slate-600">Credentials are first verified directly with the selected eBay environment, then encrypted in the Worker before storage. They are never returned to the browser. Seller authorization is a separate step; saving app credentials does not connect a seller account. Do not paste these values into chat or GitHub.</p>
           <p className="text-xs text-amber-700">Shared platform credentials can only be viewed by explicitly allowlisted platform owners. Saving also requires a completed authenticator MFA step-up (AAL2); a workspace Super Admin role alone is not sufficient.</p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <select value={credentialEnvironment} onChange={e => setCredentialEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
-              <option value="SANDBOX">Sandbox</option><option value="PRODUCTION">Production</option>
-            </select>
             <input value={clientIdInput} onChange={e => setClientIdInput(e.target.value)} placeholder="App ID / Client ID" className="border rounded-md p-2 text-xs" autoComplete="off" />
             <input value={clientSecretInput} onChange={e => setClientSecretInput(e.target.value)} placeholder="Cert ID / Client Secret" type="password" className="border rounded-md p-2 text-xs" autoComplete="new-password" />
             <input value={ruNameInput} onChange={e => setRuNameInput(e.target.value)} placeholder="OAuth RuName" className="border rounded-md p-2 text-xs" autoComplete="off" />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] text-slate-500">
-              {integrationConfig?.environments?.map((item: any) => `${item.environment}: ${item.configured ? `${item.clientIdMasked} (${item.credentialsVerified ? 'verified' : 'NOT VERIFIED — replace and verify'})` : 'not configured'}`).join(' · ') || 'Server encryption and Supabase secret-key credentials must be configured first.'}
+              {integrationConfig?.environments?.filter((item: any) => item.environment === 'PRODUCTION').map((item: any) => `Production: ${item.configured ? `${item.clientIdMasked} (${item.credentialsVerified ? 'verified' : 'NOT VERIFIED — replace and verify'})` : 'not configured'}`).join(' · ') || 'Production credentials are not configured.'}
             </span>
             <button onClick={handleSaveCredentials} disabled={credentialSaving || !clientIdInput.trim() || !clientSecretInput.trim() || !ruNameInput.trim()} className="px-3 py-2 rounded-md bg-slate-900 text-white text-xs disabled:opacity-50">
               {credentialSaving ? 'Saving securely…' : 'Verify & Save Credentials'}
@@ -307,12 +307,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           <select value={newMarketplace} onChange={e => setNewMarketplace(e.target.value as any)} className="border rounded-md p-2 text-xs">
             <option value="EBAY_UK">eBay United Kingdom</option><option value="EBAY_US">eBay United States</option><option value="EBAY_DE">eBay Germany</option>
           </select>
-          <select value={newEnvironment} onChange={e => setNewEnvironment(e.target.value as any)} className="border rounded-md p-2 text-xs">
-            <option value="SANDBOX">Sandbox (Testing)</option><option value="PRODUCTION">Production (Live)</option>
-          </select>
           <button onClick={handleCreateAccount} disabled={accountSaving || !newAccountName.trim()} className="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs disabled:opacity-50">{accountSaving ? 'Adding…' : 'Add Seller Account'}</button>
         </div>
-        <p className="text-[11px] text-slate-500">Create a separate record for each seller and marketplace. After OAuth connects the seller, the first sync starts automatically on the next scheduled run (within about 5 minutes). Demo accounts cannot be OAuth-connected.</p>
+        <p className="text-[11px] text-slate-500">Only live Production seller accounts are available in this workspace. After OAuth connects a seller, the first sync starts automatically on the next scheduled run (within about 5 minutes).</p>
       </div>
 
       {syncFeedback && (

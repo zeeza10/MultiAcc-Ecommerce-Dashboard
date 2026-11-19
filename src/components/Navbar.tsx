@@ -151,33 +151,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }
                 onStoreChange && onStoreChange(accountId);
               }}
-              aria-label="Marketplace and seller account"
-              title="Select marketplace account by environment"
+              aria-label="All Production Accounts or an individual seller account"
+              title="View all Production accounts together or select one seller account"
               className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              <option value="ALL">All Marketplace Accounts</option>
-              {marketplaceAccounts.some((account) => account.isDemo) && (
-                <optgroup label="DEMO ACCOUNTS">
-                  {marketplaceAccounts.filter((account) => account.isDemo).map((account) => (
-                    <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
-                  ))}
-                </optgroup>
-              )}
-              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'SANDBOX') && (
-                <optgroup label="SANDBOX ACCOUNTS">
-                  {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'SANDBOX').map((account) => (
-                    <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
-                  ))}
-                </optgroup>
-              )}
-              {marketplaceAccounts.some((account) => !account.isDemo && account.environment === 'PRODUCTION') && (
-                <optgroup label="PRODUCTION ACCOUNTS">
-                  {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
-                    <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
-                  ))}
-                </optgroup>
-              )}
-              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No marketplace accounts available</option>}
+              <option value="ALL">All Production Accounts</option>
+              {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
+                <option key={account.id} value={account.id}>{account.name} ({account.marketplace})</option>
+              ))}
+              {marketplaceAccounts.length === 0 && <option value="ALL" disabled>No live Production accounts available</option>}
             </select>
           </div>
         </div>

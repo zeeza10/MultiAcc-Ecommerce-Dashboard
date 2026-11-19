@@ -6,7 +6,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
   if (path === '/dashboard/kpis' && request.method === 'GET') {
     const period = url.searchParams.get('period') || '30D';
     const accountId = url.searchParams.get('accountId');
-    const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
+    const requestedEnvironment = url.searchParams.get('environment') || 'PRODUCTION';
     if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
     let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = requestedEnvironment as 'DEMO' | 'SANDBOX' | 'PRODUCTION';
     if (accountId && accountId !== 'ALL') {
@@ -242,7 +242,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     const since = new Date();
     since.setDate(since.getDate() - 6);
     const accountId = url.searchParams.get('accountId');
-    const requestedEnvironment = url.searchParams.get('environment') || 'SANDBOX';
+    const requestedEnvironment = url.searchParams.get('environment') || 'PRODUCTION';
     if (!['DEMO', 'SANDBOX', 'PRODUCTION'].includes(requestedEnvironment)) return json({ error: 'Invalid data environment.' }, 400);
     let dataEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = requestedEnvironment as 'DEMO' | 'SANDBOX' | 'PRODUCTION';
     if (accountId && accountId !== 'ALL') {

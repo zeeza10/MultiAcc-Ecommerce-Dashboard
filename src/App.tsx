@@ -100,9 +100,9 @@ export default function App() {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(() =>
     readWorkspacePreference<string>(organizationId, 'selected-store', 'ALL')
   );
-  const [selectedEnvironment, setSelectedEnvironment] = useState<'DEMO' | 'SANDBOX' | 'PRODUCTION'>(() =>
-    readWorkspacePreference<'DEMO' | 'SANDBOX' | 'PRODUCTION'>(organizationId, 'selected-environment', 'SANDBOX')
-  );
+  // Production-only workspace: legacy Demo/Sandbox preferences are intentionally ignored.
+  const [selectedEnvironment, setSelectedEnvironment] = useState<'DEMO' | 'SANDBOX' | 'PRODUCTION'>('PRODUCTION');
+  useEffect(() => { setSelectedEnvironment('PRODUCTION'); }, []);
   const [marketplaceAccounts, setMarketplaceAccounts] = useState<any[]>([]);
   const [marketplaceIntegrationReady, setMarketplaceIntegrationReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -213,11 +213,9 @@ export default function App() {
         api.getNotifications(),
         canViewMarketplace ? api.getEbayAccounts() : Promise.resolve({ accounts: [], integrationReady: false }),
       ]);
-      const accounts = accountsRes.accounts || [];
+      const accounts = (accountsRes.accounts || []).filter((account) => !account.isDemo && account.environment === 'PRODUCTION');
       const selectedAccount = accounts.find((account) => account.id === selectedStoreId);
-      const selectedAccountMatchesEnvironment = selectedEnvironment === 'DEMO'
-        ? Boolean(selectedAccount?.isDemo)
-        : Boolean(selectedAccount && !selectedAccount.isDemo && selectedAccount.environment === selectedEnvironment);
+      const selectedAccountMatchesEnvironment = Boolean(selectedAccount && !selectedAccount.isDemo && selectedAccount.environment === 'PRODUCTION');
       const savedAccountIsAvailable = selectedStoreId === 'ALL' || selectedAccountMatchesEnvironment;
       const activeAccountId = savedAccountIsAvailable ? selectedStoreId : 'ALL';
       setConfig(cfgRes.config);
@@ -226,6 +224,7 @@ export default function App() {
       setNotifications(notifRes.notifications);
       setMarketplaceAccounts(accounts);
       setMarketplaceIntegrationReady(Boolean(accountsRes.integrationReady));
+      setSelectedEnvironment('PRODUCTION');
       if (!savedAccountIsAvailable) setSelectedStoreId('ALL');
       const excRes = canViewMarketplace && activeAccountId
         ? await api.getExceptions(activeAccountId)
@@ -245,7 +244,7 @@ export default function App() {
     try {
       const accRes = await api.getEbayAccounts();
       if (!accRes.integrationReady) {
-        alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
+        alert(accRes.integrationMessage || 'eBay Production credentials are not configured yet.');
         return;
       }
       const selectedAccount = accRes.accounts.find((account) => account.id === selectedStoreId);
@@ -254,7 +253,7 @@ export default function App() {
         return;
       }
       if (selectedAccount.isDemo) {
-        alert('Demo accounts are presentation-only and cannot be synchronized.');
+        alert('Only live Production seller accounts can be synchronized from this workspace.');
         return;
       }
       if (selectedAccount.authStatus !== 'CONNECTED') {
