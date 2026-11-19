@@ -508,7 +508,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           providerCode: typeof metadata.providerCode === 'string' ? metadata.providerCode : null,
           createdAt: event.created_at,
           nextSyncAt,
-          retryable: event.event_type === 'ORDER_SYNC_FAILED' && event.severity === 'ERROR' && Boolean(account),
+          retryable: ['ORDER_SYNC_FAILED', 'INVENTORY_SYNC_FAILED'].includes(event.event_type) && event.severity === 'ERROR' && Boolean(account),
         };
       }),
     });
