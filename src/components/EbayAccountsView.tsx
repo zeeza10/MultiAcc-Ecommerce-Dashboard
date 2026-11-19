@@ -380,7 +380,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      Stored account status: {acc.authStatus}
+                      eBay authorization: {acc.authStatus === 'CONNECTED' ? 'Connected (saved authorization)' : acc.authStatus}
                     </span>
                   </div>
 
@@ -495,8 +495,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                         {sr.completedAt?.split('.')[0].replace('T', ' ') || 'In Progress'}
                       </td>
                       <td className="py-2 px-3 font-sans">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                          {sr.status}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${sr.status === 'COMPLETED' || sr.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : sr.status === 'PARTIAL' ? 'bg-amber-100 text-amber-800' : sr.status === 'RUNNING' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {sr.status === 'COMPLETED' ? 'Synced' : sr.status === 'PARTIAL' ? 'Partially synced' : sr.status === 'RUNNING' ? 'In progress' : sr.status === 'FAILED' ? 'Failed' : sr.status}
                         </span>
                       </td>
                       <td className="py-2 px-3">{sr.ordersFetched}</td>
