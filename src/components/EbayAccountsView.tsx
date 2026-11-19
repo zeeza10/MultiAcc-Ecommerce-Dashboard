@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Layers,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { MarketplaceAccount, ExceptionItem, Product, User, SystemConfig } from '../types';
@@ -98,6 +99,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [newMarketplace, setNewMarketplace] = useState<'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'>('EBAY_UK');
   const newEnvironment = 'PRODUCTION' as const;
   const [accountSaving, setAccountSaving] = useState(false);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [integrationConfig, setIntegrationConfig] = useState<any>(null);
   const credentialEnvironment = 'PRODUCTION' as const;
   const [clientIdInput, setClientIdInput] = useState('');
@@ -221,6 +223,34 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       alert(err.message || 'Could not add the eBay seller account.');
     } finally {
       setAccountSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async (account: MarketplaceAccount) => {
+    if (currentUser.role !== 'SUPER_ADMIN') {
+      alert('Only a Super Admin can delete a marketplace account.');
+      return;
+    }
+    const typedName = window.prompt(
+      `Super Admin verification required. Type the exact account name to delete: ${account.name}`
+    );
+    if (typedName === null) return;
+    if (typedName.trim() !== account.name) {
+      alert('Account name did not match. Nothing was deleted.');
+      return;
+    }
+    if (!window.confirm(`Permanently delete the unused marketplace account "${account.name}"? Linked or connected accounts cannot be deleted.`)) return;
+
+    setDeletingAccountId(account.id);
+    try {
+      await api.deleteEbayAccount(account.id, typedName.trim());
+      setSyncFeedback(`Marketplace account "${account.name}" was deleted.`);
+      await loadData();
+      window.dispatchEvent(new Event('oria-marketplace-accounts-updated'));
+    } catch (err: any) {
+      alert(err.message || 'The marketplace account could not be deleted safely.');
+    } finally {
+      setDeletingAccountId(null);
     }
   };
 
@@ -448,9 +478,20 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end space-x-2 pt-1">
+                  <div className="flex items-center justify-end flex-wrap gap-2 pt-1">
+                    {currentUser.role === 'SUPER_ADMIN' && (
+                      <button
+                        onClick={() => handleDeleteAccount(acc)}
+                        disabled={deletingAccountId === acc.id || acc.authStatus === 'CONNECTED'}
+                        title={acc.authStatus === 'CONNECTED' ? 'Disconnect the eBay authorization before deletion.' : 'Super Admin only — delete an unused account'}
+                        className="px-3 py-1.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 font-medium rounded-md transition inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingAccountId === acc.id ? 'Deleting…' : 'Delete Account'}
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleReconnect(acc.id)}
+                      onClick={() => handleReconnect(acc.id)
                       disabled={!integrationReady || (acc.environment === 'PRODUCTION' && !productionOAuthEnabled)}
                       title={!integrationReady ? integrationMessage : acc.environment === 'PRODUCTION' && !productionOAuthEnabled ? 'Production keyset is not yet activated by eBay.' : undefined}
                       className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
