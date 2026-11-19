@@ -41,6 +41,7 @@
     }
   ],
   "vars": {
+    "EBAY_PRODUCTION_OAUTH_ENABLED": "true",
     "SUPABASE_URL": "https://nmlwnezlsqystjrvszcd.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_nWi20G57zq7F1aryRHEIjg_UEcyrZeI"
   },
