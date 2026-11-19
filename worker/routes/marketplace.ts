@@ -129,6 +129,31 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
 }
 
 
+
+type EbaySyncProgress = {
+  stage: string; fetched: number; imported: number; skipped: number;
+  exceptions: number; offersFetched: number; runCreated: boolean;
+};
+function createEbaySyncProgress(): EbaySyncProgress {
+  return { stage: 'TOKEN', fetched: 0, imported: 0, skipped: 0, exceptions: 0, offersFetched: 0, runCreated: false };
+}
+function getEbaySyncFailure(error: unknown, fallbackCode: string) {
+  const providerError = error instanceof EbayOrdersApiError ? error : null;
+  const rawMessage = error instanceof Error ? error.message
+    : error && typeof error === 'object' && 'message' in error ? String((error as { message?: unknown }).message || '') : '';
+  const message = (rawMessage || 'An unexpected synchronization error occurred.')
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(/(access_token|refresh_token|client_secret|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[REDACTED]')
+    .replace(/https?:\/\/[^\s]+/gi, '[URL]')
+    .replace(/[\r\n\t\u0000-\u001f\u007f]/g, ' ').slice(0, 320);
+  const statusMatch = rawMessage.match(/HTTP\s+(\d{3})/i);
+  return {
+    code: providerError?.providerCode ? ('EBAY_API_' + providerError.providerCode).slice(0, 64) : fallbackCode,
+    message, httpStatus: providerError?.httpStatus ?? (statusMatch ? Number(statusMatch[1]) : null),
+    providerCode: providerError?.providerCode || null,
+  };
+}
+
 class EbayOrdersApiError extends Error {
   constructor(
     readonly httpStatus: number,
@@ -213,12 +238,13 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
     throw error;
   }
 }
-async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
+async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number; status: 'SUCCESS' | 'PARTIAL'; pagesPending: boolean }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  progress.stage = 'ORDERS_CHECKPOINT_READ';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
     .select('cursor_state,watermark_at,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
-  if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
+  if (checkpointError) throw new Error(checkpointError.message || 'The eBay order sync checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
   // Prefer the in-progress cursor; otherwise resume from the successful watermark
   // with a small overlap. Normalize every path before calling eBay because the
@@ -236,27 +262,31 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
   // A clamped cursor no longer describes the same result page; restart at page 0.
   let resumeOffset = !normalizedStart.clamped && Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0
     ? Number(savedCursor.offset) : 0;
+  progress.stage = 'SKU_CATALOG_READ';
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
     admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
   ]);
-  if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
+  if (mappingsResult.error || productsResult.error) throw new Error(mappingsResult.error?.message || productsResult.error?.message || 'The internal SKU catalog could not be loaded for eBay order matching.');
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
   const productById = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
   const productBySku = new Map((productsResult.data || []).map((row: any) => [row.sku, row]));
   let imported = 0, skipped = 0, exceptions = 0, fetched = 0;
-  const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING' }).select('id').single();
-  if (runError || !run) throw new Error('A marketplace sync run could not be started.');
+  progress.stage = 'SYNC_RUN_CREATE';
+  const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING', data_environment: dataEnvironment }).select('id').single();
+  if (runError || !run) throw new Error(runError?.message || 'A marketplace sync run could not be started.');
+  progress.runCreated = true;
   try {
     let offset = resumeOffset, total = 0, pages = 0, hasMore = false;
     do {
+      progress.stage = 'EBAY_ORDERS_API';
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
       endpoint.searchParams.set('limit', '200'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw await readEbayOrdersApiError(response);
       const page = await response.json() as { orders?: any[]; total?: number };
       const orders = Array.isArray(page.orders) ? page.orders : [];
-      total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; pages++;
+      total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; progress.fetched = fetched; pages++;
       for (const order of orders) {
         const externalId = typeof order.orderId === 'string' ? order.orderId : '';
         if (!externalId) continue;
@@ -279,15 +309,18 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
           currency: order.pricingSummary?.total?.currency || 'GBP', created_at: order.creationDate || new Date().toISOString(),
           safe_payload: { orderId: externalId, creationDate: order.creationDate || null, orderPaymentStatus: order.orderPaymentStatus || null, orderFulfillmentStatus: order.orderFulfillmentStatus || null, lineItems: items.map((item: any) => item.raw_item) }, items,
         };
+        progress.stage = 'ORDER_IMPORT';
         const { data: result, error: importError } = await admin.rpc('import_marketplace_order', { p_organization_id: account.organization_id, p_marketplace_account_id: account.id, p_order: payload });
-        if (importError) throw new Error('An eBay order could not be imported into the workspace.');
+        if (importError) throw new Error(importError.message || 'An eBay order could not be imported into the workspace.');
         const inserted = Array.isArray(result) ? result[0] : result;
         if (inserted?.duplicate) skipped++;
         else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
+        progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
       offset += orders.length;
       hasMore = orders.length === 200 || offset < total;
-      const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
+      progress.stage = 'ORDERS_CHECKPOINT_WRITE';
+    const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
         resource_type: 'ORDERS', data_environment: dataEnvironment,
         cursor_state: hasMore ? { since, offset, filterField } : {},
@@ -295,60 +328,58 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
         last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
         consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'marketplace_account_id,resource_type' });
-      if (checkpointSaveError) throw new Error('The eBay order sync checkpoint could not be saved.');
+      if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay order sync checkpoint could not be saved.');
       if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
-    const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
-    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
-    return { imported, skipped, exceptions, fetched };
+    progress.stage = 'ORDERS_FINALIZE';
+    const finished = new Date().toISOString();
+    const status = exceptions || hasMore ? 'PARTIAL' : 'SUCCESS';
+    const runStatus = status === 'SUCCESS' ? 'COMPLETED' : 'PARTIAL';
+    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status: runStatus, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: status, last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    return { imported, skipped, exceptions, fetched, status, pagesPending: hasMore };
   } catch (error) {
-    const providerError = error instanceof EbayOrdersApiError ? error : null;
-    const safeMessage = providerError
-      ? providerError.message.slice(0, 320)
-      : 'eBay order synchronization failed. Check the integration events and try again.';
-    const safeCode = providerError?.providerCode
-      ? ('EBAY_API_' + providerError.providerCode).slice(0, 64)
-      : 'EBAY_ORDER_SYNC_FAILED';
+    const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
+    const partial = fetched > 0 || imported > 0 || skipped > 0;
     await admin.from('marketplace_sync_runs').update({
-      completed_at: new Date().toISOString(), status: 'FAILED',
-      last_error_code: safeCode, last_error_message: safeMessage,
+      completed_at: new Date().toISOString(), status: partial ? 'PARTIAL' : 'FAILED',
+      orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions,
+      last_error_code: failure.code, last_error_message: `${progress.stage}: ${failure.message}`,
       retryable: true, attempt_count: 1,
+      log_message: `Orders sync stopped at ${progress.stage}. Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`,
     }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({
-      last_sync_status: 'FAILED', last_sync_message: safeMessage,
+      last_sync_status: partial ? 'PARTIAL' : 'FAILED', last_sync_message: `Orders ${partial ? 'partially completed' : 'failed'} at ${progress.stage}: ${failure.message}`,
     }).eq('id', account.id);
     await admin.from('marketplace_integration_events').insert({
-      organization_id: account.organization_id,
-      marketplace_account_id: account.id,
-      event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR',
-      error_code: safeCode, message: safeMessage,
-      metadata: providerError ? {
-        httpStatus: providerError.httpStatus,
-        providerCode: providerError.providerCode,
-        environment: account.environment,
-        endpoint: 'sell/fulfillment/v1/order',
-      } : { environment: account.environment },
+      organization_id: account.organization_id, marketplace_account_id: account.id,
+      event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR', error_code: failure.code, message: failure.message,
+      metadata: { stage: progress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode,
+        environment: account.environment, endpoint: progress.stage === 'EBAY_ORDERS_API' ? 'sell/fulfillment/v1/order' : null,
+        fetched, imported, skipped, exceptions },
     });
     throw error;
   }
 }
 
 
-async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetched: number; offersFetched: number; pagesPending: boolean }> {
+async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ fetched: number; offersFetched: number; pagesPending: boolean }> {
   const admin = createServiceClient(env);
+  progress.stage = 'INVENTORY_TOKEN';
   const accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
     : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  progress.stage = 'INVENTORY_CHECKPOINT_READ';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
     .select('cursor_state,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'INVENTORY').maybeSingle();
-  if (checkpointError) throw new Error('The eBay inventory checkpoint could not be loaded.');
+  if (checkpointError) throw new Error(checkpointError.message || 'The eBay inventory checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
     ? checkpoint.cursor_state as Record<string, unknown> : {};
   let offset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
   let pages = 0, fetched = 0, offersFetched = 0, hasMore = false;
   do {
+    progress.stage = 'EBAY_INVENTORY_API';
     const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/inventory_item`);
     endpoint.searchParams.set('limit', '25');
     endpoint.searchParams.set('offset', String(offset));
@@ -356,7 +387,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
     if (!response.ok) throw new Error(`eBay inventory API returned HTTP ${response.status}.`);
     const page = await response.json() as { inventoryItems?: any[]; total?: number };
     const items = Array.isArray(page.inventoryItems) ? page.inventoryItems : [];
-    fetched += items.length;
+    fetched += items.length; progress.fetched = fetched;
     pages++;
 
     // Inventory items contain product details and base stock. Offers contain the
@@ -364,6 +395,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
     // Fetch offers in small concurrent batches to respect eBay API limits.
     const offerResults: Array<{ sku: string; offers: any[] }> = [];
     const skus = items.map((item: any) => String(item.sku || '').trim()).filter((sku: string) => sku && sku.length <= 50);
+    progress.stage = 'EBAY_OFFERS_API';
     for (let index = 0; index < skus.length; index += 5) {
       const batch = skus.slice(index, index + 5);
       const batchResults = await Promise.all(batch.map(async (sku) => {
@@ -381,7 +413,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
       offerResults.push(...batchResults);
     }
     const offersBySku = new Map(offerResults.map((entry) => [entry.sku, entry.offers]));
-    offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0);
+    offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0); progress.offersFetched = offersFetched;
     const syncedAt = new Date().toISOString();
     const rows = items.filter((item: any) => String(item.sku || '').trim()).map((item: any) => {
       const sku = String(item.sku || '').trim().slice(0, 128);
@@ -402,13 +434,15 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
         updated_at: syncedAt,
       };
     });
+    progress.stage = 'INVENTORY_SNAPSHOT_WRITE';
     if (rows.length) {
       const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
-      if (saveError) throw new Error('eBay inventory and listing snapshots could not be saved.');
+      if (saveError) throw new Error(saveError.message || 'eBay inventory and listing snapshots could not be saved.');
     }
     offset += items.length;
     const total = Number(page.total ?? offset);
     hasMore = items.length === 25 || offset < total;
+    progress.stage = 'INVENTORY_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
       organization_id: account.organization_id,
       marketplace_account_id: account.id,
@@ -422,9 +456,10 @@ async function syncSellerInventory(account: any, env: WorkerEnv): Promise<{ fetc
       last_error_code: null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'marketplace_account_id,resource_type' });
-    if (checkpointSaveError) throw new Error('The eBay inventory checkpoint could not be saved.');
+    if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay inventory checkpoint could not be saved.');
     if (!items.length || !hasMore || pages >= 5) break;
   } while (true);
+  progress.stage = 'INVENTORY_COMPLETED';
   return { fetched, offersFetched, pagesPending: hasMore };
 }
 
@@ -475,7 +510,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           providerCode: typeof metadata.providerCode === 'string' ? metadata.providerCode : null,
           createdAt: event.created_at,
           nextSyncAt,
-          retryable: event.event_type === 'ORDER_SYNC_FAILED' && event.severity === 'ERROR' && Boolean(account),
+          retryable: ['ORDER_SYNC_FAILED', 'INVENTORY_SYNC_FAILED'].includes(event.event_type) && event.severity === 'ERROR' && Boolean(account),
         };
       }),
     });
@@ -591,12 +626,81 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.is_demo || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected eBay seller account can be synchronized.' }, 409);
     if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
+    const ordersProgress = createEbaySyncProgress();
+    let ordersResult: Record<string, unknown>;
     try {
-      const orders = await syncSellerOrders(account, env);
-      const inventory = await syncSellerInventory(account, env);
-      return json({ ...orders, inventory });
+      const orders = await syncSellerOrders(account, env, ordersProgress);
+      ordersResult = { ...orders };
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
+      if (!ordersProgress.runCreated) {
+        const eventAdmin = createServiceClient(env);
+        await eventAdmin.from('marketplace_integration_events').insert({
+          organization_id: account.organization_id, marketplace_account_id: account.id,
+          event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+          message: failure.message,
+          metadata: { stage: ordersProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: account.environment },
+        });
+      }
+      ordersResult = {
+        status: ordersProgress.fetched || ordersProgress.imported || ordersProgress.skipped ? 'PARTIAL' : 'FAILED',
+        fetched: ordersProgress.fetched, imported: ordersProgress.imported, skipped: ordersProgress.skipped,
+        exceptions: ordersProgress.exceptions,
+        error: { code: failure.code, message: failure.message, stage: ordersProgress.stage, httpStatus: failure.httpStatus },
+      };
     }
-    catch (error) { return json({ error: error instanceof Error ? error.message : 'eBay order synchronization failed.' }, 502); }
+
+    const inventoryProgress = createEbaySyncProgress();
+    let inventoryResult: Record<string, unknown>;
+    try {
+      const inventory = await syncSellerInventory(account, env, inventoryProgress);
+      inventoryResult = { status: inventory.pagesPending ? 'PARTIAL' : 'SUCCESS', ...inventory };
+      const eventAdmin = createServiceClient(env);
+      await eventAdmin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id, marketplace_account_id: account.id,
+        event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending ? 'WARNING' : 'INFO',
+        message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers.`,
+        metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, pagesPending: inventory.pagesPending },
+      });
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_INVENTORY_SYNC_FAILED');
+      const eventAdmin = createServiceClient(env);
+      await eventAdmin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id, marketplace_account_id: account.id,
+        event_type: 'INVENTORY_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+        message: failure.message,
+        metadata: {
+          stage: inventoryProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode,
+          environment: account.environment,
+          endpoint: inventoryProgress.stage === 'EBAY_OFFERS_API' ? 'sell/inventory/v1/offer' : 'sell/inventory/v1/inventory_item',
+          fetched: inventoryProgress.fetched, offersFetched: inventoryProgress.offersFetched,
+        },
+      });
+      inventoryResult = {
+        status: inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED',
+        fetched: inventoryProgress.fetched, offersFetched: inventoryProgress.offersFetched, pagesPending: false,
+        error: { code: failure.code, message: failure.message, stage: inventoryProgress.stage, httpStatus: failure.httpStatus },
+      };
+    }
+
+    const ordersOk = ordersResult.status === 'SUCCESS';
+    const inventoryOk = inventoryResult.status === 'SUCCESS';
+    const anyPartial = ordersResult.status === 'PARTIAL' || inventoryResult.status === 'PARTIAL';
+    const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk || anyPartial ? 'PARTIAL' : 'FAILED');
+    const orderCount = Number(ordersResult.imported || 0);
+    const inventoryCount = Number(inventoryResult.fetched || 0);
+    const summary = `Orders: ${String(ordersResult.status)} (${orderCount} imported); Inventory: ${String(inventoryResult.status)} (${inventoryCount} items).`;
+    const finalAdmin = createServiceClient(env);
+    await finalAdmin.from('marketplace_accounts').update({
+      last_sync_status: overallStatus, last_sync_message: summary,
+      ...(ordersOk || inventoryOk ? { last_sync_at: new Date().toISOString() } : {}),
+    }).eq('id', account.id).eq('organization_id', auth.organizationId);
+
+    return json({
+      status: overallStatus, orders: ordersResult, inventory: inventoryResult,
+      imported: orderCount, skipped: Number(ordersResult.skipped || 0),
+      exceptions: Number(ordersResult.exceptions || 0), fetched: Number(ordersResult.fetched || 0),
+    });
   }
 
   const connectMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/connect$/);
@@ -734,13 +838,85 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         || !isEnvironment(account.environment)) {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
-      await syncSellerOrders(account, env);
-      await syncSellerInventory(account, env);
-      await admin.from('marketplace_sync_jobs').update({
-        status: 'SUCCEEDED', completed_at: new Date().toISOString(),
-        locked_until: null, last_error_code: null, last_error_message: null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', job.id);
+      const ordersProgress = createEbaySyncProgress();
+      let ordersOk = false;
+      let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
+      let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
+      try {
+        const orders = await syncSellerOrders(account, env, ordersProgress);
+        ordersOk = orders.status === 'SUCCESS';
+        if (!ordersOk) {
+          lastErrorCode = 'EBAY_ORDER_SYNC_PARTIAL';
+          lastErrorMessage = `Orders sync is partial: fetched ${orders.fetched}, imported ${orders.imported}, pages pending: ${orders.pagesPending}.`;
+        }
+      } catch (syncError) {
+        const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
+        lastErrorCode = failure.code;
+        lastErrorMessage = `Orders failed at ${ordersProgress.stage}: ${failure.message}`;
+        if (!ordersProgress.runCreated) {
+          await admin.from('marketplace_integration_events').insert({
+            organization_id: account.organization_id, marketplace_account_id: account.id,
+            event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+            message: failure.message,
+            metadata: { stage: ordersProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: account.environment },
+          });
+        }
+      }
+
+      const inventoryProgress = createEbaySyncProgress();
+      let inventoryOk = false;
+      try {
+        const inventory = await syncSellerInventory(account, env, inventoryProgress);
+        inventoryOk = !inventory.pagesPending;
+        await admin.from('marketplace_integration_events').insert({
+          organization_id: account.organization_id, marketplace_account_id: account.id,
+          event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending ? 'WARNING' : 'INFO',
+          message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers.`,
+          metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, pagesPending: inventory.pagesPending },
+        });
+        if (inventory.pagesPending) {
+          lastErrorCode = 'EBAY_INVENTORY_SYNC_PARTIAL';
+          lastErrorMessage = 'Inventory sync has additional pages pending.';
+        }
+      } catch (syncError) {
+        const failure = getEbaySyncFailure(syncError, 'EBAY_INVENTORY_SYNC_FAILED');
+        lastErrorCode = failure.code;
+        lastErrorMessage = `Inventory failed at ${inventoryProgress.stage}: ${failure.message}`;
+        await admin.from('marketplace_integration_events').insert({
+          organization_id: account.organization_id, marketplace_account_id: account.id,
+          event_type: 'INVENTORY_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+          message: failure.message,
+          metadata: { stage: inventoryProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode,
+            environment: account.environment,
+            endpoint: inventoryProgress.stage === 'EBAY_OFFERS_API' ? 'sell/inventory/v1/offer' : 'sell/inventory/v1/inventory_item',
+            fetched: inventoryProgress.fetched, offersFetched: inventoryProgress.offersFetched },
+        });
+      }
+
+      const ordersPartial = ordersProgress.fetched > 0 || ordersProgress.imported > 0 || ordersProgress.skipped > 0;
+      const inventoryPartial = inventoryProgress.fetched > 0 || inventoryProgress.offersFetched > 0;
+      const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
+      await admin.from('marketplace_accounts').update({
+        last_sync_status: overallStatus,
+        last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
+        ...(ordersOk || inventoryOk ? { last_sync_at: new Date().toISOString() } : {}),
+      }).eq('id', account.id).eq('organization_id', account.organization_id);
+
+      if (overallStatus === 'SUCCESS') {
+        await admin.from('marketplace_sync_jobs').update({
+          status: 'SUCCEEDED', completed_at: new Date().toISOString(),
+          locked_until: null, last_error_code: null, last_error_message: null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', job.id);
+      } else {
+        await admin.from('marketplace_sync_jobs').update({
+          status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+          scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
+          locked_until: null, last_error_code: lastErrorCode, last_error_message: lastErrorMessage,
+          updated_at: new Date().toISOString(),
+        }).eq('id', job.id);
+      }
+      continue;
     } catch {
       await admin.from('marketplace_sync_jobs').update({
         status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
