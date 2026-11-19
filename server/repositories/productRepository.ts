@@ -110,7 +110,7 @@ export class SupabaseProductRepository implements ProductRepository {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
-      query = query.eq('data_environment', options.dataEnvironment || 'SANDBOX');
+      query = query.eq('data_environment', options.dataEnvironment || 'PRODUCTION');
       if (scopedClientId) query = query.eq('client_3pl_id', scopedClientId).eq('owner_type', 'CLIENT');
 
       const { data, error } = await query;
