@@ -253,7 +253,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={12} className="py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
