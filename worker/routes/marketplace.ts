@@ -889,7 +889,9 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         });
       }
 
-      const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk ? 'PARTIAL' : 'FAILED');
+      const ordersPartial = ordersProgress.fetched > 0 || ordersProgress.imported > 0 || ordersProgress.skipped > 0;
+      const inventoryPartial = inventoryProgress.fetched > 0 || inventoryProgress.offersFetched > 0;
+      const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
         last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
