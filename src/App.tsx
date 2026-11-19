@@ -244,7 +244,7 @@ export default function App() {
     try {
       const accRes = await api.getEbayAccounts();
       if (!accRes.integrationReady) {
-        alert(accRes.integrationMessage || 'eBay Sandbox credentials are not configured yet.');
+        alert(accRes.integrationMessage || 'eBay Production credentials are not configured yet.');
         return;
       }
       const selectedAccount = accRes.accounts.find((account) => account.id === selectedStoreId);
