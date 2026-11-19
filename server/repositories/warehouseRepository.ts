@@ -29,7 +29,7 @@ type LedgerRow = {
 const PAGE_SIZE = 500;
 
 async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
-  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  if (!accountId || accountId === 'ALL') return 'PRODUCTION';
   const { data, error } = await context.supabase.from('marketplace_accounts')
     .select('is_demo,environment').eq('id', accountId).eq('organization_id', context.organizationId).maybeSingle();
   if (error) throw error;
@@ -185,7 +185,7 @@ export class SupabaseWarehouseRepository {
         code,
         address: address ? { formatted: address } : {},
         is_active: true,
-        data_environment: input.dataEnvironment || 'SANDBOX',
+        data_environment: input.dataEnvironment || 'PRODUCTION',
       })
       .select('id,name,code,address,is_active')
       .single();
