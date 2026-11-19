@@ -276,7 +276,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-2.5 px-3 w-12">#</th>
-                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">Timestamp (UTC)</th>
                   <th className="py-2.5 px-3">SKU</th>
                   <th className="py-2.5 px-3">Warehouse Location</th>
