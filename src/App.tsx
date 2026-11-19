@@ -253,7 +253,7 @@ export default function App() {
         return;
       }
       if (selectedAccount.isDemo) {
-        alert('Demo accounts are presentation-only and cannot be synchronized.');
+        alert('Only live Production seller accounts can be synchronized from this workspace.');
         return;
       }
       if (selectedAccount.authStatus !== 'CONNECTED') {
