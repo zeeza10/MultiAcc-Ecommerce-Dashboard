@@ -142,11 +142,11 @@ function getEbaySyncFailure(error: unknown, fallbackCode: string) {
   const rawMessage = error instanceof Error ? error.message
     : error && typeof error === 'object' && 'message' in error ? String((error as { message?: unknown }).message || '') : '';
   const message = (rawMessage || 'An unexpected synchronization error occurred.')
-    .replace(/Bearer\\s+[^\\s,;]+/gi, 'Bearer [REDACTED]')
-    .replace(/(access_token|refresh_token|client_secret|authorization)(\\s*[:=]\\s*)[^\\s,;]+/gi, '$1$2[REDACTED]')
-    .replace(/https?:\\/\\/[^\\s]+/gi, '[URL]')
-    .replace(/[\\r\\n\\t\\u0000-\\u001f\\u007f]/g, ' ').slice(0, 320);
-  const statusMatch = rawMessage.match(/HTTP\\s+(\\d{3})/i);
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(/(access_token|refresh_token|client_secret|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[REDACTED]')
+    .replace(/https?:\/\/[^\s]+/gi, '[URL]')
+    .replace(/[\r\n\t\u0000-\u001f\u007f]/g, ' ').slice(0, 320);
+  const statusMatch = rawMessage.match(/HTTP\s+(\d{3})/i);
   return {
     code: providerError?.providerCode ? ('EBAY_API_' + providerError.providerCode).slice(0, 64) : fallbackCode,
     message, httpStatus: providerError?.httpStatus ?? (statusMatch ? Number(statusMatch[1]) : null),
@@ -320,7 +320,6 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       offset += orders.length;
       hasMore = orders.length === 200 || offset < total;
       progress.stage = 'ORDERS_CHECKPOINT_WRITE';
-      progress.stage = 'INVENTORY_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
         resource_type: 'ORDERS', data_environment: dataEnvironment,
@@ -441,6 +440,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     offset += items.length;
     const total = Number(page.total ?? offset);
     hasMore = items.length === 25 || offset < total;
+    progress.stage = 'INVENTORY_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
       organization_id: account.organization_id,
       marketplace_account_id: account.id,
