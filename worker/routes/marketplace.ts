@@ -460,7 +460,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
         const lastSyncAt = account?.last_sync_at ? new Date(account.last_sync_at).getTime() : 0;
         const intervalMs = Math.max(5, Math.min(1440, Number(account?.auto_sync_interval_minutes || 15))) * 60000;
-        const nextSyncAt = account ? new Date(Math.max(Date.now(), lastSyncAt + intervalMs)).toISOString() : null;
+        const nextSyncAt = account ? new Date(lastSyncAt ? lastSyncAt + intervalMs : Date.now() + intervalMs).toISOString() : null;
         return {
           id: event.id,
           accountId: event.marketplace_account_id,
@@ -471,11 +471,11 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           errorCode: event.error_code,
           message: event.message,
           apiName: typeof metadata.endpoint === 'string' ? metadata.endpoint : event.event_type,
-          httpStatus: Number.isFinite(Number(metadata.httpStatus)) ? Number(metadata.httpStatus) : null,
+          httpStatus: metadata.httpStatus !== null && metadata.httpStatus !== undefined && Number.isFinite(Number(metadata.httpStatus)) ? Number(metadata.httpStatus) : null,
           providerCode: typeof metadata.providerCode === 'string' ? metadata.providerCode : null,
           createdAt: event.created_at,
           nextSyncAt,
-          retryable: event.severity === 'ERROR' && Boolean(account),
+          retryable: event.event_type === 'ORDER_SYNC_FAILED' && event.severity === 'ERROR' && Boolean(account),
         };
       }),
     });
