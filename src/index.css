@@ -227,3 +227,14 @@
 :root[data-theme="dark"] .text-rose-800 {
   color: #c7d2fe;
 }
+
+
+/* Reliable touch scrolling for the fixed mobile navigation drawer. */
+#oria-mobile-navigation nav {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}

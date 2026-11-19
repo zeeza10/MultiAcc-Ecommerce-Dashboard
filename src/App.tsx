@@ -260,8 +260,7 @@ export default function App() {
     setGlobalSearch('');
   };
 
-  const searchDropdown = (
-{isGlobalSearchOpen && (
+  const searchDropdown = isGlobalSearchOpen ? (
         <div className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
@@ -344,8 +343,7 @@ export default function App() {
             <p className="px-2 py-4 text-center text-xs text-slate-500">Search orders, products, SKUs, or tracking numbers.</p>
           )}
         </div>
-      )}
-  );
+  ) : null;
 
   if (loading && !configLoaded) {
     return (
