@@ -332,9 +332,11 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
     progress.stage = 'ORDERS_FINALIZE';
-    const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
-    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    const finished = new Date().toISOString();
+    const status = exceptions || hasMore ? 'PARTIAL' : 'SUCCESS';
+    const runStatus = status === 'SUCCESS' ? 'COMPLETED' : 'PARTIAL';
+    await admin.from('marketplace_sync_runs').update({ completed_at: finished, status: runStatus, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
+    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: status, last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
     return { imported, skipped, exceptions, fetched, status, pagesPending: hasMore };
   } catch (error) {
     const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
