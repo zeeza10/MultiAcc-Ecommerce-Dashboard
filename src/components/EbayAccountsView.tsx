@@ -108,6 +108,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       loadData();
     } catch (err: any) {
       setSyncFeedback(`Sync failed: ${err.message}`);
+      void loadData();
     } finally {
       setSyncingAccountId(null);
     }
@@ -516,7 +517,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       <div><dt className="text-slate-500">API / Operation</dt><dd className="mt-0.5 break-all font-mono text-slate-800">{event.apiName || '—'}</dd></div>
                       <div><dt className="text-slate-500">HTTP Status</dt><dd className="mt-0.5 font-semibold text-slate-800">{event.httpStatus ?? 'Not recorded'}</dd></div>
                       <div><dt className="text-slate-500">eBay Error Code</dt><dd className="mt-0.5 font-mono text-slate-800">{event.providerCode || event.errorCode || '—'}</dd></div>
-                      <div><dt className="text-slate-500">Next scheduled sync</dt><dd className="mt-0.5 text-slate-800">{event.nextSyncAt ? new Date(event.nextSyncAt).toLocaleString() : 'Not scheduled'}</dd></div>
+                      <div><dt className="text-slate-500">Next scheduled sync</dt><dd className="mt-0.5 text-slate-800">{event.nextSyncAt ? (new Date(event.nextSyncAt).getTime() <= Date.now() ? 'Due now' : new Date(event.nextSyncAt).toLocaleString()) : 'Not scheduled'}</dd></div>
                     </dl>
                     <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
                       {eventAccount && event.retryable && (
