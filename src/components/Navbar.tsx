@@ -106,7 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
       {/* Main Navigation Bar */}
-      <div className="mx-auto flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-5 xl:px-6">
+      <div className="mx-auto flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-5 xl:flex-nowrap xl:gap-x-3 xl:px-4">
         {/* Brand / Logo */}
         <div className="flex min-w-0 shrink-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
@@ -121,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="relative z-20 order-3 flex w-full min-w-0 flex-wrap items-center justify-end gap-2 xl:order-none xl:flex-nowrap xl:flex-1 xl:min-w-[500px] xl:max-w-none">
-          <div className="relative z-20 min-w-0 w-full flex-1 max-w-md xl:max-w-[360px]">
+        <div className="relative z-20 order-3 flex w-full min-w-0 flex-wrap items-center justify-end gap-2 xl:order-none xl:w-[420px] xl:flex-none xl:flex-nowrap">
+          <div className="relative z-20 min-w-0 w-full flex-1 max-w-md xl:w-[220px] xl:flex-none xl:max-w-[220px]">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -136,7 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {searchDropdown}
           </div>
 
-          <div className="w-48 sm:w-56 shrink-0">
+          <div className="w-48 shrink-0 xl:w-[190px]">
             <select
               value={selectedStoreId}
               onChange={(e) => {
@@ -184,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
         {/* Action Controls & Role Switcher */}
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2 xl:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2 xl:flex-nowrap xl:gap-2">
           <button
             type="button"
             onClick={onToggleTheme}
