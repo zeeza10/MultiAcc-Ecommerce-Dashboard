@@ -40,6 +40,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<any>(null);
   const [expandedListingsAccountId, setExpandedListingsAccountId] = useState<string | null>(null);
   const [listingSnapshots, setListingSnapshots] = useState<Record<string, any[]>>({});
   const [listingTotals, setListingTotals] = useState<Record<string, number>>({});
@@ -98,16 +99,19 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const handleSync = async (accountId: string) => {
     setSyncingAccountId(accountId);
     setSyncFeedback(null);
+    setSyncResult(null);
     try {
       const res = await api.syncEbayAccount(accountId);
-      setSyncFeedback(
-        `Full sync completed: ${res.imported} orders imported, ${res.skipped} duplicate orders skipped, ${res.inventory?.fetched || 0} inventory items and ${res.inventory?.offersFetched || 0} listing offers fetched, ${res.exceptions} SKU exceptions.`
-      );
+      setSyncResult(res);
       setListingSnapshots(current => { const next = { ...current }; delete next[accountId]; return next; });
       setListingTotals(current => { const next = { ...current }; delete next[accountId]; return next; });
-      loadData();
+      void loadData();
     } catch (err: any) {
-      setSyncFeedback(`Sync failed: ${err.message}`);
+      setSyncResult({
+        status: 'FAILED',
+        orders: { status: 'FAILED', fetched: 0, imported: 0, skipped: 0, exceptions: 0, error: { code: 'SYNC_REQUEST_FAILED', message: err?.message || 'The sync request could not be completed.', stage: 'SYNC_REQUEST', httpStatus: null } },
+        inventory: { status: 'FAILED', fetched: 0, offersFetched: 0, error: { code: 'SYNC_REQUEST_FAILED', message: 'Inventory sync was not completed because the sync request failed.', stage: 'SYNC_REQUEST', httpStatus: null } },
+      });
       void loadData();
     } finally {
       setSyncingAccountId(null);
@@ -268,12 +272,44 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       {syncFeedback && (
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-900 text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <CheckCircle className="w-4 h-4 text-indigo-600 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>{syncFeedback}</span>
           </div>
           <button onClick={() => setSyncFeedback(null)} className="text-indigo-400 hover:text-indigo-700">
             <XCircle className="w-4 h-4" />
           </button>
+        </div>
+      )}
+      {syncResult && (
+        <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">Latest sync results</h3>
+              <p className="text-[11px] text-slate-500">Orders and inventory are reported independently. A problem in one does not hide successful data from the other.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold rounded px-2 py-1 ${syncResult.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : syncResult.status === 'PARTIAL' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>{syncResult.status}</span>
+              <button onClick={() => setSyncResult(null)} className="text-slate-400 hover:text-slate-700" aria-label="Dismiss sync results"><XCircle className="w-4 h-4" /></button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Orders</span>
+                <span className={`text-[10px] font-bold ${syncResult.orders?.status === 'SUCCESS' ? 'text-emerald-700' : syncResult.orders?.status === 'PARTIAL' ? 'text-amber-700' : 'text-rose-700'}`}>{syncResult.orders?.status || 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">Fetched: {syncResult.orders?.fetched ?? 0} · Imported: {syncResult.orders?.imported ?? 0} · Duplicates: {syncResult.orders?.skipped ?? 0} · SKU exceptions: {syncResult.orders?.exceptions ?? 0}</p>
+              {syncResult.orders?.error && <p className="text-[11px] text-rose-700 break-words">Stage: {syncResult.orders.error.stage}{syncResult.orders.error.httpStatus ? ` · HTTP ${syncResult.orders.error.httpStatus}` : ''} · {syncResult.orders.error.code}: {syncResult.orders.error.message}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Inventory & Listings</span>
+                <span className={`text-[10px] font-bold ${syncResult.inventory?.status === 'SUCCESS' ? 'text-emerald-700' : syncResult.inventory?.status === 'PARTIAL' ? 'text-amber-700' : 'text-rose-700'}`}>{syncResult.inventory?.status || 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">Inventory items: {syncResult.inventory?.fetched ?? 0} · Listing offers: {syncResult.inventory?.offersFetched ?? 0}{syncResult.inventory?.pagesPending ? ' · More pages pending' : ''}</p>
+              {syncResult.inventory?.error && <p className="text-[11px] text-rose-700 break-words">Stage: {syncResult.inventory.error.stage}{syncResult.inventory.error.httpStatus ? ` · HTTP ${syncResult.inventory.error.httpStatus}` : ''} · {syncResult.inventory.error.code}: {syncResult.inventory.error.message}</p>}
+            </div>
+          </div>
         </div>
       )}
 
