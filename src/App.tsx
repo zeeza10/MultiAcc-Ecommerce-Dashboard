@@ -158,14 +158,21 @@ export default function App() {
       setOrdersCount(0);
       return () => { active = false; };
     }
-    api.getOrderCount(selectedStoreId, selectedEnvironment)
-      .then((result) => { if (active) setOrdersCount(result.count); })
-      .catch((error) => {
-        console.error('Failed to load sidebar order count:', error);
-        if (active) setOrdersCount(0);
-      });
-    return () => { active = false; };
-  }, [permissions, selectedStoreId, selectedEnvironment]);
+    const refreshOrderCount = () => {
+      api.getOrderCount(selectedStoreId, selectedEnvironment)
+        .then((result) => { if (active) setOrdersCount(result.count); })
+        .catch((error) => {
+          console.error('Failed to load sidebar order count:', error);
+          if (active) setOrdersCount(0);
+        });
+    };
+    refreshOrderCount();
+    window.addEventListener('oria-orders-updated', refreshOrderCount);
+    return () => {
+      active = false;
+      window.removeEventListener('oria-orders-updated', refreshOrderCount);
+    };
+  }, [permissions, selectedStoreId, selectedEnvironment, activeTab]);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
@@ -657,6 +664,7 @@ export default function App() {
         selectedStoreId={selectedStoreId}
         selectedEnvironment={selectedEnvironment}
         onSuccess={() => {
+          window.dispatchEvent(new Event('oria-orders-updated'));
           if (activeTab === 'orders') {
             window.location.reload();
           }
