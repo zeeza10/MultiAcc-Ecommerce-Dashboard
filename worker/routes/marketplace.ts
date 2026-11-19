@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { AuthContext, WorkerEnv } from '../types';
 import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
+import { normalizeEbayOrderStartDate } from '../ebay-order-date';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
   createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials,
@@ -219,11 +220,22 @@ async function syncSellerOrders(account: any, env: WorkerEnv): Promise<{ importe
     .select('cursor_state,watermark_at,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
   if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
-  const since = typeof savedCursor.since === 'string'
-    ? savedCursor.since
-    : new Date(checkpoint?.watermark_at ? new Date(checkpoint.watermark_at).getTime() - 3 * 86400000 : Date.now() - 730 * 86400000).toISOString();
-  const filterField = typeof savedCursor.filterField === 'string' ? savedCursor.filterField : checkpoint?.watermark_at ? 'lastmodifieddate' : 'creationdate';
-  let resumeOffset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
+  // Prefer the in-progress cursor; otherwise resume from the successful watermark
+  // with a small overlap. Normalize every path before calling eBay because the
+  // Fulfillment API rejects start dates outside its rolling two-year window.
+  let requestedSince: unknown = savedCursor.since;
+  if (typeof requestedSince !== 'string' && typeof checkpoint?.watermark_at === 'string') {
+    const watermarkTime = Date.parse(checkpoint.watermark_at);
+    if (Number.isFinite(watermarkTime)) requestedSince = new Date(watermarkTime - 3 * 86400000).toISOString();
+  }
+  if (typeof requestedSince !== 'string') requestedSince = new Date(Date.now() - 365 * 86400000).toISOString();
+  const normalizedStart = normalizeEbayOrderStartDate(requestedSince);
+  const since = normalizedStart.since;
+  const filterField = savedCursor.filterField === 'lastmodifieddate' || savedCursor.filterField === 'creationdate'
+    ? savedCursor.filterField : checkpoint?.watermark_at ? 'lastmodifieddate' : 'creationdate';
+  // A clamped cursor no longer describes the same result page; restart at page 0.
+  let resumeOffset = !normalizedStart.clamped && Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0
+    ? Number(savedCursor.offset) : 0;
   const [mappingsResult, productsResult] = await Promise.all([
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
     admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
