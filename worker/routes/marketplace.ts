@@ -571,6 +571,8 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       'marketplace_sync_checkpoints',
       'marketplace_listing_snapshots',
       'marketplace_integration_events',
+      'marketplace_exceptions',
+      'marketplace_sync_jobs',
       'marketplace_sku_mappings',
       'orders',
     ];
