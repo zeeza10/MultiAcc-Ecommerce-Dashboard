@@ -429,11 +429,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       {activeTab === 'ACCOUNTS' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {accounts.map((acc) => {
+            {accounts.map((acc, index) => {
               const isSyncing = syncingAccountId === acc.id;
               return (
                 <div key={acc.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between"><span className="text-[10px] font-mono text-gray-400">#{index + 1}</span>
                     <div>
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-gray-900 text-sm">{acc.name}</span>
