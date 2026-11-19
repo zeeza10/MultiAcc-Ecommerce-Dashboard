@@ -432,6 +432,55 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   const configResponse = await handleIntegrationConfig(path, request, auth, env);
   if (configResponse) return configResponse;
 
+  if (path === '/ebay/integration/events' && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = new URL(request.url).searchParams.get('accountId');
+    let accountsQuery = auth.repositoryContext.supabase
+      .from('marketplace_accounts')
+      .select('id,name,seller_username,last_sync_at,auto_sync_interval_minutes')
+      .eq('organization_id', auth.organizationId);
+    if (accountId) accountsQuery = accountsQuery.eq('id', accountId);
+    const { data: accounts, error: accountsError } = await accountsQuery;
+    if (accountsError) throw new Error('Marketplace seller accounts could not be loaded.');
+    if (accountId && !accounts?.length) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    const accountById = new Map((accounts || []).map((account: any) => [account.id, account]));
+    const admin = createServiceClient(env);
+    let eventsQuery = admin.from('marketplace_integration_events')
+      .select('id,marketplace_account_id,event_type,severity,error_code,message,metadata,created_at')
+      .eq('organization_id', auth.organizationId);
+    if (accountId) eventsQuery = eventsQuery.eq('marketplace_account_id', accountId);
+    const { data: events, error: eventsError } = await eventsQuery
+      .order('created_at', { ascending: false }).limit(200);
+    if (eventsError) throw new Error('Marketplace integration events could not be loaded.');
+    return json({
+      events: (events || []).map((event: any) => {
+        const account: any = event.marketplace_account_id ? accountById.get(event.marketplace_account_id) : null;
+        const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+        const lastSyncAt = account?.last_sync_at ? new Date(account.last_sync_at).getTime() : 0;
+        const intervalMs = Math.max(5, Math.min(1440, Number(account?.auto_sync_interval_minutes || 15))) * 60000;
+        const nextSyncAt = account ? new Date(lastSyncAt ? lastSyncAt + intervalMs : Date.now() + intervalMs).toISOString() : null;
+        return {
+          id: event.id,
+          accountId: event.marketplace_account_id,
+          accountName: account?.name || 'Marketplace account',
+          sellerUsername: account?.seller_username || '',
+          eventType: event.event_type,
+          severity: event.severity,
+          errorCode: event.error_code,
+          message: event.message,
+          apiName: typeof metadata.endpoint === 'string' ? metadata.endpoint : event.event_type,
+          httpStatus: metadata.httpStatus !== null && metadata.httpStatus !== undefined && Number.isFinite(Number(metadata.httpStatus)) ? Number(metadata.httpStatus) : null,
+          providerCode: typeof metadata.providerCode === 'string' ? metadata.providerCode : null,
+          createdAt: event.created_at,
+          nextSyncAt,
+          retryable: event.event_type === 'ORDER_SYNC_FAILED' && event.severity === 'ERROR' && Boolean(account),
+        };
+      }),
+    });
+  }
+
   if (path === '/ebay/accounts' && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
