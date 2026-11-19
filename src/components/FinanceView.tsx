@@ -262,6 +262,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       </div>
 
       {/* Tab: Invoices */}
+      {activeTab === 'INVOICES' && <div className="text-xs text-gray-500">Total invoices: <strong className="text-gray-900">{invoices.length}</strong></div>}
       {activeTab === 'INVOICES' && (
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
@@ -357,6 +358,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       )}
 
       {/* Tab: Payments */}
+      {activeTab === 'PAYMENTS' && <div className="text-xs text-gray-500">Total payments: <strong className="text-gray-900">{payments.length}</strong></div>}
       {activeTab === 'PAYMENTS' && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
@@ -444,6 +446,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       )}
 
       {/* Tab: Expenses */}
+      {activeTab === 'EXPENSES' && <div className="text-xs text-gray-500">Total expenses: <strong className="text-gray-900">{expenses.length}</strong></div>}
       {activeTab === 'EXPENSES' && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
