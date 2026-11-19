@@ -324,6 +324,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {payouts.map((p, index) => (
                     <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {p.payoutId}
                         <div className="text-[10px] text-slate-400 font-mono">Tx: {p.transactionId}</div>
