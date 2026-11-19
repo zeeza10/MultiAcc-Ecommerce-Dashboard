@@ -73,6 +73,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser, config 
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
+                <th className="py-2.5 px-3 w-12">#</th>
                 <th className="py-2.5 px-3">Timestamp (UTC)</th>
                 <th className="py-2.5 px-3">Actor / User</th>
                 <th className="py-2.5 px-3">Action</th>
@@ -83,8 +84,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser, config 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700">
-              {filtered.map((log) => (
+              {filtered.map((log, index) => (
                 <tr key={log.id} className="hover:bg-gray-50 transition">
+                  <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                   <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">
                     {log.timestamp.replace('T', ' ').split('.')[0]}
                   </td>
