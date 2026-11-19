@@ -163,10 +163,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               {isClientUser ? 'Client Invoices & Payments' : 'Finance, Invoicing & Financial Ledger'}
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
-            </span>
-          </div>
+</div>
           <p className="text-xs text-gray-500">
             {isClientUser ? 'Invoices and payments allocated to your 3PL client account.' : `Double-entry journals, VAT (${config.defaultVatRatePercent}%) compliance, payment allocations, immutable document audit, and order-level unit profitability.`}
           </p>
@@ -265,6 +262,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       </div>
 
       {/* Tab: Invoices */}
+      {activeTab === 'INVOICES' && <div className="text-xs text-gray-500">Total invoices: <strong className="text-gray-900">{invoices.length}</strong></div>}
       {activeTab === 'INVOICES' && (
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
@@ -272,6 +270,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
+                    <th className="py-2.5 px-3 w-12">#</th>
                     <th className="py-2.5 px-3">Invoice #</th>
                     <th className="py-2.5 px-3">Type</th>
                     <th className="py-2.5 px-3">Recipient</th>
@@ -286,12 +285,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {invoices.map((inv) => {
+                  {invoices.map((inv, index) => {
                     const issueDateStr = inv.issueDate ? inv.issueDate.split('T')[0] : '—';
                     const dueDateStr = inv.dueDate ? inv.dueDate.split('T')[0] : '—';
 
                     return (
                       <tr key={inv.id} className="hover:bg-gray-50 transition">
+                        <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                         <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">
                           {inv.invoiceNumber}
                         </td>
@@ -345,7 +345,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   })}
                   {invoices.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-gray-400">
+                      <td colSpan={12} className="py-8 text-center text-gray-400">
                         No invoices recorded.
                       </td>
                     </tr>
@@ -358,12 +358,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       )}
 
       {/* Tab: Payments */}
+      {activeTab === 'PAYMENTS' && <div className="text-xs text-gray-500">Total payments: <strong className="text-gray-900">{payments.length}</strong></div>}
       {activeTab === 'PAYMENTS' && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">Payment #</th>
                   <th className="py-2.5 px-3">Date (UTC)</th>
                   <th className="py-2.5 px-3">Method</th>
@@ -375,7 +377,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-gray-700">
-                {payments.map((p) => {
+                {payments.map((p, index) => {
                   const methodStr = (p.paymentMethod || (p as any).method || 'BANK_TRANSFER').replace(/_/g, ' ');
                   const dateStr = p.paymentDate
                     ? p.paymentDate.split('T')[0]
@@ -402,6 +404,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
                   return (
                     <tr key={p.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">{p.paymentNumber}</td>
                       <td className="py-2.5 px-3 font-mono text-gray-500">{dateStr}</td>
                       <td className="py-2.5 px-3">
@@ -431,7 +434,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 })}
                 {payments.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-gray-400">
+                    <td colSpan={9} className="py-8 text-center text-gray-400">
                       No payments recorded yet. Click "Record Client Payment" to add one.
                     </td>
                   </tr>
@@ -443,12 +446,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       )}
 
       {/* Tab: Expenses */}
+      {activeTab === 'EXPENSES' && <div className="text-xs text-gray-500">Total expenses: <strong className="text-gray-900">{expenses.length}</strong></div>}
       {activeTab === 'EXPENSES' && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">Expense #</th>
                   <th className="py-2.5 px-3">Category</th>
                   <th className="py-2.5 px-3">Supplier / Description</th>
@@ -460,7 +465,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-gray-700">
-                {expenses.map((exp) => {
+                {expenses.map((exp, index) => {
                   const cat = (exp.category || 'OTHER').replace(/_/g, ' ');
                   const desc = (exp as any).description || exp.supplierName || 'Operating Expense';
                   const dateStr = exp.date ? exp.date.split('T')[0] : '—';
@@ -470,6 +475,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
                   return (
                     <tr key={exp.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">
                         {exp.expenseNumber || exp.id}
                       </td>
@@ -493,7 +499,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 })}
                 {expenses.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-gray-400">
+                    <td colSpan={9} className="py-8 text-center text-gray-400">
                       No operating expenses recorded.
                     </td>
                   </tr>

@@ -541,6 +541,62 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     return json({ account: { id: data.id, name: data.name, marketplace: data.marketplace, environment: data.environment, authStatus: data.auth_status, isDemo: data.is_demo } }, 201);
   }
 
+  const deleteAccountMatch = path.match(/^\/ebay\/accounts\/([^/]+)$/);
+  if (deleteAccountMatch && request.method === 'DELETE') {
+    // Account deletion is intentionally outside employee permission overrides:
+    // only a verified workspace Super Admin may perform this destructive action.
+    if (auth.user.role !== 'SUPER_ADMIN') return json({ error: 'Only a Super Admin can delete a marketplace account.' }, 403);
+    const origin = request.headers.get('Origin');
+    const requestOrigin = new URL(request.url).origin;
+    if (!origin || (origin !== requestOrigin && origin !== env.ALLOWED_ORIGIN)) return json({ error: 'A same-origin browser request is required for account deletion.' }, 403);
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const confirmationName = typeof body?.confirmationName === 'string' ? body.confirmationName.trim() : '';
+    if (!confirmationName) return json({ error: 'Type the exact marketplace account name to confirm deletion.' }, 400);
+
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase
+      .from('marketplace_accounts')
+      .select('id,name,auth_status,organization_id')
+      .eq('id', deleteAccountMatch[1])
+      .eq('organization_id', auth.organizationId)
+      .maybeSingle();
+    if (accountError) throw new Error('Marketplace account could not be verified.');
+    if (!account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.name !== confirmationName) return json({ error: 'The confirmation name does not match this marketplace account.' }, 400);
+    if (account.auth_status === 'CONNECTED') return json({ error: 'This seller is connected to eBay. Disconnect/revoke its authorization before deleting it.' }, 409);
+
+    // Fail closed: only delete an accidental, unused account. Never cascade-delete
+    // orders, sync history, credentials, listings, mappings or audit evidence.
+    const admin = createServiceClient(env);
+    const linkedTables = [
+      'marketplace_credentials',
+      'marketplace_oauth_states',
+      'marketplace_sync_runs',
+      'marketplace_sync_checkpoints',
+      'marketplace_listing_snapshots',
+      'marketplace_integration_events',
+      'marketplace_exceptions',
+      'marketplace_sync_jobs',
+      'marketplace_sku_mappings',
+      'orders',
+    ];
+    const linked = [];
+    for (const table of linkedTables) {
+      const { count, error } = await admin.from(table).select('*', { count: 'exact', head: true })
+        .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId);
+      if (error) return json({ error: 'Deletion safety check could not verify all linked records. No data was deleted.' }, 503);
+      if ((count || 0) > 0) linked.push({ table, count });
+    }
+    if (linked.length) return json({
+      error: 'This account has linked authorization or business history and cannot be hard-deleted. No data was changed.',
+      linkedRecords: linked,
+    }, 409);
+
+    const { error: deleteError } = await admin.from('marketplace_accounts')
+      .delete().eq('id', account.id).eq('organization_id', auth.organizationId);
+    if (deleteError) return json({ error: 'Marketplace account could not be deleted safely. No related business data was removed.' }, 409);
+    return json({ success: true, deletedAccountId: account.id });
+  }
+
   if (path === '/ebay/accounts' && request.method === 'GET') {
     const [accountsResult, syncResult] = await Promise.all([
       auth.repositoryContext.supabase.from('marketplace_accounts')

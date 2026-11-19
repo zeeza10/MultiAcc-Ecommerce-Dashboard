@@ -222,12 +222,15 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         </div>
       </div>
 
+      <div className="text-xs text-gray-500">Showing <strong className="text-gray-900">{filteredProducts.length}</strong> of <strong className="text-gray-900">{products.length}</strong> products / SKUs</div>
+
       {/* Catalog Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
+                <th className="py-2.5 px-3 w-12">#</th>
                 <th className="py-2.5 px-3">SKU Code</th>
                 <th className="py-2.5 px-3">Product Name & Category</th>
                 <th className="py-2.5 px-3">Owner</th>
@@ -244,21 +247,22 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={isWarehouseStaff ? 10 : 12} className="py-8 text-center text-gray-500">
                     Loading catalog items...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={isWarehouseStaff ? 10 : 12} className="py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((p) => {
+                filteredProducts.map((p, index) => {
                   const isLow = p.stockAvailable <= p.lowStockThreshold;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50/80 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">
                         {p.sku}
                       </td>

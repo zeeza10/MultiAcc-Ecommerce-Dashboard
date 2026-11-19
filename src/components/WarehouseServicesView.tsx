@@ -394,18 +394,18 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr><th className="py-2.5 px-3">Client</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Location Bins</th><th className="py-2.5 px-3 text-center">On Hand</th><th className="py-2.5 px-3 text-center">Available</th><th className="py-2.5 px-3 text-center">Reserved</th><th className="py-2.5 px-3 text-center">Damaged</th><th className="py-2.5 px-3 text-right">Storage Estimate</th></tr>
+                  <tr><th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Client</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Location Bins</th><th className="py-2.5 px-3 text-center">On Hand</th><th className="py-2.5 px-3 text-center">Available</th><th className="py-2.5 px-3 text-center">Reserved</th><th className="py-2.5 px-3 text-center">Damaged</th><th className="py-2.5 px-3 text-right">Storage Estimate</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {clientStorageRows.map(row => (
+                  {clientStorageRows.map((row, index) => (
                     <tr key={row.id}>
-                      <td className="py-3 px-3"><div className="font-semibold text-slate-900 dark:text-slate-100">{row.clientName}</div><div className="text-[10px] text-slate-400">{row.code} · {row.snapshotDate}</div></td>
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td><td className="py-3 px-3"><div className="font-semibold text-slate-900 dark:text-slate-100">{row.clientName}</div><div className="text-[10px] text-slate-400">{row.code} · {row.snapshotDate}</div></td>
                       <td className="py-3 px-3"><div className="font-medium">{row.skuCount} SKUs</div><div className="text-[10px] text-slate-400 max-w-[220px] truncate" title={row.skus}>{row.skus}</div></td>
                       <td className="py-3 px-3 font-mono text-[11px]">{row.locations}</td>
                       <td className="py-3 px-3 text-center">{row.onHand}</td><td className="py-3 px-3 text-center font-bold text-emerald-600">{row.available}</td><td className="py-3 px-3 text-center text-amber-600">{row.reserved}</td><td className="py-3 px-3 text-center text-rose-500">{row.damaged}</td><td className="py-3 px-3 text-right font-mono">{formatMoney(row.estimatedCostMinor)}</td>
                     </tr>
                   ))}
-                  {clientStorageRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-slate-500">No storage snapshots are recorded in the database yet.</td></tr>}
+                  {clientStorageRows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-slate-500">No storage snapshots are recorded in the database yet.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -439,7 +439,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
                   <tr>
-                    <th className="py-2.5 px-3">Job ID</th>
+                    <th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Job ID</th>
                     <th className="py-2.5 px-3">Client</th>
                     <th className="py-2.5 px-3">Service Type</th>
                     <th className="py-2.5 px-3 text-center">Quantity</th>
@@ -451,8 +451,9 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {packagingJobs.map((j) => (
+                  {packagingJobs.map((j, index) => (
                     <tr key={j.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {j.jobNumber}
                         {j.orderNumber && (
@@ -522,7 +523,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
                   <tr>
-                    <th className="py-2.5 px-3">Dispatch ID</th>
+                    <th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Dispatch ID</th>
                     <th className="py-2.5 px-3">Client</th>
                     <th className="py-2.5 px-3">Carrier & Tracking</th>
                     <th className="py-2.5 px-3">Destination</th>
@@ -533,8 +534,9 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {shippingJobs.map((s) => (
+                  {shippingJobs.map((s, index) => (
                     <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {s.dispatchId}
                         <div className="text-[10px] text-slate-400 font-mono">Order: {s.orderNumber}</div>
@@ -588,12 +590,12 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr><th className="py-2.5 px-3">Client Company</th><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3 text-right">Storage</th><th className="py-2.5 px-3 text-right">Packaging</th><th className="py-2.5 px-3 text-right">Shipping</th><th className="py-2.5 px-3 text-right">Invoiced Total</th><th className="py-2.5 px-3 text-right">Paid</th><th className="py-2.5 px-3 text-right">Balance Due</th><th className="py-2.5 px-3 text-center">Status</th></tr>
+                  <tr><th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Client Company</th><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3 text-right">Storage</th><th className="py-2.5 px-3 text-right">Packaging</th><th className="py-2.5 px-3 text-right">Shipping</th><th className="py-2.5 px-3 text-right">Invoiced Total</th><th className="py-2.5 px-3 text-right">Paid</th><th className="py-2.5 px-3 text-right">Balance Due</th><th className="py-2.5 px-3 text-center">Status</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {clientBillingRows.map(row => (
+                  {clientBillingRows.map((row, index) => (
                     <tr key={row.id}>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{row.companyName}</td>
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td><td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{row.companyName}</td>
                       <td className="py-3 px-3 font-mono text-slate-500">{row.code}</td>
                       <td className="py-3 px-3 text-right font-mono">{formatMoney(row.storage)}</td>
                       <td className="py-3 px-3 text-right font-mono">{formatMoney(row.packaging)}</td>
@@ -604,7 +606,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                       <td className="py-3 px-3 text-center"><span className="px-2 py-0.5 rounded text-[10px] font-semibold">{row.status}</span></td>
                     </tr>
                   ))}
-                  {clientBillingRows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-slate-500">No 3PL billing records are available.</td></tr>}
+                  {clientBillingRows.length === 0 && <tr><td colSpan={10} className="py-8 text-center text-slate-500">No 3PL billing records are available.</td></tr>}
                 </tbody>
               </table>
             </div>

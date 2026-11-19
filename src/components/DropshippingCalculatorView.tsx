@@ -574,6 +574,7 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
               <tr>
+                <th className="py-2.5 px-3 w-12">#</th>
                 <th className="py-2.5 px-3">SKU</th>
                 <th className="py-2.5 px-3">Product Name</th>
                 <th className="py-2.5 px-3">Option Mode</th>
@@ -586,8 +587,9 @@ export const DropshippingCalculatorView: React.FC<DropshippingCalculatorViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-              {savedSimulations.map((s) => (
+              {savedSimulations.map((s, index) => (
                 <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                  <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                   <td className="py-3 px-3 font-mono font-semibold text-indigo-600 dark:text-indigo-400">{s.sku}</td>
                   <td className="py-3 px-3 font-medium text-slate-900 dark:text-slate-100">{s.productName}</td>
                   <td className="py-3 px-3">

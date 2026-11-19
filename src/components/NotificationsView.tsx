@@ -65,7 +65,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">System Notifications & Operational Alerts</h1>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">System Notifications & Operational Alerts <span className="text-sm font-medium text-gray-500">({notifications.length})</span></h1>
           <p className="text-xs text-gray-500">
             Automated monitoring across the 9 SRS alert categories (S16.2) including sync failures, unmapped SKUs, stockout risks, and overdue receivables.
           </p>
@@ -78,14 +78,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             No system notifications. All operations are operating within normal parameters.
           </div>
         ) : (
-          notifications.map((n) => (
+          notifications.map((n, index) => (
             <div
               key={n.id}
               className={`p-4 flex items-start justify-between gap-4 transition ${
                 n.isDismissed ? 'opacity-50 bg-gray-50/50' : 'hover:bg-gray-50'
               }`}
             >
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-3"><span className="mt-1 text-[10px] font-mono text-gray-400">#{index + 1}</span>
                 <div className="mt-0.5">
                   {n.severity === 'CRITICAL' ? (
                     <AlertCircle className="w-5 h-5 text-rose-600" />

@@ -123,10 +123,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               3PL Logistics & Fulfilment Operations
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
-            </span>
-          </div>
+</div>
           <p className="text-xs text-gray-500">
             Multi-client inventory isolation (AT-07), Pick & Pack waves, carrier parcel manifests, and periodic storage billing.
           </p>
@@ -195,10 +192,11 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <span className="text-gray-500 font-normal">SRS S13 Compliance</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {clients.map((c) => (
+                {clients.map((c, index) => (
                   <div key={c.id} className="p-4 hover:bg-gray-50 transition text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 text-xs">{index + 1}</div>
                         <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center font-bold text-indigo-700 text-xs">
                           {c.code}
                         </div>
@@ -249,8 +247,8 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
               <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wide">
                 Contracted Rate Card Parameters
               </h3>
-              {rateCards.map((rc) => (
-                <div key={rc.id} className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {rateCards.map((rc, index) => (
+                <div key={rc.id} className="relative grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs border-t border-gray-100 pt-2"><span className="absolute -top-2 left-0 bg-white px-1 text-[10px] text-gray-400">#{index + 1}</span>
                   <div className="p-2.5 bg-gray-50 rounded border border-gray-200">
                     <div className="text-gray-500 font-medium">Pick Fee</div>
                     <div className="font-bold text-gray-900 mt-1">{formatMoney(rc.pickFeeMinor, rc.currency || config.baseCurrency)} / pick</div>
@@ -316,8 +314,8 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 No orders currently in the active Pick & Pack queue.
               </div>
             ) : (
-              pickPackOrders.map((ord) => (
-                <div key={ord.id} className="p-4 hover:bg-gray-50 transition text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              pickPackOrders.map((ord, index) => (
+                <div key={ord.id} className="p-4 hover:bg-gray-50 transition text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"><span className="text-[10px] font-mono text-gray-400">#{index + 1}</span>
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-bold text-indigo-700 text-sm">{ord.orderNumber}</span>
@@ -393,6 +391,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">Order Number</th>
                   <th className="py-2.5 px-3">Customer & Destination</th>
                   <th className="py-2.5 px-3">Carrier Service</th>
@@ -404,13 +403,14 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
               <tbody className="divide-y divide-gray-100 text-gray-700">
                 {shippingOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
                       No dispatched parcels found.
                     </td>
                   </tr>
                 ) : (
-                  shippingOrders.map((ord) => (
+                  shippingOrders.map((ord, index) => (
                     <tr key={ord.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">
                         {ord.orderNumber}
                       </td>

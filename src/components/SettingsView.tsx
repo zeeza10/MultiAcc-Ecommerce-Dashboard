@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   Sliders,
   ShieldCheck,
-  Layers,
   Cloud,
   RotateCcw,
 } from 'lucide-react';
@@ -33,7 +32,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [adjValThreshold, setAdjValThreshold] = useState(
     String(config.adjustmentApprovalThresholdValueMinor / 100)
   );
-  const [activePhase, setActivePhase] = useState(config.activeReleasePhase);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [workerHealth, setWorkerHealth] = useState<{
@@ -80,7 +78,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         defaultVatRatePercent: parseFloat(vatRate) || 20,
         adjustmentApprovalThresholdQuantity: parseInt(adjQtyThreshold, 10) || 10,
         adjustmentApprovalThresholdValueMinor: Math.round(parseFloat(adjValThreshold || '0') * 100),
-        activeReleasePhase: activePhase,
       };
 
       await api.updateConfig(updated);
@@ -97,7 +94,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div>
         <h1 className="text-xl font-bold text-gray-900 tracking-tight">System & Operations Settings</h1>
         <p className="text-xs text-gray-500">
-          Commercial parameters, threshold gates for adjustments, release phase controls, and seed data utilities.
+          Commercial parameters, adjustment approval thresholds, and backend health.
         </p>
       </div>
 
@@ -116,69 +113,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       <form onSubmit={handleSave} className="space-y-5 text-xs">
-        {/* Release Phase Roadmap Selector */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3">
-          <div className="flex items-center space-x-2 border-b border-gray-100 pb-2">
-            <Layers className="w-4 h-4 text-indigo-600" />
-            <h3 className="font-bold text-gray-900 text-sm">Release Roadmap Phase Governance</h3>
-          </div>
-          <p className="text-gray-600">
-            Per PRD Section 6 & SRS Section 3: "Do not expose future-phase modules as fully operational features before their respective phases are implemented. Hide unreleased features or clearly label them as coming in a future phase."
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {[
-              {
-                id: 'P1',
-                title: 'Phase 1: Core Operations Only',
-                desc: 'eBay multi-account order sync, products, inventory with append-only ledger, adjustments, basic dashboard, and reports R-01 to R-06.',
-              },
-              {
-                id: 'P2',
-                title: 'Phase 2: Purchasing & Returns',
-                desc: 'Adds supplier directory, PO partial receiving, warehouse locations, returns with multi-disposition, and reports R-07 to R-09.',
-              },
-              {
-                id: 'P3',
-                title: 'Phase 3: 3PL & Client Portal',
-                desc: 'Adds 3PL client accounts, commercial rate cards, storage occupancy snapshots, live billing previews, and reports R-10 & R-11.',
-              },
-              {
-                id: 'P4',
-                title: 'Phase 4: Finance & Profitability',
-                desc: 'Adds immutable invoices, multi-allocation payments, double-entry financial ledger, order unit economics, and reports R-12 to R-14.',
-              },
-              {
-                id: 'ALL',
-                title: 'All Phases Active (Full Enterprise Suite)',
-                desc: 'Unlocks complete operational capabilities across all 5 phases for end-to-end testing and demonstration.',
-              },
-            ].map((p) => (
-              <label
-                key={p.id}
-                className={`p-3 rounded-lg border cursor-pointer transition flex flex-col justify-between ${
-                  activePhase === p.id
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 font-medium shadow-2xs'
-                    : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="font-bold text-xs">{p.title}</div>
-                  <input
-                    type="radio"
-                    name="activeReleasePhase"
-                    value={p.id}
-                    checked={activePhase === p.id}
-                    onChange={(e) => setActivePhase(e.target.value as any)}
-                    className="mt-0.5 text-indigo-600"
-                  />
-                </div>
-                <div className="text-[11px] text-gray-500 mt-1">{p.desc}</div>
-              </label>
-            ))}
-          </div>
-        </div>
-
         {/* Commercial & Approval Thresholds */}
         <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-4">
           <div className="flex items-center space-x-2 border-b border-gray-100 pb-2">

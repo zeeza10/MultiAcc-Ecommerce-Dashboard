@@ -151,6 +151,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
+                <th className="py-2.5 px-3 w-12">#</th>
                 <th className="py-2.5 px-3">Adjustment #</th>
                 <th className="py-2.5 px-3">Date (UTC)</th>
                 <th className="py-2.5 px-3">SKU</th>
@@ -167,18 +168,18 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={12} className="py-8 text-center text-gray-500">
                     Loading stock adjustments...
                   </td>
                 </tr>
               ) : filteredAdjustments.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={12} className="py-8 text-center text-gray-500">
                     No adjustments found.
                   </td>
                 </tr>
               ) : (
-                filteredAdjustments.map((a) => {
+                filteredAdjustments.map((a, index) => {
                   const req = getRequester(a);
                   const isRequester =
                     req.toLowerCase().includes((currentUser.email || '').toLowerCase()) ||
@@ -189,6 +190,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
 
                   return (
                     <tr key={a.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-semibold font-mono text-gray-900">
                         {a.adjustmentNumber || a.id}
                       </td>
