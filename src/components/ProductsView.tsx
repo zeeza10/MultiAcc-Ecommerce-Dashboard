@@ -247,13 +247,13 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-gray-500">
+                  <td colSpan={isWarehouseStaff ? 10 : 12} className="py-8 text-center text-gray-500">
                     Loading catalog items...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-gray-500">
+                  <td colSpan={isWarehouseStaff ? 10 : 12} className="py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
