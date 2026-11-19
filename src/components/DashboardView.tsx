@@ -164,7 +164,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="mt-1 flex items-center text-[11px] text-emerald-600">
               <TrendingUp className="w-3 h-3 mr-0.5" />
-              <span>Created in {period} (excl. cancelled)</span>
+              <span>All-time orders · all statuses</span>
             </div>
           </div>
 
