@@ -453,6 +453,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {packagingJobs.map((j, index) => (
                     <tr key={j.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {j.jobNumber}
                         {j.orderNumber && (
@@ -535,6 +536,7 @@ export const WarehouseServicesView: React.FC<WarehouseServicesViewProps> = ({ cu
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {shippingJobs.map((s, index) => (
                     <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {s.dispatchId}
                         <div className="text-[10px] text-slate-400 font-mono">Order: {s.orderNumber}</div>
