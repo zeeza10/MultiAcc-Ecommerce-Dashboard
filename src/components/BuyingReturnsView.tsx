@@ -315,10 +315,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               Purchasing, Receipts, Returns & Customers
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
-              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
-            </span>
-          </div>
+</div>
           <p className="text-xs text-gray-500">
             Control buying, goods receiving with partial / discrepancy notes, return inspections with dispositions, and customer directory.
           </p>
