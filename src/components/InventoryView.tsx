@@ -196,6 +196,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
+      <div className="text-xs text-gray-500">Current stock records: <strong className="text-gray-900">{filteredBalances.length}</strong> · Ledger entries: <strong className="text-gray-900">{filteredLedger.length}</strong></div>
+
       {/* Tab 1: Current Balances */}
       {activeTab === 'BALANCES' && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
@@ -203,6 +205,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">SKU Code</th>
                   <th className="py-2.5 px-3">Ownership</th>
                   <th className="py-2.5 px-3">Available (Sellable)</th>
@@ -217,19 +220,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <tbody className="divide-y divide-gray-100 text-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500">
+                    <td colSpan={10} className="py-8 text-center text-gray-500">
                       Calculating ledger balances...
                     </td>
                   </tr>
                 ) : filteredBalances.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500">
+                    <td colSpan={10} className="py-8 text-center text-gray-500">
                       No stock balances recorded.
                     </td>
                   </tr>
                 ) : (
-                  filteredBalances.map((b) => (
+                  filteredBalances.map((b, index) => (
                     <tr key={b.productId} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">{b.sku}</td>
                       <td className="py-2.5 px-3 text-[11px]">
                         <span
@@ -271,6 +275,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   <th className="py-2.5 px-3">Timestamp (UTC)</th>
                   <th className="py-2.5 px-3">SKU</th>
                   <th className="py-2.5 px-3">Warehouse Location</th>
@@ -296,8 +301,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredLedger.map((row) => (
+                  filteredLedger.map((row, index) => (
                     <tr key={row.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2 px-3 text-gray-400 tabular-nums">{index + 1}</td>
                       <td className="py-2 px-3 text-gray-500">
                         {row.createdAt.split('.')[0].replace('T', ' ')}
                       </td>
