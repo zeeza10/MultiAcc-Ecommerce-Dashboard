@@ -268,6 +268,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
+                <th className="py-2.5 px-3 w-12">#</th>
                 <th className="py-2.5 px-3">Order Number</th>
                 <th className="py-2.5 px-3">Channel / Source</th>
                 <th className="py-2.5 px-3">Customer / Buyer</th>
@@ -282,21 +283,22 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-500">
+                  <td colSpan={10} className="py-8 text-center text-gray-500">
                     Loading orders...
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-500">
+                  <td colSpan={10} className="py-8 text-center text-gray-500">
                     No orders found matching the filter criteria.
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => {
+                orders.map((order, index) => {
                   const hasBackorder = order.lines.some((l) => l.isBackordered);
                   return (
                     <tr key={order.id} className="hover:bg-gray-50/80 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">
                         <div className="flex items-center space-x-1.5">
                           <span>{order.orderNumber}</span>
@@ -368,6 +370,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-slate-50 px-3 py-2 text-xs text-gray-600">
+          <span>{loading ? 'Loading order count…' : `Total orders in this view: ${orders.length}`}</span>
+          <span className="font-medium">{statusFilter === 'ALL' ? 'All statuses' : `Filter: ${statusFilter}`}</span>
         </div>
       </div>
 

@@ -98,6 +98,7 @@ export const api = {
   getCharts: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<any>(`/dashboard/charts?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
 
   // Orders
+  getOrderCount: (accountId?: string, environment: 'DEMO' | 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => request<{ count: number }>(`/orders/count?environment=${environment}${accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : ''}`),
   getOrders: (params: { status?: string; accountId?: string; search?: string; environment?: 'DEMO' | 'SANDBOX' | 'PRODUCTION' } = {}) => {
     const q = new URLSearchParams();
     if (params.status && params.status !== 'ALL') q.set('status', params.status);

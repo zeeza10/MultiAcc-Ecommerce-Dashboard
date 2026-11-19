@@ -33,6 +33,7 @@ interface SidebarProps {
   config: SystemConfig;
   unreadAlertCount: number;
   pendingExceptionsCount: number;
+  ordersCount: number;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
 }
@@ -54,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   permissions,
   unreadAlertCount,
   pendingExceptionsCount,
+  ordersCount,
   isMobileOpen,
   onCloseMobile,
 }) => {
@@ -77,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Sales',
       items: [
-        { id: 'orders', label: 'Orders', icon: ShoppingCart, phase: 'P1', permission: 'orders.view' },
+        { id: 'orders', label: 'Orders', icon: ShoppingCart, phase: 'P1', badge: ordersCount, permission: 'orders.view' },
         {
           id: 'ebay-accounts',
           label: 'eBay Accounts',
