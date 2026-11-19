@@ -301,16 +301,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Demo Data Management */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3">
-        <h3 className="font-bold text-gray-900 text-sm">Demo Data & Sandbox Records</h3>
-        <p className="text-gray-600 text-xs">
-          Sample business records are tagged as demo data. Marketplace accounts remain disconnected in Sandbox, and no live credentials are created.
-        </p>
-        <p className="text-amber-700 text-xs">
-          Bulk reset is disabled until a verified demo-only deletion workflow is available. This screen will not delete existing business records.
-        </p>
-      </div>
     </div>
   );
 };
