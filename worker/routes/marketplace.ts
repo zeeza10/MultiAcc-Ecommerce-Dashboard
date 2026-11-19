@@ -568,6 +568,14 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     authorize.searchParams.set('scope', OAUTH_SCOPES.join(' '));
     authorize.searchParams.set('state', state);
     authorize.searchParams.set('prompt', 'login');
+    // Safe start diagnostics: confirm the CSRF state was created and included without exposing its value.
+    console.info('[eBay OAuth] authorization request prepared', {
+      environment: account.environment,
+      stateIncluded: authorize.searchParams.has('state'),
+      stateLength: state.length,
+      redirectUriPresent: authorize.searchParams.has('redirect_uri'),
+      scopeCount: OAUTH_SCOPES.length,
+    });
     return json({ authorizationUrl: authorize.toString() });
   }
 
@@ -689,6 +697,14 @@ export async function handleEbayOAuthCallback(request: Request, env: WorkerEnv):
   const state = url.searchParams.get('state') || '';
   const code = url.searchParams.get('code') || '';
   const eBayError = url.searchParams.get('error');
+  // Safe OAuth diagnostics: log parameter presence only; never log state, code, tokens, or full URLs.
+  console.info('[eBay OAuth] callback parameters', {
+    hasState: Boolean(state),
+    stateLength: state.length,
+    hasCode: Boolean(code),
+    hasError: Boolean(eBayError),
+    queryKeys: [...url.searchParams.keys()].sort(),
+  });
   const returnUrl = (status: string) => Response.redirect(`https://app.oriafuture.com/?ebay_oauth=${encodeURIComponent(status)}`, 302);
   if (!state || state.length > 512) return returnUrl('invalid_state');
   const admin = createServiceClient(env);
