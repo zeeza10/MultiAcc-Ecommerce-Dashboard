@@ -1,4 +1,4 @@
-```tsx
+tsx
 import React, { useState, useEffect } from 'react';
 import {
   Store,
@@ -1365,4 +1365,4 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     </div>
   );
 };
-```
+
