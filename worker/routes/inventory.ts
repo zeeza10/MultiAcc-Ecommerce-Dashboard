@@ -4,7 +4,7 @@ import { json } from '../http';
 async function resolveDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
   const accountId = url.searchParams.get('accountId');
   if (!accountId || accountId === 'ALL') {
-    const requested = url.searchParams.get('environment') || 'SANDBOX';
+    const requested = url.searchParams.get('environment') || 'PRODUCTION';
     if (requested === 'DEMO' || requested === 'SANDBOX' || requested === 'PRODUCTION') return requested;
     throw new Error('The selected data environment is invalid.');
   }
