@@ -546,6 +546,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     // Account deletion is intentionally outside employee permission overrides:
     // only a verified workspace Super Admin may perform this destructive action.
     if (auth.user.role !== 'SUPER_ADMIN') return json({ error: 'Only a Super Admin can delete a marketplace account.' }, 403);
+    const origin = request.headers.get('Origin');
+    const requestOrigin = new URL(request.url).origin;
+    if (!origin || (origin !== requestOrigin && origin !== env.ALLOWED_ORIGIN)) return json({ error: 'A same-origin browser request is required for account deletion.' }, 403);
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     const confirmationName = typeof body?.confirmationName === 'string' ? body.confirmationName.trim() : '';
     if (!confirmationName) return json({ error: 'Type the exact marketplace account name to confirm deletion.' }, 400);
@@ -578,7 +581,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     ];
     const linked = [];
     for (const table of linkedTables) {
-      const { count, error } = await admin.from(table).select('id', { count: 'exact', head: true })
+      const { count, error } = await admin.from(table).select('*', { count: 'exact', head: true })
         .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId);
       if (error) return json({ error: 'Deletion safety check could not verify all linked records. No data was deleted.' }, 503);
       if ((count || 0) > 0) linked.push({ table, count });
