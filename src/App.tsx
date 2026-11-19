@@ -65,6 +65,7 @@ export default function App() {
   const [initError, setInitError] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [exceptionsCount, setExceptionsCount] = useState(0);
+  const [ordersCount, setOrdersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<NavItem>(() => {
     const saved = readWorkspacePreference<string>(organizationId, 'active-tab', 'dashboard');
     return NAV_ITEMS.includes(saved as NavItem) ? saved as NavItem : 'dashboard';
@@ -149,6 +150,22 @@ export default function App() {
   useEffect(() => {
     initApp();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const canViewOrders = permissions.includes('*') || permissions.includes('orders.view');
+    if (!canViewOrders) {
+      setOrdersCount(0);
+      return () => { active = false; };
+    }
+    api.getOrderCount(selectedStoreId, selectedEnvironment)
+      .then((result) => { if (active) setOrdersCount(result.count); })
+      .catch((error) => {
+        console.error('Failed to load sidebar order count:', error);
+        if (active) setOrdersCount(0);
+      });
+    return () => { active = false; };
+  }, [permissions, selectedStoreId, selectedEnvironment, activeTab]);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
@@ -410,6 +427,7 @@ export default function App() {
           config={config}
           unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}
+          ordersCount={ordersCount}
           isMobileOpen={isMobileSidebarOpen}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
