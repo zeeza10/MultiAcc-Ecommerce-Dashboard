@@ -490,6 +490,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
+                    <th className="py-2.5 px-3 w-12">#</th>
                     <th className="py-2.5 px-3">PO Number</th>
                     <th className="py-2.5 px-3">Supplier Name</th>
                     <th className="py-2.5 px-3">Status</th>
@@ -501,8 +502,9 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {purchaseOrders.map((po) => (
+                  {purchaseOrders.map((po, index) => (
                     <tr key={po.id} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">{po.poNumber}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">{po.supplierName}</td>
                       <td className="py-2.5 px-3">
@@ -701,11 +703,11 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {suppliers.map((s) => (
+          {suppliers.map((s, index) => (
             <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-2 text-xs">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">{s.name}</h3>
+                  <div className="flex items-center gap-2"><span className="text-[10px] font-mono text-gray-400">#{index + 1}</span><h3 className="font-bold text-gray-900 text-sm">{s.name}</h3></div>
                   <div className="text-gray-500 font-mono text-[11px]">Vendor Code: {s.code}</div>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold text-[10px]">
@@ -762,6 +764,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
+                    <th className="py-2.5 px-3 w-12">#</th>
                     <th className="py-2.5 px-3">Customer Name</th>
                     <th className="py-2.5 px-3">Email Address</th>
                     <th className="py-2.5 px-3">Primary Shipping Address</th>
@@ -773,6 +776,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                 <tbody className="divide-y divide-gray-100 text-gray-700">
                   {customerList.map((c, idx) => (
                     <tr key={idx} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{idx + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
                           {c.name.charAt(0)}
