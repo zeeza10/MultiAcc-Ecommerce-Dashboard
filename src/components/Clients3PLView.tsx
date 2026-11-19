@@ -192,10 +192,11 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
                 <span className="text-gray-500 font-normal">SRS S13 Compliance</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {clients.map((c) => (
+                {clients.map((c, index) => (
                   <div key={c.id} className="p-4 hover:bg-gray-50 transition text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 text-xs">{index + 1}</div>
                         <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center font-bold text-indigo-700 text-xs">
                           {c.code}
                         </div>
