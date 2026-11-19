@@ -559,7 +559,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                   ))}
                   {purchaseOrders.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-gray-400">
+                      <td colSpan={9} className="py-8 text-center text-gray-400">
                         No purchase orders found.
                       </td>
                     </tr>
@@ -572,6 +572,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
       )}
 
       {/* Tab: Customer Returns */}
+      {subTab === "RETURNS" && <div className="text-xs text-gray-500">Total customer returns: <strong className="text-gray-900">{returns.length}</strong></div>}
+
       {subTab === 'RETURNS' && (
         <div className="space-y-4">
           <div className="flex justify-end gap-2"><button onClick={() => exportReportCsv('Customer Returns Report', returnReportColumns, returnReportRows)} className="px-3 py-2 rounded-md border border-gray-300 text-xs font-semibold text-gray-700">Export CSV</button><button onClick={() => exportReportPdf('Customer Returns Report', returnReportColumns, returnReportRows)} className="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-semibold">Export PDF</button></div>
@@ -580,6 +582,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
+                    <th className="py-2.5 px-3 w-12">#</th>
                     <th className="py-2.5 px-3">Return #</th>
                     <th className="py-2.5 px-3">Order Number</th>
                     <th className="py-2.5 px-3">Customer</th>
@@ -591,7 +594,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {returns.map((ret) => {
+                  {returns.map((ret, index) => {
                     const reasonDisplay = ret.reasonCode
                       ? ret.reasonCode.replace(/_/g, ' ')
                       : (ret.lines?.[0]?.notes || (ret.lines?.[0] as any)?.reason || 'Customer Return');
@@ -601,6 +604,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
                     return (
                       <tr key={ret.id} className="hover:bg-gray-50 transition">
+                        <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                         <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">{ret.returnNumber}</td>
                         <td className="py-2.5 px-3 font-semibold text-gray-900">{ret.orderNumber}</td>
                         <td className="py-2.5 px-3">{ret.customerName}</td>
