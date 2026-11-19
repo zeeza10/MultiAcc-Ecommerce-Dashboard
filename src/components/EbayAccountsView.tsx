@@ -159,6 +159,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       });
       void loadData();
     } finally {
+      window.dispatchEvent(new Event('oria-orders-updated'));
       setSyncingAccountId(null);
     }
   };
