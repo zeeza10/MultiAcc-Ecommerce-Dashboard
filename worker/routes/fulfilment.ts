@@ -3,7 +3,7 @@ import { json } from '../http';
 
 async function getDataEnvironment(auth: AuthContext, url: URL): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
   const accountId = url.searchParams.get('accountId');
-  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  if (!accountId || accountId === 'ALL') return 'PRODUCTION';
   const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
     .select('id,is_demo,environment').eq('id', accountId)
     .eq('organization_id', auth.organizationId).maybeSingle();
