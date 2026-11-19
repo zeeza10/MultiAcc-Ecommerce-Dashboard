@@ -46,8 +46,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) allTimeOrdersQuery = allTimeOrdersQuery.eq('client_3pl_id', auth.user.clientId);
 
     const [ordersResult, allTimeOrdersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult, payoutResult] = await Promise.all([
-      allTimeOrdersQuery,
       ordersQuery,
+      allTimeOrdersQuery,
       canViewInventory && !storeScoped
         ? (() => {
             let query = auth.repositoryContext.supabase.from('products').select('id,currency,low_stock_threshold,cost_price_minor') .eq('organization_id', auth.organizationId).eq('data_environment', dataEnvironment);
