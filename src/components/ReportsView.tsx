@@ -170,11 +170,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
           )}
 
+          <div className="text-xs text-gray-500">Total report records: <strong className="text-gray-900">{reportData.data?.length || 0}</strong></div>
+
           {/* Table Data */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-700 font-semibold text-[11px] uppercase tracking-wider">
                 <tr>
+                  <th className="py-2.5 px-3 w-12">#</th>
                   {reportData.columns?.map((col: string, idx: number) => (
                     <th key={idx} className="py-2.5 px-3">
                       {col}
@@ -185,7 +188,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <tbody className="divide-y divide-gray-100 text-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={reportData.columns?.length || 5} className="py-8 text-center text-gray-500">
+                    <td colSpan={(reportData.columns?.length || 5) + 1} className="py-8 text-center text-gray-500">
                       Generating report...
                     </td>
                   </tr>
@@ -198,6 +201,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 ) : (
                   reportData.data?.map((row: any, rIdx: number) => (
                     <tr key={rIdx} className="hover:bg-gray-50 transition">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{rIdx + 1}</td>
                       {Object.values(row).map((val: any, cIdx: number) => {
                         const isStatusCol = String(val) === 'BALANCED' || String(val) === 'HEALTHY' || String(val) === 'ACTIVE';
                         const isWarning = String(val).includes('WARNING') || String(val).includes('CRITICAL');
