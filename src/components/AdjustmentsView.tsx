@@ -174,7 +174,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
                 </tr>
               ) : filteredAdjustments.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500">
+                  <td colSpan={12} className="py-8 text-center text-gray-500">
                     No adjustments found.
                   </td>
                 </tr>
