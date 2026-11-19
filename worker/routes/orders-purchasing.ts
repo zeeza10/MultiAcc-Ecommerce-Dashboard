@@ -29,7 +29,10 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
       .eq('data_environment', await resolveDataEnvironment(auth, url));
     const accountId = url.searchParams.get('accountId');
     if (accountId && accountId !== 'ALL') query = query.eq('marketplace_account_id', accountId);
-    if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) query = query.eq('client_3pl_id', auth.user.clientId);
+    if (auth.user.role === 'CLIENT_USER') {
+      if (!auth.user.clientId) return json({ count: 0 });
+      query = query.eq('client_3pl_id', auth.user.clientId);
+    }
     const { count, error } = await query;
     if (error) throw new Error('Order count could not be loaded for this workspace.');
     return json({ count: count ?? 0 });
