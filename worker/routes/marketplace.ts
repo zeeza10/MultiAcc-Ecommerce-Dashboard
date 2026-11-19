@@ -843,8 +843,12 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
       let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
       try {
-        await syncSellerOrders(account, env, ordersProgress);
-        ordersOk = true;
+        const orders = await syncSellerOrders(account, env, ordersProgress);
+        ordersOk = orders.status === 'SUCCESS';
+        if (!ordersOk) {
+          lastErrorCode = 'EBAY_ORDER_SYNC_PARTIAL';
+          lastErrorMessage = `Orders sync is partial: fetched ${orders.fetched}, imported ${orders.imported}, pages pending: ${orders.pagesPending}.`;
+        }
       } catch (syncError) {
         const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
         lastErrorCode = failure.code;
