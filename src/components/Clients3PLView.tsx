@@ -123,10 +123,7 @@ export const Clients3PLView: React.FC<Clients3PLViewProps> = ({
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               3PL Logistics & Fulfilment Operations
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
-            </span>
-          </div>
+</div>
           <p className="text-xs text-gray-500">
             Multi-client inventory isolation (AT-07), Pick & Pack waves, carrier parcel manifests, and periodic storage billing.
           </p>
