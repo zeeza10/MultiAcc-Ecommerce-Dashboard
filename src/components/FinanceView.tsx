@@ -496,7 +496,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 })}
                 {expenses.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-gray-400">
+                    <td colSpan={9} className="py-8 text-center text-gray-400">
                       No operating expenses recorded.
                     </td>
                   </tr>
