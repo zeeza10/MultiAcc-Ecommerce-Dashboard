@@ -229,7 +229,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
               <h3 className="font-bold text-sm text-gray-900">No warehouses configured</h3>
               <p className="text-xs text-gray-500 mt-1">Create your first warehouse to start setting up receiving and storage locations.</p>
             </div>
-          ) : warehouses.map(warehouse => {
+          ) : warehouses.map((warehouse, index) => {
             const occupancy = warehouse.totalCapacity > 0 ? Math.round(warehouse.occupiedQty / warehouse.totalCapacity * 100) : 0;
             return (
               <div key={warehouse.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-2xs space-y-4 text-xs">
@@ -237,7 +237,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700"><Warehouse className="w-5 h-5" /></div>
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">{warehouse.name}</h3>
+                      <div className="flex items-center gap-2"><span className="text-[10px] font-mono text-gray-400">#{index + 1}</span><h3 className="text-sm font-bold text-gray-900">{warehouse.name}</h3></div>
                       <div className="text-gray-500 font-mono text-[11px]">Facility Code: {warehouse.code} · {warehouse.zones.reduce((sum, zone) => sum + zone.locationCount, 0)} locations · Capacity: {warehouse.totalCapacity.toLocaleString()} units</div>
                       <div className="text-gray-600 mt-0.5">{warehouse.address || 'No address provided'}</div>
                     </div>
