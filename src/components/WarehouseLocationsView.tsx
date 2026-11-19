@@ -215,7 +215,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
           Facilities ({warehouses.length})
         </button>
         <button onClick={() => setActiveSubTab('LOCATIONS')} className={`px-3 py-1.5 rounded-md transition ${activeSubTab === 'LOCATIONS' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}`}>
-          Location Bins & Aisles ({locations.length})
+          Location Bins & Aisles ({locations.length}) · Showing {filteredLocations.length}
         </button>
       </div>
 
@@ -277,15 +277,15 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-3">Location Code</th><th className="py-2.5 px-3">Warehouse</th><th className="py-2.5 px-3">Zone / Aisle / Shelf / Bin</th><th className="py-2.5 px-3">Type</th><th className="py-2.5 px-3">On-hand Qty</th><th className="py-2.5 px-3">Capacity</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Location Code</th><th className="py-2.5 px-3">Warehouse</th><th className="py-2.5 px-3">Zone / Aisle / Shelf / Bin</th><th className="py-2.5 px-3">Type</th><th className="py-2.5 px-3">On-hand Qty</th><th className="py-2.5 px-3">Capacity</th><th className="py-2.5 px-3">SKUs</th><th className="py-2.5 px-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-gray-700">
-                {filteredLocations.map(location => {
+                {filteredLocations.map((location, index) => {
                   const pct = location.capacityUnits > 0 ? Math.round(location.occupiedQty / location.capacityUnits * 100) : 0;
                   return (
                     <tr key={location.id} className="hover:bg-gray-50 transition">
-                      <td className="py-2.5 px-3 font-bold font-mono text-indigo-700">{location.locationCode}</td>
+                      <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td><td className="py-2.5 px-3 font-bold font-mono text-indigo-700">{location.locationCode}</td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">{location.warehouseName}</td>
                       <td className="py-2.5 px-3 text-gray-600">{[location.zone, location.aisle, location.shelf, location.bin].filter(Boolean).join(' / ') || '—'}</td>
                       <td className="py-2.5 px-3"><span className="px-1.5 py-0.5 rounded bg-gray-100 font-mono text-[10px] text-gray-700">{location.locationType}</span></td>
@@ -301,7 +301,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                     </tr>
                   );
                 })}
-                {filteredLocations.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-gray-500">No locations found. Add a warehouse location to begin.</td></tr>}
+                {filteredLocations.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-gray-500">No locations found. Add a warehouse location to begin.</td></tr>}
               </tbody>
             </table>
           </div>
