@@ -163,10 +163,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               {isClientUser ? 'Client Invoices & Payments' : 'Finance, Invoicing & Financial Ledger'}
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-              {config.activeReleasePhase === 'ALL' ? 'All Phases Active' : `${config.activeReleasePhase} Active`}
-            </span>
-          </div>
+</div>
           <p className="text-xs text-gray-500">
             {isClientUser ? 'Invoices and payments allocated to your 3PL client account.' : `Double-entry journals, VAT (${config.defaultVatRatePercent}%) compliance, payment allocations, immutable document audit, and order-level unit profitability.`}
           </p>
