@@ -165,7 +165,7 @@ export default function App() {
         if (active) setOrdersCount(0);
       });
     return () => { active = false; };
-  }, [permissions, selectedStoreId, selectedEnvironment, activeTab]);
+  }, [permissions, selectedStoreId, selectedEnvironment]);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
