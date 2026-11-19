@@ -290,13 +290,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <tbody className="divide-y divide-gray-100 text-gray-700 font-mono text-[11px]">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500 font-sans">
+                    <td colSpan={10} className="py-8 text-center text-gray-500 font-sans">
                       Loading ledger rows...
                     </td>
                   </tr>
                 ) : filteredLedger.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500 font-sans">
+                    <td colSpan={10} className="py-8 text-center text-gray-500 font-sans">
                       No stock movements recorded.
                     </td>
                   </tr>
