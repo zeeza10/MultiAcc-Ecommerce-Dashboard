@@ -30,7 +30,7 @@ type ReceiptItemRow = {
 const PAGE_SIZE = 500;
 
 async function getDataEnvironment(context: RepositoryContext, accountId?: string): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
-  if (!accountId || accountId === 'ALL') return 'SANDBOX';
+  if (!accountId || accountId === 'ALL') return 'PRODUCTION';
   const { data, error } = await context.supabase
     .from('marketplace_accounts')
     .select('is_demo,environment')
@@ -279,7 +279,7 @@ export class SupabasePurchasingRepository {
         currency,
         lead_time_days: input.leadTimeDays,
         is_active: true,
-        data_environment: input.dataEnvironment || 'SANDBOX',
+        data_environment: input.dataEnvironment || 'PRODUCTION',
       })
       .select('id,name,code,contact_name,email,phone,payment_terms_days,currency,lead_time_days,is_active')
       .single();
