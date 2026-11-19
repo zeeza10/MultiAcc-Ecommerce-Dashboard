@@ -156,7 +156,7 @@ export const api = {
       status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
       orders: {
         status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
-        fetched?: number; imported?: number; skipped?: number; exceptions?: number;
+        fetched?: number; imported?: number; skipped?: number; exceptions?: number; pagesPending?: boolean;
         error?: { code: string; message: string; stage: string; httpStatus: number | null };
       };
       inventory: {
