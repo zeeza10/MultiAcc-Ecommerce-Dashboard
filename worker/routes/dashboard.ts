@@ -38,7 +38,15 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
     if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) ordersQuery = ordersQuery.eq('client_3pl_id', auth.user.clientId);
 
     const settingsQuery = auth.repositoryContext.supabase.from('system_settings').select('active_release_phase').eq('organization_id', auth.organizationId).maybeSingle();
-    const [ordersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult, payoutResult] = await Promise.all([
+    let allTimeOrdersQuery = auth.repositoryContext.supabase.from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', auth.organizationId)
+      .eq('data_environment', dataEnvironment);
+    if (accountId && accountId !== 'ALL') allTimeOrdersQuery = allTimeOrdersQuery.eq('marketplace_account_id', accountId);
+    if (auth.user.role === 'CLIENT_USER' && auth.user.clientId) allTimeOrdersQuery = allTimeOrdersQuery.eq('client_3pl_id', auth.user.clientId);
+
+    const [ordersResult, allTimeOrdersResult, productsResult, inventoryBalances, invoiceResult, expenseResult, settingsResult, payoutResult] = await Promise.all([
+      allTimeOrdersQuery,
       ordersQuery,
       canViewInventory && !storeScoped
         ? (() => {
@@ -66,7 +74,7 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
             .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
         : Promise.resolve({ data: [], error: null }),
     ]);
-    if (ordersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error || payoutResult.error) {
+    if (ordersResult.error || allTimeOrdersResult.error || productsResult.error || invoiceResult.error || expenseResult.error || settingsResult.error || payoutResult.error) {
       throw new Error('Dashboard source records could not be loaded.');
     }
     let products = productsResult.data || [];
@@ -204,7 +212,8 @@ export async function handleDashboardRoute(path: string, request: Request, url: 
       .filter(row => String(row.status).toUpperCase() === 'OVERDUE')
       .reduce((sum, row) => sum + outstandingForCurrency(row), 0);
     return json({ kpis: {
-      totalOrders: activeOrders.length,
+      totalOrders: allTimeOrdersResult.count ?? 0,
+      periodOrders: activeOrders.length,
       pendingOrders: pendingOrders.length,
       revenueMinor,
       lowStockItems,
