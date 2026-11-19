@@ -16,6 +16,51 @@ import {
 import { api } from '../services/api';
 import { MarketplaceAccount, ExceptionItem, Product, User, SystemConfig } from '../types';
 
+const getSyncStatusLabel = (status?: string) => {
+  switch ((status || '').toUpperCase()) {
+    case 'SUCCESS':
+    case 'COMPLETED': return 'Synced successfully';
+    case 'PARTIAL': return 'Partially synced';
+    case 'FAILED': return 'Sync failed';
+    case 'RUNNING': return 'Sync in progress';
+    case 'NOT_SYNCED':
+    case 'NEVER': return 'Not synced yet';
+    default: return status || 'No sync recorded';
+  }
+};
+
+const getSyncStatusClass = (status?: string) => {
+  switch ((status || '').toUpperCase()) {
+    case 'SUCCESS':
+    case 'COMPLETED': return 'text-emerald-700';
+    case 'PARTIAL': return 'text-amber-700';
+    case 'FAILED': return 'text-rose-700';
+    case 'RUNNING': return 'text-blue-700';
+    default: return 'text-slate-600';
+  }
+};
+
+const getIntegrationGuidance = (event: any) => {
+  const code = `${event.errorCode || ''} ${event.providerCode || ''}`.toUpperCase();
+  const status = Number(event.httpStatus || 0);
+  if (status === 401 || status === 403 || /TOKEN|OAUTH|AUTHORIZATION|INVALID_GRANT/.test(code)) {
+    return 'eBay authorization may have expired or lacks the required permission. Reconnect this seller account, then retry the sync.';
+  }
+  if (status === 429 || /RATE.?LIMIT/.test(code)) {
+    return 'eBay is limiting requests. Wait for the next scheduled attempt before retrying.';
+  }
+  if (status >= 500) {
+    return 'The eBay service returned a temporary server error. Keep the account connected and retry after a short delay.';
+  }
+  if (/SKU|PRODUCT|MAPPING/.test(code)) {
+    return 'An eBay SKU could not be matched to the internal catalog. Review the Unmapped SKU Exception Queue; do not create a guessed mapping.';
+  }
+  if (event.retryable) {
+    return 'The operation can be retried. Check the stage and provider response above, then use Retry Orders + Inventory.';
+  }
+  return 'Review the API operation, stage, error code and provider message above. If the cause is not clear, preserve this event for technical investigation before retrying.';
+};
+
 interface EbayAccountsViewProps {
   currentUser: User;
   config: SystemConfig;
@@ -393,10 +438,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       <span>Auto Polling Schedule:</span>
                       <span className="font-medium text-gray-900">Every {acc.autoSyncIntervalMinutes} minutes</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>Last Polling Result:</span>
-                      <span className="font-medium text-indigo-700">{acc.lastSyncStatus}</span>
+                    <div className="flex justify-between text-gray-600 gap-3">
+                      <span>Last Sync Result:</span>
+                      <span className={`font-semibold text-right ${getSyncStatusClass(acc.lastSyncStatus)}`}>{getSyncStatusLabel(acc.lastSyncStatus)}</span>
                     </div>
+                    <p className="text-[10px] text-slate-500">“Connected” confirms a saved eBay authorization. A successful API sync is tracked separately in this result and the sync history below.</p>
                     {acc.lastSyncMessage && (
                       <div className="text-[11px] text-gray-500 pt-1 border-t border-gray-200">
                         {acc.lastSyncMessage}
@@ -546,6 +592,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                           <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${event.severity === 'ERROR' || event.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>{event.severity}</span>
                         </div>
                         <p className="mt-1 break-words text-xs text-slate-700">{event.message}</p>
+                        <p className="mt-1 text-[11px] text-indigo-800"><strong>Recommended next step:</strong> {getIntegrationGuidance(event)}</p>
                       </div>
                       <span className="shrink-0 text-[11px] text-slate-500">{event.createdAt ? new Date(event.createdAt).toLocaleString() : '—'}</span>
                     </div>
