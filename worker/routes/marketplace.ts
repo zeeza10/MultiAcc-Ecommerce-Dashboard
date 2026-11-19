@@ -838,13 +838,79 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         || !isEnvironment(account.environment)) {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
-      await syncSellerOrders(account, env);
-      await syncSellerInventory(account, env);
-      await admin.from('marketplace_sync_jobs').update({
-        status: 'SUCCEEDED', completed_at: new Date().toISOString(),
-        locked_until: null, last_error_code: null, last_error_message: null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', job.id);
+      const ordersProgress = createEbaySyncProgress();
+      let ordersOk = false;
+      let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
+      let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
+      try {
+        await syncSellerOrders(account, env, ordersProgress);
+        ordersOk = true;
+      } catch (syncError) {
+        const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
+        lastErrorCode = failure.code;
+        lastErrorMessage = `Orders failed at ${ordersProgress.stage}: ${failure.message}`;
+        if (!ordersProgress.runCreated) {
+          await admin.from('marketplace_integration_events').insert({
+            organization_id: account.organization_id, marketplace_account_id: account.id,
+            event_type: 'ORDER_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+            message: failure.message,
+            metadata: { stage: ordersProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: account.environment },
+          });
+        }
+      }
+
+      const inventoryProgress = createEbaySyncProgress();
+      let inventoryOk = false;
+      try {
+        const inventory = await syncSellerInventory(account, env, inventoryProgress);
+        inventoryOk = !inventory.pagesPending;
+        await admin.from('marketplace_integration_events').insert({
+          organization_id: account.organization_id, marketplace_account_id: account.id,
+          event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending ? 'WARNING' : 'INFO',
+          message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers.`,
+          metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, pagesPending: inventory.pagesPending },
+        });
+        if (inventory.pagesPending) {
+          lastErrorCode = 'EBAY_INVENTORY_SYNC_PARTIAL';
+          lastErrorMessage = 'Inventory sync has additional pages pending.';
+        }
+      } catch (syncError) {
+        const failure = getEbaySyncFailure(syncError, 'EBAY_INVENTORY_SYNC_FAILED');
+        lastErrorCode = failure.code;
+        lastErrorMessage = `Inventory failed at ${inventoryProgress.stage}: ${failure.message}`;
+        await admin.from('marketplace_integration_events').insert({
+          organization_id: account.organization_id, marketplace_account_id: account.id,
+          event_type: 'INVENTORY_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+          message: failure.message,
+          metadata: { stage: inventoryProgress.stage, httpStatus: failure.httpStatus, providerCode: failure.providerCode,
+            environment: account.environment,
+            endpoint: inventoryProgress.stage === 'EBAY_OFFERS_API' ? 'sell/inventory/v1/offer' : 'sell/inventory/v1/inventory_item',
+            fetched: inventoryProgress.fetched, offersFetched: inventoryProgress.offersFetched },
+        });
+      }
+
+      const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk ? 'PARTIAL' : 'FAILED');
+      await admin.from('marketplace_accounts').update({
+        last_sync_status: overallStatus,
+        last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
+        ...(ordersOk || inventoryOk ? { last_sync_at: new Date().toISOString() } : {}),
+      }).eq('id', account.id).eq('organization_id', account.organization_id);
+
+      if (overallStatus === 'SUCCESS') {
+        await admin.from('marketplace_sync_jobs').update({
+          status: 'SUCCEEDED', completed_at: new Date().toISOString(),
+          locked_until: null, last_error_code: null, last_error_message: null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', job.id);
+      } else {
+        await admin.from('marketplace_sync_jobs').update({
+          status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+          scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
+          locked_until: null, last_error_code: lastErrorCode, last_error_message: lastErrorMessage,
+          updated_at: new Date().toISOString(),
+        }).eq('id', job.id);
+      }
+      continue;
     } catch {
       await admin.from('marketplace_sync_jobs').update({
         status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
