@@ -309,6 +309,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
                   <tr>
+                    <th className="py-2.5 px-3 w-12">#</th>
                     <th className="py-2.5 px-3">Payout ID</th>
                     <th className="py-2.5 px-3">Store Account</th>
                     <th className="py-2.5 px-3">Date Disbursed</th>
@@ -321,7 +322,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {payouts.map((p) => (
+                  {payouts.map((p, index) => (
                     <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {p.payoutId}
@@ -394,7 +395,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
                   <tr>
-                    <th className="py-2.5 px-3">Period</th>
+                    <th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Period</th>
                     <th className="py-2.5 px-3">Store Account</th>
                     <th className="py-2.5 px-3 text-right">Expected Payout</th>
                     <th className="py-2.5 px-3 text-right">Actual Payout</th>
@@ -405,9 +406,9 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {reconciliations.map((r) => (
+                  {reconciliations.map((r, index) => (
                     <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{r.period}</td>
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td><td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{r.period}</td>
                       <td className="py-3 px-3 font-medium text-slate-900 dark:text-slate-100">{r.accountName}</td>
                       <td className="py-3 px-3 text-right font-mono font-medium">
                         {formatMoney(r.expectedPayoutMinor, currency)}
@@ -455,12 +456,12 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-semibold uppercase text-[11px]">
-                  <tr><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3">Account Description</th><th className="py-2.5 px-3 text-right">Debit ({currency})</th><th className="py-2.5 px-3 text-right">Credit ({currency})</th><th className="py-2.5 px-3">Transaction Source</th></tr>
+                  <tr><th className="py-2.5 px-3 w-12">#</th><th className="py-2.5 px-3">Account Code</th><th className="py-2.5 px-3">Account Description</th><th className="py-2.5 px-3 text-right">Debit ({currency})</th><th className="py-2.5 px-3 text-right">Credit ({currency})</th><th className="py-2.5 px-3">Transaction Source</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {ledgerByAccount.map((entry) => (
+                  {ledgerByAccount.map((entry, index) => (
                     <tr key={entry.accountId}>
-                      <td className="py-3 px-3 font-mono font-semibold">{entry.accountId}</td>
+                      <td className="py-3 px-3 text-slate-400 font-mono tabular-nums">{index + 1}</td><td className="py-3 px-3 font-mono font-semibold">{entry.accountId}</td>
                       <td className="py-3 px-3">{entry.accountName}</td>
                       <td className="py-3 px-3 text-right font-mono">{formatMoney(entry.debitMinor, currency)}</td>
                       <td className="py-3 px-3 text-right font-mono">{formatMoney(entry.creditMinor, currency)}</td>
@@ -468,7 +469,7 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
                     </tr>
                   ))}
                   <tr className="bg-slate-50 dark:bg-slate-800/40 font-bold">
-                    <td colSpan={2} className="py-3 px-3 text-right">Trial Balance Total:</td>
+                    <td colSpan={3} className="py-3 px-3 text-right">Trial Balance Total:</td>
                     <td className="py-3 px-3 text-right font-mono">{formatMoney(ledgerTotals.debitMinor, currency)}</td>
                     <td className="py-3 px-3 text-right font-mono">{formatMoney(ledgerTotals.creditMinor, currency)}</td>
                     <td className={ledgerTotals.debitMinor === ledgerTotals.creditMinor ? "py-3 px-3 text-emerald-600" : "py-3 px-3 text-rose-600"}>{ledgerTotals.debitMinor === ledgerTotals.creditMinor ? 'BALANCED' : 'OUT OF BALANCE'}</td>
