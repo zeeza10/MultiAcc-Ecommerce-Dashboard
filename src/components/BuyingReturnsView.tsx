@@ -643,7 +643,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
                   })}
                   {returns.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-gray-400">
+                      <td colSpan={9} className="py-8 text-center text-gray-400">
                         No customer returns recorded.
                       </td>
                     </tr>
