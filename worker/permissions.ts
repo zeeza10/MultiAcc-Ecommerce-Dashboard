@@ -4,6 +4,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/integration/events') return 'marketplace.view';
   if (method === 'POST' && path === '/ebay/accounts') return 'marketplace.manage';
+  if (method === 'DELETE' && /^\/ebay\/accounts\/[^/]+$/.test(path)) return null;
   if (method === 'GET' && path === '/ebay/integration/config') return 'settings.manage';
   if (method === 'POST' && path === '/ebay/integration/config') return 'settings.manage';
   if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/connect$/.test(path)) return 'marketplace.manage';
