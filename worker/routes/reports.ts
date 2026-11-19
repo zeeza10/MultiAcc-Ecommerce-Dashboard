@@ -23,7 +23,7 @@ async function rows(auth:AuthContext, table:string, columns:string, dateColumn?:
 const result=(id:string,summary:Record<string,unknown>,columns:string[],data:Record<string,unknown>[])=>({id,name:DEFINITIONS[id].name,phase:DEFINITIONS[id].phase,summary,columns,data});
 
 async function getDataEnvironment(auth: AuthContext, accountId: string | null): Promise<'DEMO' | 'SANDBOX' | 'PRODUCTION'> {
- if (!accountId || accountId === 'ALL') return 'SANDBOX';
+ if (!accountId || accountId === 'ALL') return 'PRODUCTION';
  const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
   .select('id,is_demo,environment').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
  if (error) throw new Error('The selected marketplace account could not be verified.');
