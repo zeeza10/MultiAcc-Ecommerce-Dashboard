@@ -298,7 +298,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 <span className="text-xs font-semibold text-slate-900">Orders</span>
                 <span className={`text-[10px] font-bold ${syncResult.orders?.status === 'SUCCESS' ? 'text-emerald-700' : syncResult.orders?.status === 'PARTIAL' ? 'text-amber-700' : 'text-rose-700'}`}>{syncResult.orders?.status || 'NOT RUN'}</span>
               </div>
-              <p className="text-[11px] text-slate-600">Fetched: {syncResult.orders?.fetched ?? 0} · Imported: {syncResult.orders?.imported ?? 0} · Duplicates: {syncResult.orders?.skipped ?? 0} · SKU exceptions: {syncResult.orders?.exceptions ?? 0}</p>
+              <p className="text-[11px] text-slate-600">Fetched: {syncResult.orders?.fetched ?? 0} · Imported: {syncResult.orders?.imported ?? 0} · Duplicates: {syncResult.orders?.skipped ?? 0} · SKU exceptions: {syncResult.orders?.exceptions ?? 0}{syncResult.orders?.pagesPending ? ' · More order pages pending' : ''}</p>
               {syncResult.orders?.error && <p className="text-[11px] text-rose-700 break-words">Stage: {syncResult.orders.error.stage}{syncResult.orders.error.httpStatus ? ` · HTTP ${syncResult.orders.error.httpStatus}` : ''} · {syncResult.orders.error.code}: {syncResult.orders.error.message}</p>}
             </div>
             <div className="rounded-md border border-slate-200 p-3 space-y-1">
