@@ -238,13 +238,13 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
     throw error;
   }
 }
-async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number }> {
+async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number; status: 'SUCCESS' | 'PARTIAL'; pagesPending: boolean }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
   progress.stage = 'ORDERS_CHECKPOINT_READ';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
     .select('cursor_state,watermark_at,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'ORDERS').maybeSingle();
-  if (checkpointError) throw new Error('The eBay order sync checkpoint could not be loaded.');
+  if (checkpointError) throw new Error(checkpointError.message || 'The eBay order sync checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object' ? checkpoint.cursor_state as Record<string, unknown> : {};
   // Prefer the in-progress cursor; otherwise resume from the successful watermark
   // with a small overlap. Normalize every path before calling eBay because the
@@ -267,7 +267,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
     admin.from('marketplace_sku_mappings').select('external_sku,product_id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id),
     admin.from('products').select('id,sku,name').eq('organization_id', account.organization_id).eq('data_environment', dataEnvironment),
   ]);
-  if (mappingsResult.error || productsResult.error) throw new Error('The internal SKU catalog could not be loaded for eBay order matching.');
+  if (mappingsResult.error || productsResult.error) throw new Error(mappingsResult.error?.message || productsResult.error?.message || 'The internal SKU catalog could not be loaded for eBay order matching.');
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
   const productById = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
   const productBySku = new Map((productsResult.data || []).map((row: any) => [row.sku, row]));
@@ -329,21 +329,21 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         last_attempt_at: new Date().toISOString(), last_successful_at: hasMore ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
         consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'marketplace_account_id,resource_type' });
-      if (checkpointSaveError) throw new Error('The eBay order sync checkpoint could not be saved.');
+      if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay order sync checkpoint could not be saved.');
       if (!orders.length || !hasMore || pages >= 10) break;
     } while (true);
     progress.stage = 'ORDERS_FINALIZE';
     const finished = new Date().toISOString(), status = exceptions || hasMore ? 'PARTIAL' : 'COMPLETED';
     await admin.from('marketplace_sync_runs').update({ completed_at: finished, status, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: exceptions || hasMore ? 'PARTIAL' : 'SUCCESS', last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
-    return { imported, skipped, exceptions, fetched };
+    return { imported, skipped, exceptions, fetched, status, pagesPending: hasMore };
   } catch (error) {
     const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
     const partial = fetched > 0 || imported > 0 || skipped > 0;
     await admin.from('marketplace_sync_runs').update({
       completed_at: new Date().toISOString(), status: partial ? 'PARTIAL' : 'FAILED',
       orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions,
-      last_error_code: failure.code, last_error_message: ${progress.stage}: ${failure.message},
+      last_error_code: failure.code, last_error_message: `${progress.stage}: ${failure.message}`,
       retryable: true, attempt_count: 1,
       log_message: `Orders sync stopped at ${progress.stage}. Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`,
     }).eq('id', run.id);
@@ -372,7 +372,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
   progress.stage = 'INVENTORY_CHECKPOINT_READ';
   const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
     .select('cursor_state,last_successful_at').eq('marketplace_account_id', account.id).eq('resource_type', 'INVENTORY').maybeSingle();
-  if (checkpointError) throw new Error('The eBay inventory checkpoint could not be loaded.');
+  if (checkpointError) throw new Error(checkpointError.message || 'The eBay inventory checkpoint could not be loaded.');
   const savedCursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
     ? checkpoint.cursor_state as Record<string, unknown> : {};
   let offset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
@@ -436,7 +436,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     progress.stage = 'INVENTORY_SNAPSHOT_WRITE';
     if (rows.length) {
       const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
-      if (saveError) throw new Error('eBay inventory and listing snapshots could not be saved.');
+      if (saveError) throw new Error(saveError.message || 'eBay inventory and listing snapshots could not be saved.');
     }
     offset += items.length;
     const total = Number(page.total ?? offset);
@@ -454,7 +454,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
       last_error_code: null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'marketplace_account_id,resource_type' });
-    if (checkpointSaveError) throw new Error('The eBay inventory checkpoint could not be saved.');
+    if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay inventory checkpoint could not be saved.');
     if (!items.length || !hasMore || pages >= 5) break;
   } while (true);
   progress.stage = 'INVENTORY_COMPLETED';
@@ -628,7 +628,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     let ordersResult: Record<string, unknown>;
     try {
       const orders = await syncSellerOrders(account, env, ordersProgress);
-      ordersResult = { status: 'SUCCESS', ...orders };
+      ordersResult = { ...orders };
     } catch (error) {
       const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
       if (!ordersProgress.runCreated) {
