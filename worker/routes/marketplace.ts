@@ -588,7 +588,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       linkedRecords: linked,
     }, 409);
 
-    const { error: deleteError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+    const { error: deleteError } = await admin.from('marketplace_accounts')
       .delete().eq('id', account.id).eq('organization_id', auth.organizationId);
     if (deleteError) return json({ error: 'Marketplace account could not be deleted safely. No related business data was removed.' }, 409);
     return json({ success: true, deletedAccountId: account.id });
