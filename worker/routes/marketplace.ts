@@ -441,7 +441,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     endpoint.searchParams.set('limit', '25');
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`eBay inventory API returned HTTP ${response.status}.`);
+    if (!response.ok) throw await readEbayOrdersApiError(response);
     const page = await response.json() as { inventoryItems?: any[]; total?: number };
     const items = Array.isArray(page.inventoryItems) ? page.inventoryItems : [];
     fetched += items.length; progress.fetched = fetched;
@@ -450,7 +450,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     // Inventory items contain product details and base stock. Offers contain the
     // actual marketplace listing state, listing ID, price and offer-level quantity.
     // Fetch offers in small concurrent batches to respect eBay API limits.
-    const offerResults: Array<{ sku: string; offers: any[]; error?: string }> = [];
+    const offerResults: Array<{ sku: string; offers: any[]; error?: string; httpStatus?: number | null; providerCode?: string | null }> = [];
     const skus = items.map((item: any) => String(item.sku || '').trim()).filter((sku: string) => sku && sku.length <= 50);
     progress.stage = 'EBAY_OFFERS_API';
     for (let index = 0; index < skus.length; index += 5) {
@@ -464,11 +464,12 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
           offersUrl.searchParams.set('offset', '0');
           const offersResponse = await fetch(offersUrl, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
           if (offersResponse.status === 404) return { sku, offers: [] as any[] };
-          if (!offersResponse.ok) throw new Error(`eBay offers API returned HTTP ${offersResponse.status} for SKU ${sku}.`);
+          if (!offersResponse.ok) throw await readEbayOrdersApiError(offersResponse);
           const offersPayload = await offersResponse.json() as { offers?: any[] };
           return { sku, offers: Array.isArray(offersPayload.offers) ? offersPayload.offers : [] };
         } catch (error) {
-          return { sku, offers: [] as any[], error: error instanceof Error ? error.message : 'Offer details could not be synchronized.' };
+          const failure = getEbaySyncFailure(error, 'EBAY_OFFERS_API_FAILED');
+          return { sku, offers: [] as any[], error: failure.message, httpStatus: failure.httpStatus, providerCode: failure.providerCode };
         }
       }));
       offerResults.push(...batchResults);
@@ -504,7 +505,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
         severity: 'WARNING',
         error_code: 'EBAY_OFFERS_API_FAILED',
         message: entry.error || `Offer details could not be synchronized for SKU ${entry.sku}.`,
-        metadata: { sku: entry.sku, stage: 'EBAY_OFFERS_API', endpoint: 'sell/inventory/v1/offer', environment: account.environment },
+        metadata: { sku: entry.sku, stage: 'EBAY_OFFERS_API', endpoint: 'sell/inventory/v1/offer', environment: account.environment, httpStatus: entry.httpStatus ?? null, providerCode: entry.providerCode ?? null },
       })));
       if (eventError) throw new Error('Some listing offer failures could not be recorded for review.');
     }
@@ -1066,13 +1067,22 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         }).eq('id', job.id);
       }
       continue;
-    } catch {
+    } catch (jobError) {
+      const failure = getEbaySyncFailure(jobError, 'SCHEDULED_SYNC_FAILED');
+      const failedAt = new Date().toISOString();
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: job.organization_id, marketplace_account_id: job.marketplace_account_id,
+        event_type: 'SCHEDULED_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+        message: failure.message,
+        metadata: { stage: 'SCHEDULED_JOB_FINALIZE', httpStatus: failure.httpStatus, providerCode: failure.providerCode, attempt: job.attempt_count, environment: job.data_environment || null },
+      });
       await admin.from('marketplace_sync_jobs').update({
         status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+        completed_at: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? failedAt : null,
         scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
-        locked_until: null, last_error_code: 'SCHEDULED_SYNC_FAILED',
-        last_error_message: 'Scheduled eBay synchronization failed. Retry is queued when eligible.',
-        updated_at: new Date().toISOString(),
+        locked_until: null, last_error_code: failure.code,
+        last_error_message: `${failure.httpStatus ? `HTTP ${failure.httpStatus}: ` : ''}${failure.message}`,
+        updated_at: failedAt,
       }).eq('id', job.id);
     }
   }
