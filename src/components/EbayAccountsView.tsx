@@ -901,8 +901,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                           className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
                         >
                           {expandedListingsAccountId === acc.id
-                            ? 'Hide synced listings'
-                            : `View synced listings (${listingTotals[acc.id] ?? 'load'})`}
+                            ? 'Hide Sync Listings'
+                            : `View Sync Listings (${listingTotals[acc.id] ?? 'Load'})`}
                         </button>
 
                         {expandedListingsAccountId === acc.id && (
@@ -914,7 +914,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             ) : (
                               <>
                                 <div className="text-[11px] text-slate-500 mb-2">
-                                  Total listings: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
+                                  Total synced inventory records: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
                                 </div>
 
                                 <table className="w-full text-left text-[11px]">
@@ -923,7 +923,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                       <th className="p-2">#</th>
                                       <th className="p-2">SKU</th>
                                       <th className="p-2">Product</th>
-                                      <th className="p-2">Listing</th>
+                                      <th className="p-2">Sync Status</th>
+                                      <th className="p-2">eBay Listing Status</th>
                                       <th className="p-2">Inventory Qty</th>
                                       <th className="p-2">Offer Qty / Price</th>
                                     </tr>
@@ -935,7 +936,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                         <td className="p-2">{listingIndex + 1}</td>
                                         <td className="p-2 font-mono">{listing.sku}</td>
                                         <td className="p-2 min-w-40">{listing.title || '—'}</td>
-                                        <td className="p-2">{listing.listingStatus}</td>
+                                        <td className="p-2"><span className="rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">Synced</span></td>
+                                        <td className="p-2">{listing.listingStatus === 'NOT_LISTED' ? 'Inventory synced — no active eBay offer' : listing.listingStatus}</td>
                                         <td className="p-2 tabular-nums">{listing.inventoryQuantity ?? '—'}</td>
                                         <td className="p-2">
                                           {listing.offers?.length
@@ -954,8 +956,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
                                     {!(listingSnapshots[acc.id] || []).length && (
                                       <tr>
-                                        <td colSpan={6} className="p-3 text-center text-slate-500">
-                                          No synced inventory yet. Use “Sync Orders + Inventory” after connecting.
+                                        <td colSpan={7} className="p-3 text-center text-slate-500">
+                                          No listing snapshots are available for this account yet. Last account status: {getSyncStatusLabel(acc.lastSyncStatus)}. {acc.lastSyncMessage || 'Run Sync Orders + Inventory to retrieve the seller inventory.'}
                                         </td>
                                       </tr>
                                     )}
