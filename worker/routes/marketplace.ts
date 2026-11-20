@@ -673,8 +673,25 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    const { data: skuFailureEvents, error: skuEventsError } = await admin.from('marketplace_integration_events')
+      .select('message,metadata,created_at')
+      .eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', account.id)
+      .eq('event_type', 'INVENTORY_SKU_SYNC_FAILED')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (skuEventsError) throw new Error('Per-SKU listing sync results could not be loaded.');
+    const latestSkuFailure = new Map<string, any>();
+    for (const event of skuFailureEvents || []) {
+      const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata as Record<string, unknown> : {};
+      const sku = typeof metadata.sku === 'string' ? metadata.sku : '';
+      if (sku && !latestSkuFailure.has(sku)) latestSkuFailure.set(sku, event);
+    }
     return json({
-      listings: (data || []).map((row: any) => ({
+      listings: (data || []).map((row: any) => {
+        const failure = latestSkuFailure.get(row.external_sku);
+        const isFailed = Boolean(failure && new Date(failure.created_at).getTime() > new Date(row.synced_at).getTime());
+        return ({
         sku: row.external_sku,
         title: row.inventory_item?.product?.title || '',
         description: row.inventory_item?.product?.description || '',
@@ -685,8 +702,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         offers: Array.isArray(row.offers) ? row.offers : [],
         sourceUpdatedAt: row.source_updated_at,
         syncedAt: row.synced_at,
-        syncStatus: 'SYNCED',
-      })),
+        syncStatus: isFailed ? 'PARTIAL' : 'SYNCED',
+        syncError: isFailed ? failure.message : null,
+      }); }),
       total: count || 0,
       limit,
       offset,
