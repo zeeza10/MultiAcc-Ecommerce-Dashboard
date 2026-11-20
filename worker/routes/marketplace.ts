@@ -581,6 +581,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           errorCode: event.error_code,
           message: event.message,
           apiName: typeof metadata.endpoint === 'string' ? metadata.endpoint : event.event_type,
+          stage: typeof metadata.stage === 'string' ? metadata.stage : null,
           httpStatus: metadata.httpStatus !== null && metadata.httpStatus !== undefined && Number.isFinite(Number(metadata.httpStatus)) ? Number(metadata.httpStatus) : null,
           providerCode: typeof metadata.providerCode === 'string' ? metadata.providerCode : null,
           createdAt: event.created_at,
