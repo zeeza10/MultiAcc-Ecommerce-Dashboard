@@ -50,6 +50,8 @@ type OrderHistoryRow = {
   changed_by: string | null;
   note: string | null;
   changed_at: string;
+  source: 'EBAY' | 'WORKSPACE' | string;
+  source_timestamp: string | null;
 };
 
 const PAGE_SIZE = 500;
@@ -113,6 +115,9 @@ const mapOrder = (row: OrderRow, lines: OrderLine[], includeRawPayload = false):
       country: String(address.country || address.country_code || ''),
     },
     status: row.status,
+    marketplaceStatus: typeof row.raw_payload?.orderFulfillmentStatus === 'string' ? row.raw_payload.orderFulfillmentStatus : undefined,
+    marketplacePaymentStatus: typeof row.raw_payload?.orderPaymentStatus === 'string' ? row.raw_payload.orderPaymentStatus : undefined,
+    marketplaceLastModifiedAt: typeof row.raw_payload?.lastModifiedDate === 'string' ? row.raw_payload.lastModifiedDate : undefined,
     paymentState: row.payment_state,
     totalMinor: Number(row.total_minor),
     taxMinor: Number(row.tax_minor),
@@ -257,7 +262,7 @@ export class SupabaseOrderRepository implements OrderRepository {
       this.readItems([row.id]),
       this.context.supabase
         .from('order_status_history')
-        .select('id,order_id,from_status,to_status,changed_by,note,changed_at')
+        .select('id,order_id,from_status,to_status,changed_by,note,changed_at,source,source_timestamp')
         .eq('organization_id', this.context.organizationId)
         .eq('order_id', row.id)
         .order('changed_at', { ascending: true }),
@@ -272,6 +277,8 @@ export class SupabaseOrderRepository implements OrderRepository {
       toStatus: history.to_status,
       changedBy: history.changed_by || '',
       note: history.note || undefined,
+      source: history.source || 'WORKSPACE',
+      sourceTimestamp: history.source_timestamp || undefined,
       timestamp: history.changed_at,
     }));
     return { order: mapOrder(row, lines, options.includeRawPayload === true), histories };

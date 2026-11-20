@@ -142,6 +142,10 @@ export interface Order {
     country: string;
   };
   status: OrderStatus;
+  /** Latest raw fulfillment status received from the marketplace; distinct from the workspace workflow status. */
+  marketplaceStatus?: string;
+  marketplacePaymentStatus?: string;
+  marketplaceLastModifiedAt?: string;
   paymentState: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED';
   totalMinor: number;
   taxMinor: number;

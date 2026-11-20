@@ -341,7 +341,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           {order.lines.map((l) => `${l.quantity}x ${l.sku}`).join(', ')}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">{getStatusBadge(order.status)}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex flex-col items-start gap-1">
+                          {getStatusBadge(order.status)}
+                          {order.salesSource === 'EBAY' && order.marketplaceStatus && (
+                            <span className="text-[10px] font-medium text-blue-700">eBay: {order.marketplaceStatus}</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
                         {formatMoney(order.totalMinor, order.currency || config.baseCurrency)}
                       </td>
@@ -386,6 +393,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               <div>
                 <div className="flex items-center space-x-2">
                   <h2 className="text-lg font-bold text-gray-900">{selectedOrder.orderNumber}</h2>
+                  <span className="text-[10px] font-semibold text-gray-500">Workspace:</span>
                   {getStatusBadge(selectedOrder.status)}
                   <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-800 font-mono font-medium">
                     {selectedOrder.salesSource}
@@ -423,6 +431,24 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               <div className="mx-5 mt-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <span>{actionError}</span>
+              </div>
+            )}
+
+            {/* Marketplace status is provider data; workspace status remains the local operational workflow. */}
+            {selectedOrder.salesSource === 'EBAY' && (
+              <div className="mx-5 mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                  <div className="font-semibold text-blue-900 mb-1">Current eBay Fulfillment Status</div>
+                  <div className="text-sm font-bold text-blue-950">{selectedOrder.marketplaceStatus || 'Not provided by eBay'}</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="font-semibold text-gray-600 mb-1">eBay Payment Status</div>
+                  <div className="text-sm font-bold text-gray-900">{selectedOrder.marketplacePaymentStatus || 'Not provided by eBay'}</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="font-semibold text-gray-600 mb-1">eBay Order Last Modified</div>
+                  <div className="text-sm font-bold text-gray-900">{selectedOrder.marketplaceLastModifiedAt ? new Date(selectedOrder.marketplaceLastModifiedAt).toLocaleString() : 'Not provided by eBay'}</div>
+                </div>
               </div>
             )}
 
@@ -594,18 +620,20 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   Order Status Transition History
                 </h3>
                 <div className="bg-slate-50 border border-gray-200 rounded-lg p-3 space-y-2">
-                  {orderHistories.map((h, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs border-b border-gray-200/60 pb-1.5 last:border-0 last:pb-0">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                        <span className="font-semibold text-gray-900">
-                          {h.fromStatus ? `${h.fromStatus} → ` : ''}{h.toStatus}
-                        </span>
-                        <span className="text-gray-500">• {h.note}</span>
+                  {orderHistories.length === 0 ? (
+                    <p className="text-xs text-gray-500">{selectedOrder.salesSource === 'EBAY' ? 'No saved status history is available yet. The current eBay status above is taken from the latest status data already stored; history will be recorded when a future eBay import observes a status snapshot or change.' : 'No saved status history is available for this order yet.'}</p>
+                  ) : orderHistories.map((h, i) => (
+                    <div key={h.id || i} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 text-xs border-b border-gray-200/60 pb-2 last:border-0 last:pb-0">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${h.source === 'EBAY' ? 'bg-blue-600' : 'bg-indigo-600'}`}></span>
+                          <span className="font-semibold text-gray-900">{h.fromStatus ? `${h.fromStatus} → ` : 'Initial snapshot: '}{h.toStatus}</span>
+                          <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">{h.source === 'EBAY' ? 'eBay' : 'Workspace'}</span>
+                        </div>
+                        {h.note && <p className="mt-1 text-gray-500">{h.note}</p>}
+                        {h.sourceTimestamp && <p className="mt-1 text-[11px] text-blue-700">eBay last-modified time: {new Date(h.sourceTimestamp).toLocaleString()} (not guaranteed to be the exact status-change time)</p>}
                       </div>
-                      <div className="text-[11px] text-gray-400 font-mono">
-                        {h.timestamp.replace('T', ' ').split('.')[0]} ({h.changedBy})
-                      </div>
+                      <div className="shrink-0 text-[11px] text-gray-400 font-mono">Recorded: {h.timestamp ? new Date(h.timestamp).toLocaleString() : 'Unknown'}{h.changedBy ? ` • ${h.changedBy}` : ''}</div>
                     </div>
                   ))}
                 </div>
