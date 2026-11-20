@@ -253,7 +253,7 @@ CREATE POLICY web_push_subscriptions_insert_self
 DROP POLICY IF EXISTS web_push_subscriptions_delete_self ON public.web_push_subscriptions;
 CREATE POLICY web_push_subscriptions_delete_self
   ON public.web_push_subscriptions FOR DELETE TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
 
 COMMENT ON TABLE public.web_push_subscriptions IS
   'Per-user browser push endpoints. Subscription keys are only readable by their owning authenticated user and service_role.';
