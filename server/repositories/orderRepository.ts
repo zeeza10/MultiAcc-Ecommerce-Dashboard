@@ -50,8 +50,8 @@ type OrderHistoryRow = {
   changed_by: string | null;
   note: string | null;
   changed_at: string;
-  source: 'EBAY' | 'WORKSPACE' | string;
-  source_timestamp: string | null;
+  source?: 'EBAY' | 'WORKSPACE' | string;
+  source_timestamp?: string | null;
 };
 
 const PAGE_SIZE = 500;
