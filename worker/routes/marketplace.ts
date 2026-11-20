@@ -750,7 +750,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       const eventAdmin = createServiceClient(env);
       await eventAdmin.from('marketplace_integration_events').insert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
-        event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending ? 'WARNING' : 'INFO',
+        event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending || inventory.failedSkus.length ? 'WARNING' : 'INFO',
         message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers; ${inventory.failedSkus.length} SKU offer lookups failed.`,
         metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, failedSkus: inventory.failedSkus, pagesPending: inventory.pagesPending },
       });
