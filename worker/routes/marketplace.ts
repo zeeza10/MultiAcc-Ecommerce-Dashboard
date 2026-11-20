@@ -668,6 +668,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         offers: Array.isArray(row.offers) ? row.offers : [],
         sourceUpdatedAt: row.source_updated_at,
         syncedAt: row.synced_at,
+        syncStatus: 'SYNCED',
       })),
       total: count || 0,
       limit,
