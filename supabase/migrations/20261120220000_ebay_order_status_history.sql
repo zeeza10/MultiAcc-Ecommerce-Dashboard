@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
 ALTER TABLE public.web_push_subscriptions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.web_push_subscriptions FROM PUBLIC, anon;
 GRANT SELECT, INSERT, DELETE ON public.web_push_subscriptions TO authenticated;
+GRANT ALL ON public.web_push_subscriptions TO service_role;
 
 DROP POLICY IF EXISTS web_push_subscriptions_select_self ON public.web_push_subscriptions;
 CREATE POLICY web_push_subscriptions_select_self
@@ -256,4 +257,4 @@ CREATE POLICY web_push_subscriptions_delete_self
   USING (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
 
 COMMENT ON TABLE public.web_push_subscriptions IS
-  'Per-user browser push endpoints. Subscription keys are only readable by their owning authenticated user and service_role.';
+  'Per-user browser push endpoints protected by organization permission and owner-only RLS for authenticated users; service_role sends background notifications.';
