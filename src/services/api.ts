@@ -163,7 +163,7 @@ export const api = {
       };
       inventory: {
         status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
-        fetched?: number; offersFetched?: number; pagesPending?: boolean;
+        fetched?: number; offersFetched?: number; pagesPending?: boolean; failedSkus?: string[];
         error?: { code: string; message: string; stage: string; httpStatus: number | null };
       };
       imported: number; skipped: number; exceptions: number; fetched: number;
