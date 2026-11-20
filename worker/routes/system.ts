@@ -95,7 +95,7 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
   }
 
   if (path === '/notifications/push/public-key' && request.method === 'GET') {
-    return json({ enabled: Boolean(env.VAPID_PUBLIC_KEY), publicKey: env.VAPID_PUBLIC_KEY || null });
+    return json({ enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT), publicKey: env.VAPID_PUBLIC_KEY || null });
   }
 
   if (path === '/notifications/push/subscriptions' && request.method === 'POST') {
