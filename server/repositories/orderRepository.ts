@@ -50,8 +50,8 @@ type OrderHistoryRow = {
   changed_by: string | null;
   note: string | null;
   changed_at: string;
-  source: 'EBAY' | 'WORKSPACE' | string;
-  source_timestamp: string | null;
+  source?: 'EBAY' | 'WORKSPACE' | string;
+  source_timestamp?: string | null;
 };
 
 const PAGE_SIZE = 500;
@@ -258,15 +258,36 @@ export class SupabaseOrderRepository implements OrderRepository {
     if (error) throw error;
     if (!data) return null;
     const row = data as unknown as OrderRow;
-    const [itemsResult, historyResult] = await Promise.all([
-      this.readItems([row.id]),
-      this.context.supabase
+    const itemsPromise = this.readItems([row.id]);
+    const historyColumnsWithProvider = 'id,order_id,from_status,to_status,changed_by,note,changed_at,source,source_timestamp';
+    const historyColumnsLegacy = 'id,order_id,from_status,to_status,changed_by,note,changed_at';
+
+    // PR #151's provider metadata migration may not yet be applied in every
+    // environment. Keep order details readable against the existing schema.
+    let historyResult = await this.context.supabase
+      .from('order_status_history')
+      .select(historyColumnsWithProvider)
+      .eq('organization_id', this.context.organizationId)
+      .eq('order_id', row.id)
+      .order('changed_at', { ascending: true });
+
+    const missingProviderColumns = Boolean(
+      historyResult.error &&
+      (historyResult.error.code === '42703' ||
+        historyResult.error.code === 'PGRST204' ||
+        /column .*source.* does not exist|source_timestamp.*schema cache/i.test(historyResult.error.message || '')),
+    );
+
+    if (missingProviderColumns) {
+      historyResult = await this.context.supabase
         .from('order_status_history')
-        .select('id,order_id,from_status,to_status,changed_by,note,changed_at,source,source_timestamp')
+        .select(historyColumnsLegacy)
         .eq('organization_id', this.context.organizationId)
         .eq('order_id', row.id)
-        .order('changed_at', { ascending: true }),
-    ]);
+        .order('changed_at', { ascending: true });
+    }
+
+    const [itemsResult] = await Promise.all([itemsPromise]);
     if (historyResult.error) throw historyResult.error;
 
     const lines = itemsResult.map(mapOrderItem);
@@ -277,8 +298,8 @@ export class SupabaseOrderRepository implements OrderRepository {
       toStatus: history.to_status,
       changedBy: history.changed_by || '',
       note: history.note || undefined,
-      source: history.source || 'WORKSPACE',
-      sourceTimestamp: history.source_timestamp || undefined,
+      source: 'source' in history ? history.source || 'WORKSPACE' : 'WORKSPACE',
+      sourceTimestamp: 'source_timestamp' in history ? history.source_timestamp || undefined : undefined,
       timestamp: history.changed_at,
     }));
     return { order: mapOrder(row, lines, options.includeRawPayload === true), histories };
