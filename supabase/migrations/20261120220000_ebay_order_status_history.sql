@@ -211,3 +211,49 @@ GRANT EXECUTE ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) TO 
 
 COMMENT ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) IS
   'Imports new eBay orders and records source-aware status snapshots/changes. Existing orders update only marketplace-owned fields; workspace workflow status is never overwritten. Service-role only.';
+
+
+-- Notification provenance: existing/legacy rows are deliberately not deleted.
+-- Only newly generated, verified eBay Production order alerts are exposed by the UI.
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'LEGACY',
+  ADD COLUMN IF NOT EXISTS source_event_key text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_source_event_key_uidx
+  ON public.notifications (organization_id, source_event_key)
+  WHERE source_event_key IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  endpoint text NOT NULL UNIQUE,
+  p256dh text NOT NULL,
+  auth_secret text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT web_push_subscription_endpoint_https CHECK (endpoint LIKE 'https://%'),
+  CONSTRAINT web_push_subscription_key_lengths CHECK (length(p256dh) BETWEEN 80 AND 200 AND length(auth_secret) BETWEEN 16 AND 100)
+);
+
+ALTER TABLE public.web_push_subscriptions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.web_push_subscriptions FROM PUBLIC, anon;
+GRANT SELECT, INSERT, DELETE ON public.web_push_subscriptions TO authenticated;
+
+DROP POLICY IF EXISTS web_push_subscriptions_select_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_select_self
+  ON public.web_push_subscriptions FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS web_push_subscriptions_insert_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_insert_self
+  ON public.web_push_subscriptions FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS web_push_subscriptions_delete_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_delete_self
+  ON public.web_push_subscriptions FOR DELETE TO authenticated
+  USING (user_id = auth.uid());
+
+COMMENT ON TABLE public.web_push_subscriptions IS
+  'Per-user browser push endpoints. Subscription keys are only readable by their owning authenticated user and service_role.';
