@@ -940,7 +940,18 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                           <span title={listing.syncError || undefined} className={`rounded px-1.5 py-0.5 font-semibold ${listing.syncStatus === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
                                             {listing.syncStatus === 'PARTIAL' ? 'Partially synced' : 'Synced'}
                                           </span>
-                                          {listing.syncError && <div className="mt-1 max-w-xs whitespace-normal text-[10px] text-rose-700">{listing.syncError}</div>}
+                                          {listing.syncError && (
+                                            <div className="mt-1 max-w-xs whitespace-normal text-[10px] text-rose-700">
+                                              {listing.syncError}
+                                              {listing.syncErrorDetails && (
+                                                <div className="mt-0.5 font-mono text-[9px]">
+                                                  {listing.syncErrorDetails.stage || 'API'} · {listing.syncErrorDetails.errorCode || 'PROVIDER_ERROR'}
+                                                  {listing.syncErrorDetails.httpStatus ? ` · HTTP ${listing.syncErrorDetails.httpStatus}` : ''}
+                                                  {listing.syncErrorDetails.providerCode ? ` · eBay ${listing.syncErrorDetails.providerCode}` : ''}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </td>
                                         <td className="p-2">{listing.syncStatus === 'PARTIAL' ? 'Offer details unavailable' : listing.listingStatus === 'NOT_LISTED' ? 'Inventory synced — no active eBay offer' : listing.listingStatus}</td>
                                         <td className="p-2 tabular-nums">{listing.inventoryQuantity ?? '—'}</td>
@@ -1371,4 +1382,3 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     </div>
   );
 };
-
