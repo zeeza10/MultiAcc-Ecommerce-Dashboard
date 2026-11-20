@@ -4,8 +4,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Oria Future';
   const options = {
     body: payload.body || 'A new live eBay order has arrived.',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/oria-icon.svg',
+    badge: '/oria-icon.svg',
     tag: payload.notificationId || 'oria-live-ebay-order',
     renotify: false,
     data: { url: payload.url || '/' },
