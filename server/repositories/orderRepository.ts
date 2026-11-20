@@ -92,7 +92,7 @@ const mapOrderItem = (row: OrderItemRow): OrderLine => ({
   reservedQuantity: Number(row.reserved_quantity),
 });
 
-const mapOrder = (row: OrderRow, lines: OrderLine[]): Order => {
+const mapOrder = (row: OrderRow, lines: OrderLine[], includeRawPayload = false): Order => {
   const address = row.shipping_address || {};
   return {
     id: row.id,
@@ -122,7 +122,7 @@ const mapOrder = (row: OrderRow, lines: OrderLine[]): Order => {
     carrier: row.carrier || undefined,
     trackingNumber: row.tracking_number || undefined,
     shippingCostMinor: row.shipping_cost_minor == null ? undefined : Number(row.shipping_cost_minor),
-    rawPayload: row.raw_payload || undefined,
+    ...(includeRawPayload && row.raw_payload ? { rawPayload: row.raw_payload } : {}),
     notes: row.notes || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -238,7 +238,7 @@ export class SupabaseOrderRepository implements OrderRepository {
 
   async getOrder(
     orderId: string,
-    options: Pick<OrderListOptions, 'client3plId' | 'onlyClientOrders'> = {},
+    options: Pick<OrderListOptions, 'client3plId' | 'onlyClientOrders'> & { includeRawPayload?: boolean } = {},
   ): Promise<{ order: Order; histories: Array<Record<string, unknown>> } | null> {
     let query = this.context.supabase
       .from('orders')
@@ -274,6 +274,6 @@ export class SupabaseOrderRepository implements OrderRepository {
       note: history.note || undefined,
       timestamp: history.changed_at,
     }));
-    return { order: mapOrder(row, lines), histories };
+    return { order: mapOrder(row, lines, options.includeRawPayload === true), histories };
   }
 }
