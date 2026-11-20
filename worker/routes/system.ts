@@ -99,7 +99,7 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
   }
 
   if (path === '/notifications/push/subscriptions' && request.method === 'POST') {
-    if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return json({ error: 'Push notifications are not configured on the server yet.' }, 503);
+    if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return json({ error: 'Push notifications are not configured on the server yet.' }, 503);
     const body = await request.json() as Record<string, unknown>;
     const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
     const keys = body.keys && typeof body.keys === 'object' ? body.keys as Record<string, unknown> : {};
