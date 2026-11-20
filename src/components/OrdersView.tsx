@@ -341,7 +341,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           {order.lines.map((l) => `${l.quantity}x ${l.sku}`).join(', ')}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">{getStatusBadge(order.status)}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex flex-col items-start gap-1">
+                          {getStatusBadge(order.status)}
+                          {order.salesSource === 'EBAY' && order.marketplaceStatus && (
+                            <span className="text-[10px] font-medium text-blue-700">eBay: {order.marketplaceStatus}</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 font-bold text-gray-900">
                         {formatMoney(order.totalMinor, order.currency || config.baseCurrency)}
                       </td>
