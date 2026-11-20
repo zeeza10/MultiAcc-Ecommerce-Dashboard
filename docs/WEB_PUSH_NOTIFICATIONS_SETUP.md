@@ -33,6 +33,7 @@ The Worker reports push as unavailable until all three values are configured. Do
 - Android/desktop browsers need a secure HTTPS origin and service-worker support.
 - On iPhone/iPad, Web Push requires iOS/iPadOS 16.4 or later and the site installed to the Home Screen.
 - Removing a subscription on one device does not affect other devices.
+- Signing out removes the current device's push subscription before ending the authenticated session.
 - Expired push endpoints (HTTP 404/410) are removed automatically.
 
 ## Data safety
