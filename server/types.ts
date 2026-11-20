@@ -482,7 +482,8 @@ export interface NotificationItem {
     | 'ADJUSTMENT_AWAITING_APPROVAL'
     | 'OVERDUE_INVOICE'
     | 'LEDGER_RECONCILIATION_DIFFERENCE'
-    | 'RETURN_AWAITING_INSPECTION';
+    | 'RETURN_AWAITING_INSPECTION'
+    | 'NEW_EBAY_ORDER';
   title: string;
   message: string;
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
@@ -490,6 +491,7 @@ export interface NotificationItem {
   isRead: boolean;
   isDismissed: boolean;
   createdAt: string;
+  source?: 'EBAY' | 'LEGACY' | string;
 }
 
 export interface SystemConfig {
