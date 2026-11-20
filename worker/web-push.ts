@@ -33,7 +33,7 @@ async function createVapidAuthorization(endpoint: string, env: WorkerEnv): Promi
   const audience = new URL(endpoint).origin;
   const claims = jsonPart({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, sub: env.VAPID_SUBJECT });
   const signingInput = encoder.encode(header + '.' + claims);
-  const jwk = {
+  const jwk: JsonWebKey = {
     kty: 'EC', crv: 'P-256',
     x: encodeBase64Url(publicBytes.slice(1, 33)),
     y: encodeBase64Url(publicBytes.slice(33, 65)),
