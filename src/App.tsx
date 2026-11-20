@@ -299,6 +299,24 @@ export default function App() {
     }
   };
 
+  const handleSignOut = async () => {
+    // Detach this browser's push endpoint before ending the authenticated session.
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration('/');
+      const subscription = await registration?.pushManager.getSubscription();
+      if (subscription) {
+        try {
+          await api.removePushSubscription(subscription.endpoint);
+        } finally {
+          await subscription.unsubscribe();
+        }
+      }
+    } catch (error) {
+      console.error('Could not clean up this device push subscription during sign out:', error);
+    }
+    await signOut();
+  };
+
   const handleNavigate = (tab: NavItem, filterState?: any) => {
     setActiveTab(tab);
     setTabFilterState(filterState || null);
@@ -411,7 +429,7 @@ export default function App() {
       <Navbar
         currentUser={currentUser}
         organizationName={organizationName}
-        onSignOut={signOut}
+        onSignOut={handleSignOut}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
