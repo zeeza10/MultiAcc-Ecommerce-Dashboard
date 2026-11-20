@@ -163,13 +163,13 @@ export const api = {
       };
       inventory: {
         status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
-        fetched?: number; offersFetched?: number; pagesPending?: boolean;
+        fetched?: number; offersFetched?: number; pagesPending?: boolean; failedSkus?: string[];
         error?: { code: string; message: string; stage: string; httpStatus: number | null };
       };
       imported: number; skipped: number; exceptions: number; fetched: number;
     }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
   getEbayListings: (id: string, limit = 50, offset = 0) =>
-    request<{ listings: Array<{ sku: string; title: string; description: string; imageUrls: string[]; condition: string; inventoryQuantity: number | null; listingStatus: string; offers: any[]; syncedAt: string }>; total: number; limit: number; offset: number }>(`/ebay/accounts/${id}/listings?limit=${limit}&offset=${offset}`),
+    request<{ listings: Array<{ sku: string; title: string; description: string; imageUrls: string[]; condition: string; inventoryQuantity: number | null; listingStatus: string; offers: any[]; syncedAt: string; syncStatus?: 'SYNCED' | 'PARTIAL'; syncError?: string | null }>; total: number; limit: number; offset: number }>(`/ebay/accounts/${id}/listings?limit=${limit}&offset=${offset}`),
   connectEbayAccount: (id: string) =>
     request<{ authorizationUrl: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
   getExceptions: (accountId?: string) => request<{ exceptions: ExceptionItem[] }>(`/ebay/exceptions${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),

@@ -57,6 +57,7 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
     const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderDetailMatch[1], {
       client3plId: auth.user.clientId,
       onlyClientOrders: auth.user.role === 'CLIENT_USER',
+      includeRawPayload: auth.user.role === 'SUPER_ADMIN',
     });
     return result ? json(result) : json({ error: 'Order not found in this workspace.' }, 404);
   }
@@ -71,7 +72,9 @@ export async function handleOrderPurchasingRoute(path: string, request: Request,
       p_order: body,
     });
     if (error) throw new Error(error.message || 'Order could not be updated.');
-    const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderEditMatch[1]);
+    const result = await new SupabaseOrderRepository(auth.repositoryContext).getOrder(orderEditMatch[1], {
+      includeRawPayload: auth.user.role === 'SUPER_ADMIN',
+    });
     return result ? json({ order: result.order }) : json({ error: 'Updated order could not be reloaded.' }, 500);
   }
 

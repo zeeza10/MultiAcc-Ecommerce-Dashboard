@@ -363,7 +363,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
 }
 
 
-async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ fetched: number; offersFetched: number; pagesPending: boolean }> {
+async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ fetched: number; offersFetched: number; pagesPending: boolean; failedSkus: string[] }> {
   const admin = createServiceClient(env);
   progress.stage = 'INVENTORY_TOKEN';
   const accessToken = await getSellerAccessToken(env, account);
@@ -393,26 +393,31 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     // Inventory items contain product details and base stock. Offers contain the
     // actual marketplace listing state, listing ID, price and offer-level quantity.
     // Fetch offers in small concurrent batches to respect eBay API limits.
-    const offerResults: Array<{ sku: string; offers: any[] }> = [];
+    const offerResults: Array<{ sku: string; offers: any[]; error?: string }> = [];
     const skus = items.map((item: any) => String(item.sku || '').trim()).filter((sku: string) => sku && sku.length <= 50);
     progress.stage = 'EBAY_OFFERS_API';
     for (let index = 0; index < skus.length; index += 5) {
       const batch = skus.slice(index, index + 5);
       const batchResults = await Promise.all(batch.map(async (sku) => {
-        const offersUrl = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/offer`);
-        offersUrl.searchParams.set('sku', sku);
-        offersUrl.searchParams.set('marketplace_id', marketplaceId);
-        offersUrl.searchParams.set('limit', '100');
-        offersUrl.searchParams.set('offset', '0');
-        const offersResponse = await fetch(offersUrl, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
-        if (offersResponse.status === 404) return { sku, offers: [] as any[] };
-        if (!offersResponse.ok) throw new Error(`eBay offers API returned HTTP ${offersResponse.status} for an inventory SKU.`);
-        const offersPayload = await offersResponse.json() as { offers?: any[] };
-        return { sku, offers: Array.isArray(offersPayload.offers) ? offersPayload.offers : [] };
+        try {
+          const offersUrl = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/offer`);
+          offersUrl.searchParams.set('sku', sku);
+          offersUrl.searchParams.set('marketplace_id', marketplaceId);
+          offersUrl.searchParams.set('limit', '100');
+          offersUrl.searchParams.set('offset', '0');
+          const offersResponse = await fetch(offersUrl, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+          if (offersResponse.status === 404) return { sku, offers: [] as any[] };
+          if (!offersResponse.ok) throw new Error(`eBay offers API returned HTTP ${offersResponse.status} for SKU ${sku}.`);
+          const offersPayload = await offersResponse.json() as { offers?: any[] };
+          return { sku, offers: Array.isArray(offersPayload.offers) ? offersPayload.offers : [] };
+        } catch (error) {
+          return { sku, offers: [] as any[], error: error instanceof Error ? error.message : 'Offer details could not be synchronized.' };
+        }
       }));
       offerResults.push(...batchResults);
     }
     const offersBySku = new Map(offerResults.map((entry) => [entry.sku, entry.offers]));
+    const failedOffers = offerResults.filter((entry) => Boolean(entry.error));
     offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0); progress.offersFetched = offersFetched;
     const syncedAt = new Date().toISOString();
     const rows = items.filter((item: any) => String(item.sku || '').trim()).map((item: any) => {
@@ -428,12 +433,24 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
         inventory_item: item,
         offers,
         total_ship_to_location_quantity: Number.isFinite(Number(quantityValue)) ? Math.max(0, Math.trunc(Number(quantityValue))) : null,
-        listing_status: listingStatuses.includes('PUBLISHED') ? 'PUBLISHED' : (listingStatuses[0] || 'NOT_LISTED'),
+        listing_status: failedOffers.some((entry) => entry.sku === sku) ? 'UNKNOWN' : (listingStatuses.includes('PUBLISHED') ? 'PUBLISHED' : (listingStatuses[0] || 'NOT_LISTED')),
         source_updated_at: item.product?.aspects?.updatedAt || null,
         synced_at: syncedAt,
         updated_at: syncedAt,
       };
     });
+    if (failedOffers.length) {
+      const { error: eventError } = await admin.from('marketplace_integration_events').insert(failedOffers.map((entry) => ({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'INVENTORY_SKU_SYNC_FAILED',
+        severity: 'WARNING',
+        error_code: 'EBAY_OFFERS_API_FAILED',
+        message: entry.error || `Offer details could not be synchronized for SKU ${entry.sku}.`,
+        metadata: { sku: entry.sku, stage: 'EBAY_OFFERS_API', endpoint: 'sell/inventory/v1/offer', environment: account.environment },
+      })));
+      if (eventError) throw new Error('Some listing offer failures could not be recorded for review.');
+    }
     progress.stage = 'INVENTORY_SNAPSHOT_WRITE';
     if (rows.length) {
       const { error: saveError } = await admin.from('marketplace_listing_snapshots').upsert(rows, { onConflict: 'marketplace_account_id,external_sku' });
@@ -460,7 +477,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     if (!items.length || !hasMore || pages >= 5) break;
   } while (true);
   progress.stage = 'INVENTORY_COMPLETED';
-  return { fetched, offersFetched, pagesPending: hasMore };
+  return { fetched, offersFetched, pagesPending: hasMore, failedSkus: offerResults.filter((entry) => entry.error).map((entry) => entry.sku) };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
@@ -656,8 +673,25 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    const { data: skuFailureEvents, error: skuEventsError } = await admin.from('marketplace_integration_events')
+      .select('message,metadata,created_at')
+      .eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', account.id)
+      .eq('event_type', 'INVENTORY_SKU_SYNC_FAILED')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (skuEventsError) throw new Error('Per-SKU listing sync results could not be loaded.');
+    const latestSkuFailure = new Map<string, any>();
+    for (const event of skuFailureEvents || []) {
+      const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata as Record<string, unknown> : {};
+      const sku = typeof metadata.sku === 'string' ? metadata.sku : '';
+      if (sku && !latestSkuFailure.has(sku)) latestSkuFailure.set(sku, event);
+    }
     return json({
-      listings: (data || []).map((row: any) => ({
+      listings: (data || []).map((row: any) => {
+        const failure = latestSkuFailure.get(row.external_sku);
+        const isFailed = Boolean(failure && new Date(failure.created_at).getTime() > new Date(row.synced_at).getTime());
+        return ({
         sku: row.external_sku,
         title: row.inventory_item?.product?.title || '',
         description: row.inventory_item?.product?.description || '',
@@ -668,7 +702,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         offers: Array.isArray(row.offers) ? row.offers : [],
         sourceUpdatedAt: row.source_updated_at,
         syncedAt: row.synced_at,
-      })),
+        syncStatus: isFailed ? 'PARTIAL' : 'SYNCED',
+        syncError: isFailed ? failure.message : null,
+      }); }),
       total: count || 0,
       limit,
       offset,
@@ -710,13 +746,13 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     let inventoryResult: Record<string, unknown>;
     try {
       const inventory = await syncSellerInventory(account, env, inventoryProgress);
-      inventoryResult = { status: inventory.pagesPending ? 'PARTIAL' : 'SUCCESS', ...inventory };
+      inventoryResult = { status: inventory.pagesPending || inventory.failedSkus.length ? 'PARTIAL' : 'SUCCESS', ...inventory };
       const eventAdmin = createServiceClient(env);
       await eventAdmin.from('marketplace_integration_events').insert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
-        event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending ? 'WARNING' : 'INFO',
-        message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers.`,
-        metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, pagesPending: inventory.pagesPending },
+        event_type: 'INVENTORY_SYNC_COMPLETED', severity: inventory.pagesPending || inventory.failedSkus.length ? 'WARNING' : 'INFO',
+        message: `Inventory sync fetched ${inventory.fetched} items and ${inventory.offersFetched} listing offers; ${inventory.failedSkus.length} SKU offer lookups failed.`,
+        metadata: { stage: 'INVENTORY_COMPLETED', environment: account.environment, endpoint: 'sell/inventory/v1/inventory_item', fetched: inventory.fetched, offersFetched: inventory.offersFetched, failedSkus: inventory.failedSkus, pagesPending: inventory.pagesPending },
       });
     } catch (error) {
       const failure = getEbaySyncFailure(error, 'EBAY_INVENTORY_SYNC_FAILED');

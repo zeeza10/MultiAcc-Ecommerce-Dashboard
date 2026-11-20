@@ -612,11 +612,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               </div>
 
               {/* Raw eBay JSON Payload Traceability (SRS FR-EBAY-05) */}
-              {selectedOrder.rawPayload && (
+              {currentUser.role === 'SUPER_ADMIN' && selectedOrder.rawPayload && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-                      Original Marketplace Payload (Audit Traceability)
+                      Technical Diagnostics — Original Marketplace Payload
                     </h3>
                     <button
                       onClick={() => {
@@ -627,7 +627,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
                     >
                       <Copy className="w-3.5 h-3.5" />
-                      <span>{copiedRaw ? 'Copied!' : 'Copy Raw JSON'}</span>
+                      <span>{copiedRaw ? 'Copied!' : 'Copy Technical JSON'}</span>
                     </button>
                   </div>
                   <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-[10px] font-mono max-h-40 overflow-y-auto">
