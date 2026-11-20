@@ -110,6 +110,28 @@ export default function App() {
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
 
+  // Keep the notification bell current while the workspace is open. Only live eBay order alerts are returned by the API.
+  useEffect(() => {
+    let active = true;
+    const refreshNotifications = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await api.getNotifications();
+        if (active) setNotifications(result.notifications);
+      } catch (error) {
+        console.error('Failed to refresh live eBay notifications:', error);
+      }
+    };
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshNotifications(); };
+    const intervalId = window.setInterval(() => { void refreshNotifications(); }, 15000);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [organizationId]);
+
   // Apply one application-wide theme at the document root and persist the choice.
   useEffect(() => {
     document.documentElement.dataset.theme = isDarkTheme ? 'dark' : 'light';
