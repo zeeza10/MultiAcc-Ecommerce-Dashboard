@@ -31,7 +31,7 @@ async function createVapidAuthorization(endpoint: string, env: WorkerEnv): Promi
   if (publicBytes.length !== 65 || privateKey.length !== 32) throw new Error('VAPID keys must be a P-256 public key and 32-byte private scalar.');
   const header = jsonPart({ typ: 'JWT', alg: 'ES256' });
   const audience = new URL(endpoint).origin;
-  const claims = jsonPart({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, sub: env.VAPID_SUBJECT || 'mailto:admin@oriafuture.com' });
+  const claims = jsonPart({ aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, sub: env.VAPID_SUBJECT });
   const signingInput = encoder.encode(header + '.' + claims);
   const jwk = {
     kty: 'EC', crv: 'P-256',
@@ -50,7 +50,7 @@ export async function sendWebPushNotification(
   payload: { title: string; body: string; url: string; notificationId: string },
   env: WorkerEnv,
 ): Promise<{ ok: boolean; status?: number }> {
-  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return { ok: false };
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return { ok: false };
   try {
     const uaPublic = decodeBase64Url(subscription.p256dh);
     const authSecret = decodeBase64Url(subscription.auth_secret);
