@@ -1,4 +1,8 @@
 -- Store provider-origin metadata without rewriting existing order history.
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'LEGACY',
+  ADD COLUMN IF NOT EXISTS source_event_key text;
+
 -- This migration is code only; it must be reviewed and explicitly deployed before it affects any database.
 ALTER TABLE public.order_status_history
   ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'WORKSPACE',
@@ -97,6 +101,25 @@ BEGIN
       'EBAY', v_source_timestamp
     );
     v_history_recorded := true;
+
+    -- Create the in-app alert in the same transaction as the new Production order.
+    IF EXISTS (
+      SELECT 1 FROM public.marketplace_accounts AS a
+      WHERE a.id = p_marketplace_account_id
+        AND a.organization_id = p_organization_id
+        AND a.environment = 'PRODUCTION'
+        AND a.is_demo = false
+    ) THEN
+      INSERT INTO public.notifications(
+        organization_id, notification_type, title, message, severity,
+        reference_url, source, source_event_key
+      ) VALUES (
+        p_organization_id, 'NEW_EBAY_ORDER', 'New eBay order received',
+        format('Order %s has been received from your connected eBay seller account.', v_order_number),
+        'INFO', '/orders', 'EBAY',
+        'EBAY_ORDER:' || p_marketplace_account_id::text || ':' || v_external_order_id
+      );
+    END IF;
   ELSE
     -- Existing live order: lock it and update only marketplace-owned fields.
     SELECT o.id INTO v_order_id
