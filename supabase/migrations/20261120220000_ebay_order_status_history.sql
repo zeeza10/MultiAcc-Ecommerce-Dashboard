@@ -243,12 +243,12 @@ GRANT SELECT, INSERT, DELETE ON public.web_push_subscriptions TO authenticated;
 DROP POLICY IF EXISTS web_push_subscriptions_select_self ON public.web_push_subscriptions;
 CREATE POLICY web_push_subscriptions_select_self
   ON public.web_push_subscriptions FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
 
 DROP POLICY IF EXISTS web_push_subscriptions_insert_self ON public.web_push_subscriptions;
 CREATE POLICY web_push_subscriptions_insert_self
   ON public.web_push_subscriptions FOR INSERT TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  WITH CHECK (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
 
 DROP POLICY IF EXISTS web_push_subscriptions_delete_self ON public.web_push_subscriptions;
 CREATE POLICY web_push_subscriptions_delete_self
