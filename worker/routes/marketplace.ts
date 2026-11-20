@@ -307,7 +307,9 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
           payment_state: String(order.orderPaymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'PENDING',
           total_minor: totalMinor, tax_minor: moneyMinor(order.pricingSummary?.tax?.value), shipping_charge_minor: moneyMinor(order.pricingSummary?.deliveryCost?.value),
           currency: order.pricingSummary?.total?.currency || 'GBP', created_at: order.creationDate || new Date().toISOString(),
-          safe_payload: { orderId: externalId, creationDate: order.creationDate || null, orderPaymentStatus: order.orderPaymentStatus || null, orderFulfillmentStatus: order.orderFulfillmentStatus || null, lineItems: items.map((item: any) => item.raw_item) }, items,
+          marketplace_status: typeof order.orderFulfillmentStatus === 'string' ? order.orderFulfillmentStatus : null,
+          marketplace_status_updated_at: typeof order.lastModifiedDate === 'string' && Number.isFinite(Date.parse(order.lastModifiedDate)) ? new Date(order.lastModifiedDate).toISOString() : null,
+          safe_payload: { orderId: externalId, creationDate: order.creationDate || null, lastModifiedDate: order.lastModifiedDate || null, orderPaymentStatus: order.orderPaymentStatus || null, orderFulfillmentStatus: order.orderFulfillmentStatus || null, lineItems: items.map((item: any) => item.raw_item) }, items,
         };
         progress.stage = 'ORDER_IMPORT';
         const { data: result, error: importError } = await admin.rpc('import_marketplace_order', { p_organization_id: account.organization_id, p_marketplace_account_id: account.id, p_order: payload });
