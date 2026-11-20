@@ -218,7 +218,7 @@ export async function handleApiRequest(request: Request, env: WorkerEnv, createS
     if (dashboardResponse) return dashboardResponse;
     const marketplaceResponse = await handleMarketplaceRoute(path, request, auth, env);
     if (marketplaceResponse) return marketplaceResponse;
-    const systemResponse = await handleSystemRoute(path, request, auth);
+    const systemResponse = await handleSystemRoute(path, request, auth, env);
     if (systemResponse) return systemResponse;
 
     const orderPurchasingResponse = await handleOrderPurchasingRoute(path, request, url, auth);
