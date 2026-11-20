@@ -5,3 +5,9 @@ ALLOWED_ORIGIN=http://localhost:3000
 # Comma-separated Supabase Auth user UUIDs allowed to manage shared platform eBay credentials.
 # This is separate from workspace SUPER_ADMIN roles and fails closed when unset.
 PLATFORM_SUPER_ADMIN_USER_IDS=
+
+# Web Push (generate a dedicated P-256 VAPID key pair; never use sample values).
+# Configure the private key as a secret in Cloudflare. These local placeholders stay empty.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
