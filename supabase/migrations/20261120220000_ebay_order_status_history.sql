@@ -5,7 +5,7 @@ ALTER TABLE public.notifications
 
 -- This migration is code only; it must be reviewed and explicitly deployed before it affects any database.
 ALTER TABLE public.order_status_history
-  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'WORKSPACE',
+  ADD COLUMN IF NOT EXISTS source text,
   ADD COLUMN IF NOT EXISTS source_timestamp timestamptz;
 
 COMMENT ON COLUMN public.order_status_history.source IS
@@ -42,11 +42,8 @@ BEGIN
 
   v_external_order_id := NULLIF(p_order ->> 'external_order_id', '');
   v_order_number := NULLIF(p_order ->> 'order_number', '');
-  v_marketplace_status := COALESCE(
-    NULLIF(p_order ->> 'marketplace_status', ''),
-    NULLIF(p_order ->> 'status', ''),
-    'Unknown'
-  );
+  -- Only record a provider status when eBay actually supplied one.
+  v_marketplace_status := NULLIF(p_order ->> 'marketplace_status', '');
   v_source_timestamp := NULLIF(p_order ->> 'marketplace_status_updated_at', '')::timestamptz;
 
   IF p_organization_id IS NULL OR p_marketplace_account_id IS NULL
@@ -91,16 +88,19 @@ BEGIN
   v_inserted := v_order_id IS NOT NULL;
 
   IF v_inserted THEN
-    -- This is an initial provider snapshot, not an invented earlier transition.
-    INSERT INTO public.order_status_history(
-      organization_id, order_id, from_status, to_status, changed_by, note,
-      source, source_timestamp
-    ) VALUES (
-      p_organization_id, v_order_id, NULL, v_marketplace_status, NULL,
-      'Initial eBay status snapshot; eBay does not provide the earlier transition history.',
-      'EBAY', v_source_timestamp
-    );
-    v_history_recorded := true;
+    -- A status snapshot is saved only when the provider supplied an actual status.
+    -- No placeholder such as "Unknown" is written into order history.
+    IF v_marketplace_status IS NOT NULL THEN
+      INSERT INTO public.order_status_history(
+        organization_id, order_id, from_status, to_status, changed_by, note,
+        source, source_timestamp
+      ) VALUES (
+        p_organization_id, v_order_id, NULL, v_marketplace_status, NULL,
+        'Initial status snapshot observed from eBay.',
+        'EBAY', v_source_timestamp
+      );
+      v_history_recorded := true;
+    END IF;
 
     -- Create the in-app alert in the same transaction as the new Production order.
     IF EXISTS (
@@ -141,18 +141,18 @@ BEGIN
     ORDER BY h.changed_at DESC, h.id DESC
     LIMIT 1;
 
-    IF v_previous_marketplace_status IS NULL THEN
-      -- Existing orders get one current snapshot only; no historical transitions are fabricated.
+    IF v_marketplace_status IS NOT NULL AND v_previous_marketplace_status IS NULL THEN
+      -- Existing orders get one actual observed baseline only; no earlier transitions are fabricated.
       INSERT INTO public.order_status_history(
         organization_id, order_id, from_status, to_status, changed_by, note,
         source, source_timestamp
       ) VALUES (
         p_organization_id, v_order_id, NULL, v_marketplace_status, NULL,
-        'First eBay status snapshot captured after history tracking was enabled; prior transitions are unknown.',
+        'First actual eBay status snapshot observed after history tracking was enabled.',
         'EBAY', v_source_timestamp
       );
       v_history_recorded := true;
-    ELSIF v_previous_marketplace_status IS DISTINCT FROM v_marketplace_status THEN
+    ELSIF v_marketplace_status IS NOT NULL AND v_previous_marketplace_status IS DISTINCT FROM v_marketplace_status THEN
       INSERT INTO public.order_status_history(
         organization_id, order_id, from_status, to_status, changed_by, note,
         source, source_timestamp
