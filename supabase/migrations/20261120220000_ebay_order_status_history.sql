@@ -231,11 +231,12 @@ CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  endpoint text NOT NULL UNIQUE,
+  endpoint text NOT NULL,
   p256dh text NOT NULL,
   auth_secret text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT web_push_subscription_unique UNIQUE (organization_id, user_id, endpoint),
   CONSTRAINT web_push_subscription_endpoint_https CHECK (endpoint LIKE 'https://%'),
   CONSTRAINT web_push_subscription_key_lengths CHECK (length(p256dh) BETWEEN 80 AND 200 AND length(auth_secret) BETWEEN 16 AND 100)
 );
