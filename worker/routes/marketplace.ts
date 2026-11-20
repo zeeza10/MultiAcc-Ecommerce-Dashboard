@@ -258,9 +258,21 @@ async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string,
   // Notification delivery must never roll back or mark a successfully imported order as failed.
   if (error || !notification?.id) return;
 
+  const { data: members, error: memberError } = await admin.from('organization_members')
+    .select('user_id,roles(code)')
+    .eq('organization_id', account.organization_id)
+    .eq('is_active', true);
+  if (memberError || !members?.length) return;
+  // Client portal users do not receive organization-wide order alerts.
+  const recipientIds = members
+    .filter((member: any) => member.roles?.code !== 'CLIENT_USER')
+    .map((member: any) => member.user_id);
+  if (!recipientIds.length) return;
+
   const { data: subscriptions, error: subscriptionError } = await admin.from('web_push_subscriptions')
     .select('id,endpoint,p256dh,auth_secret')
-    .eq('organization_id', account.organization_id);
+    .eq('organization_id', account.organization_id)
+    .in('user_id', recipientIds);
   if (subscriptionError || !subscriptions?.length) return;
 
   await Promise.all(subscriptions.map(async (subscription: any) => {
