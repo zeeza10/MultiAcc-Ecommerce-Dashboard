@@ -3,6 +3,7 @@ import type { AuthContext, WorkerEnv } from '../types';
 import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { normalizeEbayOrderStartDate } from '../ebay-order-date';
+import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
   createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials,
@@ -238,6 +239,41 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
     throw error;
   }
 }
+async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string, externalOrderId: string, env: WorkerEnv): Promise<void> {
+  const sourceEventKey = `EBAY_ORDER:${account.id}:${externalOrderId}`;
+  const title = 'New eBay order received';
+  const message = `Order ${orderNumber} has been received from your connected eBay seller account.`;
+  const { data: notification, error } = await admin.from('notifications').insert({
+    organization_id: account.organization_id,
+    notification_type: 'NEW_EBAY_ORDER',
+    title,
+    message,
+    severity: 'INFO',
+    reference_url: '/orders',
+    source: 'EBAY',
+    source_event_key: sourceEventKey,
+  }).select('id').maybeSingle();
+  // Notification delivery must never roll back or mark a successfully imported order as failed.
+  if (error || !notification?.id) return;
+
+  const { data: subscriptions, error: subscriptionError } = await admin.from('web_push_subscriptions')
+    .select('id,endpoint,p256dh,auth_secret')
+    .eq('organization_id', account.organization_id);
+  if (subscriptionError || !subscriptions?.length) return;
+
+  await Promise.all(subscriptions.map(async (subscription: any) => {
+    const result = await sendWebPushNotification(subscription, {
+      title,
+      body: message,
+      url: '/',
+      notificationId: notification.id,
+    }, env);
+    if (result.status === 404 || result.status === 410) {
+      await admin.from('web_push_subscriptions').delete().eq('id', subscription.id);
+    }
+  }));
+}
+
 async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number; status: 'SUCCESS' | 'PARTIAL'; pagesPending: boolean }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
@@ -316,7 +352,11 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         if (importError) throw new Error(importError.message || 'An eBay order could not be imported into the workspace.');
         const inserted = Array.isArray(result) ? result[0] : result;
         if (inserted?.duplicate) skipped++;
-        else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
+        else if (inserted?.inserted) {
+          imported++;
+          exceptions += Number(inserted.exception_count || 0);
+          await notifyNewEbayOrder(admin, account, orderNumber, externalId, env);
+        }
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
       offset += orders.length;
