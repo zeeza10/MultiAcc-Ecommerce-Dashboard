@@ -142,7 +142,18 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
     if (auth.user.role === 'CLIENT_USER') notificationsQuery = notificationsQuery.eq('user_id', auth.user.id);
     else notificationsQuery = notificationsQuery.or(`user_id.is.null,user_id.eq.${auth.user.id}`);
     const { data, error } = await notificationsQuery;
-    if (error) throw new Error('Notifications could not be loaded.');
+    if (error) {
+      // PR #152's provenance column is delivered by a separately approved
+      // database migration. Until it exists, keep the workspace API healthy
+      // and do not expose legacy/unverified notifications as live eBay alerts.
+      const missingSourceColumn = error.code === '42703' || error.code === 'PGRST204' ||
+        /column .*source.* does not exist|source.*schema cache/i.test(error.message || '');
+      if (missingSourceColumn) {
+        console.warn('Live eBay notifications are unavailable until the notification provenance migration is applied.');
+        return json({ notifications: [] });
+      }
+      throw new Error('Notifications could not be loaded.');
+    }
     return json({ notifications: (data || []).map(row => ({
       id: row.id, type: row.notification_type, title: row.title, message: row.message,
       severity: row.severity, referenceUrl: row.reference_url || '', isRead: row.is_read, source: row.source,
