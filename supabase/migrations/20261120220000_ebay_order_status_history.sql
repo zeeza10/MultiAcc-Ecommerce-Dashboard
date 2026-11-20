@@ -223,6 +223,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS notifications_source_event_key_uidx
   ON public.notifications (organization_id, source_event_key)
   WHERE source_event_key IS NOT NULL;
 
+CREATE INDEX IF NOT EXISTS notifications_live_ebay_orders_idx
+  ON public.notifications (organization_id, created_at DESC)
+  WHERE source = 'EBAY' AND notification_type = 'NEW_EBAY_ORDER' AND is_dismissed = false;
+
 CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -235,6 +239,9 @@ CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
   CONSTRAINT web_push_subscription_endpoint_https CHECK (endpoint LIKE 'https://%'),
   CONSTRAINT web_push_subscription_key_lengths CHECK (length(p256dh) BETWEEN 80 AND 200 AND length(auth_secret) BETWEEN 16 AND 100)
 );
+
+CREATE INDEX IF NOT EXISTS web_push_subscriptions_org_user_idx
+  ON public.web_push_subscriptions (organization_id, user_id);
 
 ALTER TABLE public.web_push_subscriptions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.web_push_subscriptions FROM PUBLIC, anon;
