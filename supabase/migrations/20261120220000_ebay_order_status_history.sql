@@ -57,7 +57,6 @@ BEGIN
       AND a.organization_id = p_organization_id
       AND a.marketplace IN ('EBAY_UK','EBAY_US','EBAY_DE')
       AND a.is_demo = false
-      AND a.environment = 'PRODUCTION'
   ) THEN
     RAISE EXCEPTION 'marketplace account is not eligible for live order import';
   END IF;
