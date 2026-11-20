@@ -936,8 +936,13 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                         <td className="p-2">{listingIndex + 1}</td>
                                         <td className="p-2 font-mono">{listing.sku}</td>
                                         <td className="p-2 min-w-40">{listing.title || '—'}</td>
-                                        <td className="p-2"><span className="rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">Synced</span></td>
-                                        <td className="p-2">{listing.listingStatus === 'NOT_LISTED' ? 'Inventory synced — no active eBay offer' : listing.listingStatus}</td>
+                                        <td className="p-2">
+                                          <span title={listing.syncError || undefined} className={`rounded px-1.5 py-0.5 font-semibold ${listing.syncStatus === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                            {listing.syncStatus === 'PARTIAL' ? 'Partially synced' : 'Synced'}
+                                          </span>
+                                          {listing.syncError && <div className="mt-1 max-w-xs whitespace-normal text-[10px] text-rose-700">{listing.syncError}</div>}
+                                        </td>
+                                        <td className="p-2">{listing.syncStatus === 'PARTIAL' ? 'Offer details unavailable' : listing.listingStatus === 'NOT_LISTED' ? 'Inventory synced — no active eBay offer' : listing.listingStatus}</td>
                                         <td className="p-2 tabular-nums">{listing.inventoryQuantity ?? '—'}</td>
                                         <td className="p-2">
                                           {listing.offers?.length
