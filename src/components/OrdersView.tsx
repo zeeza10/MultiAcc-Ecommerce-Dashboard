@@ -614,7 +614,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 </h3>
                 <div className="bg-slate-50 border border-gray-200 rounded-lg p-3 space-y-2">
                   {orderHistories.length === 0 ? (
-                    <p className="text-xs text-gray-500">No saved status history is available yet. The current eBay status above is taken from the latest status data already stored; history will be recorded when a future eBay import observes a status snapshot or change.</p>
+                    <p className="text-xs text-gray-500">{selectedOrder.salesSource === 'EBAY' ? 'No saved status history is available yet. The current eBay status above is taken from the latest status data already stored; history will be recorded when a future eBay import observes a status snapshot or change.' : 'No saved status history is available for this order yet.'}</p>
                   ) : orderHistories.map((h, i) => (
                     <div key={h.id || i} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 text-xs border-b border-gray-200/60 pb-2 last:border-0 last:pb-0">
                       <div className="min-w-0">
