@@ -67,7 +67,7 @@ export async function sendWebPushNotification(
     const recordSize = new Uint8Array([0, 0, 16, 0]);
     const keyInfo = concat(encoder.encode('Content-Encoding: aes128gcm\0'), recordSize, new Uint8Array([asPublic.length]), asPublic);
     const contentKey = await hkdf(inputKeyMaterial, salt, keyInfo, 16);
-    const nonce = await hkdf(inputKeyMaterial, salt, concat(encoder.encode('Content-Encoding: nonce\0'), recordSize, new Uint8Array([asPublic.length]), asPublic), 12);
+    const nonce = await hkdf(inputKeyMaterial, salt, encoder.encode('Content-Encoding: nonce\0'), 12);
     const aesKey = await crypto.subtle.importKey('raw', contentKey, 'AES-GCM', false, ['encrypt']);
     const plaintext = concat(encoder.encode(JSON.stringify(payload)), new Uint8Array([2]));
     const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, tagLength: 128 }, aesKey, plaintext));
