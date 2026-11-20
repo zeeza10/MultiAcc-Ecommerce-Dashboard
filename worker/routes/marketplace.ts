@@ -732,7 +732,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
     const { data: skuFailureEvents, error: skuEventsError } = await admin.from('marketplace_integration_events')
-      .select('message,metadata,created_at')
+      .select('message,metadata,created_at,error_code')
       .eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', account.id)
       .eq('event_type', 'INVENTORY_SKU_SYNC_FAILED')
@@ -762,6 +762,13 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
         syncedAt: row.synced_at,
         syncStatus: isFailed ? 'PARTIAL' : 'SYNCED',
         syncError: isFailed ? failure.message : null,
+        syncErrorDetails: isFailed ? {
+          errorCode: failure.error_code || null,
+          httpStatus: Number.isFinite(Number(failure.metadata?.httpStatus)) ? Number(failure.metadata.httpStatus) : null,
+          providerCode: typeof failure.metadata?.providerCode === 'string' ? failure.metadata.providerCode : null,
+          stage: typeof failure.metadata?.stage === 'string' ? failure.metadata.stage : null,
+          occurredAt: failure.created_at,
+        } : null,
       }); }),
       total: count || 0,
       limit,
