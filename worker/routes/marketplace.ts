@@ -239,25 +239,18 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
     throw error;
   }
 }
-async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string, externalOrderId: string, env: WorkerEnv): Promise<void> {
+async function notifyNewEbayOrder(admin: any, account: any, externalOrderId: string, env: WorkerEnv): Promise<void> {
   // Never surface Sandbox or demo orders as live business notifications.
   if (account.is_demo || account.environment !== 'PRODUCTION') return;
   const sourceEventKey = `EBAY_ORDER:${account.id}:${externalOrderId}`;
-  const title = 'New eBay order received';
-  const message = `Order ${orderNumber} has been received from your connected eBay seller account.`;
-  const { data: notification, error } = await admin.from('notifications').insert({
-    organization_id: account.organization_id,
-    notification_type: 'NEW_EBAY_ORDER',
-    title,
-    message,
-    severity: 'INFO',
-    reference_url: '/orders',
-    source: 'EBAY',
-    source_event_key: sourceEventKey,
-  }).select('id').maybeSingle();
-  // Notification delivery must never roll back or mark a successfully imported order as failed.
+  // The in-app alert is inserted atomically by import_marketplace_order with the new order.
+  const { data: notification, error } = await admin.from('notifications')
+    .select('id,title,message')
+    .eq('organization_id', account.organization_id)
+    .eq('source_event_key', sourceEventKey)
+    .maybeSingle();
   if (error || !notification?.id) {
-    console.warn('A new eBay order was imported, but its in-app notification could not be stored.', error?.code || 'notification_insert_failed');
+    console.warn('The imported eBay order has no matching transactional notification.', error?.code || 'notification_not_found');
     return;
   }
 
@@ -284,8 +277,8 @@ async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string,
 
   await Promise.all(subscriptions.map(async (subscription: any) => {
     const result = await sendWebPushNotification(subscription, {
-      title,
-      body: message,
+      title: notification.title,
+      body: notification.message,
       url: '/',
       notificationId: notification.id,
     }, env);
@@ -377,7 +370,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         else if (inserted?.inserted) {
           imported++;
           exceptions += Number(inserted.exception_count || 0);
-          await notifyNewEbayOrder(admin, account, orderNumber, externalId, env);
+          await notifyNewEbayOrder(admin, account, externalId, env);
         }
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
