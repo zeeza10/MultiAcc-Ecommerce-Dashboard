@@ -16,7 +16,7 @@ Generate a key pair locally with Node.js (the private key is printed only in you
 node --input-type=module -e "const c=globalThis.crypto; const pair=await c.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']); const pub=new Uint8Array(await c.subtle.exportKey('raw',pair.publicKey)); const priv=await c.subtle.exportKey('jwk',pair.privateKey); const b=x=>Buffer.from(x).toString('base64url'); console.log('VAPID_PUBLIC_KEY='+b(pub)); console.log('VAPID_PRIVATE_KEY='+priv.d);"
 ```
 
-Set the public key as a Worker variable and the private key as a secret. Set the contact subject as a Worker variable (or secret):
+For simplicity, the commands below store all three values as Worker secrets. The public key and contact subject are not private, but storing them as secrets is also supported:
 
 ```bash
 npx wrangler secret put VAPID_PRIVATE_KEY
