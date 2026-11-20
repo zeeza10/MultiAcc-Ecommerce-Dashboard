@@ -954,7 +954,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                                     : '—'}
                                                 </div>
                                               ))
-                                            : 'No offer'}
+                                            : listing.syncStatus === 'PARTIAL' ? 'Offer details unavailable' : 'No offer'}
                                         </td>
                                       </tr>
                                     ))}
