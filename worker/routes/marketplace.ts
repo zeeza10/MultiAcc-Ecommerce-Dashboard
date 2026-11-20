@@ -3,6 +3,7 @@ import type { AuthContext, WorkerEnv } from '../types';
 import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { normalizeEbayOrderStartDate } from '../ebay-order-date';
+import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
   createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials,
@@ -238,6 +239,56 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
     throw error;
   }
 }
+async function notifyNewEbayOrder(admin: any, account: any, externalOrderId: string, env: WorkerEnv): Promise<void> {
+  // Never surface Sandbox or demo orders as live business notifications.
+  if (account.is_demo || account.environment !== 'PRODUCTION') return;
+  const sourceEventKey = `EBAY_ORDER:${account.id}:${externalOrderId}`;
+  // The in-app alert is inserted atomically by import_marketplace_order with the new order.
+  const { data: notification, error } = await admin.from('notifications')
+    .select('id,title,message')
+    .eq('organization_id', account.organization_id)
+    .eq('source_event_key', sourceEventKey)
+    .maybeSingle();
+  if (error || !notification?.id) {
+    console.warn('The imported eBay order has no matching transactional notification.', error?.code || 'notification_not_found');
+    return;
+  }
+
+  const { data: members, error: memberError } = await admin.from('organization_members')
+    .select('user_id,roles(code)')
+    .eq('organization_id', account.organization_id)
+    .eq('is_active', true);
+  if (memberError || !members?.length) return;
+  // Client portal users do not receive organization-wide order alerts.
+  const recipientIds = members
+    .filter((member: any) => member.roles?.code !== 'CLIENT_USER')
+    .map((member: any) => member.user_id);
+  if (!recipientIds.length) return;
+
+  const { data: subscriptions, error: subscriptionError } = await admin.from('web_push_subscriptions')
+    .select('id,endpoint,p256dh,auth_secret')
+    .eq('organization_id', account.organization_id)
+    .in('user_id', recipientIds);
+  if (subscriptionError) {
+    console.warn('Live eBay order notification was stored, but push subscriptions could not be loaded.');
+    return;
+  }
+  if (!subscriptions?.length) return;
+
+  await Promise.all(subscriptions.map(async (subscription: any) => {
+    const result = await sendWebPushNotification(subscription, {
+      title: notification.title,
+      body: notification.message,
+      url: '/',
+      notificationId: notification.id,
+    }, env);
+    if (!result.ok) console.warn('Web Push delivery failed for a live eBay order notification.', result.status || 'vapid_or_crypto_error');
+    if (result.status === 404 || result.status === 410) {
+      await admin.from('web_push_subscriptions').delete().eq('id', subscription.id);
+    }
+  }));
+}
+
 async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySyncProgress = createEbaySyncProgress()): Promise<{ imported: number; skipped: number; exceptions: number; fetched: number; status: 'SUCCESS' | 'PARTIAL'; pagesPending: boolean }> {
   const admin = createServiceClient(env), accessToken = await getSellerAccessToken(env, account);
   const dataEnvironment = account.is_demo ? 'DEMO' : account.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
@@ -316,7 +367,11 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         if (importError) throw new Error(importError.message || 'An eBay order could not be imported into the workspace.');
         const inserted = Array.isArray(result) ? result[0] : result;
         if (inserted?.duplicate) skipped++;
-        else if (inserted?.inserted) { imported++; exceptions += Number(inserted.exception_count || 0); }
+        else if (inserted?.inserted) {
+          imported++;
+          exceptions += Number(inserted.exception_count || 0);
+          await notifyNewEbayOrder(admin, account, externalId, env);
+        }
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
       offset += orders.length;

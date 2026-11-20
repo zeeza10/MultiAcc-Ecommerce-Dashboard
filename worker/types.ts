@@ -13,6 +13,9 @@ export type WorkerEnv = {
   EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN?: string;
   ALLOWED_ORIGIN?: string;
   PLATFORM_SUPER_ADMIN_USER_IDS?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
   API_IP_RATE_LIMITER?: RateLimitBinding;
   API_READ_RATE_LIMITER?: RateLimitBinding;
   API_WRITE_RATE_LIMITER?: RateLimitBinding;

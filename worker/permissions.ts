@@ -17,6 +17,9 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && path === '/access/overview') return 'users.manage';
   if (method === 'POST' && path === '/access/invitations') return 'users.manage';
   if (method === 'GET' && path === '/notifications') return 'dashboard.view';
+  if (method === 'GET' && path === '/notifications/push/public-key') return 'dashboard.view';
+  if (method === 'POST' && path === '/notifications/push/subscriptions') return 'dashboard.view';
+  if (method === 'DELETE' && path === '/notifications/push/subscriptions') return 'dashboard.view';
   if (method === 'POST' && /^\/notifications\/[^/]+\/dismiss$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/products') return 'products.view';
   if (method === 'POST' && path === '/products') return 'products.create';

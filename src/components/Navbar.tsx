@@ -213,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={() => setShowNotifMenu(!showNotifMenu)}
               className="relative p-2 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none"
-              title="System Alerts & Exception Queue"
+              title="Live eBay Order Notifications"
             >
               <Bell className="w-5 h-5" />
               {unreadNotifications.length > 0 && (
@@ -224,10 +224,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {showNotifMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                    In-App Alerts ({unreadNotifications.length})
+              <div className="absolute right-0 top-full mt-2 z-[70] w-[min(24rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl sm:w-96">
+                <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-3 sm:px-4">
+                  <span className="min-w-0 text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                    New eBay Orders ({unreadNotifications.length})
                   </span>
                   <button
                     onClick={() => {
@@ -240,12 +240,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                <div className="max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain divide-y divide-gray-100">
                   {unreadNotifications.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-gray-500">No active alerts. All operations nominal.</div>
+                    <div className="p-4 text-center text-xs text-gray-500">No new live eBay order alerts.</div>
                   ) : (
                     unreadNotifications.map((n) => (
-                      <div key={n.id} className="p-3 hover:bg-gray-50 text-xs">
+                      <div key={n.id} className="p-3 text-xs hover:bg-gray-50 break-words">
                         <div className="flex items-start justify-between gap-2">
                           <span className="font-semibold text-gray-900">{n.title}</span>
                           <button

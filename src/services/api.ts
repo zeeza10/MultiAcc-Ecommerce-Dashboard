@@ -322,6 +322,11 @@ export const api = {
   getNotifications: () => request<{ notifications: NotificationItem[] }>('/notifications'),
   dismissNotification: (id: string) =>
     request<{ success: boolean }>(`/notifications/${id}/dismiss`, { method: 'POST' }),
+  getPushPublicKey: () => request<{ enabled: boolean; publicKey: string | null }>('/notifications/push/public-key'),
+  savePushSubscription: (subscription: PushSubscriptionJSON) =>
+    request<{ success: boolean; alreadySubscribed?: boolean }>('/notifications/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription) }),
+  removePushSubscription: (endpoint: string) =>
+    request<{ success: boolean }>('/notifications/push/subscriptions', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   getConfig: () => request<{ config: SystemConfig }>('/system/config'),
   updateConfig: (config: Partial<SystemConfig>) =>
     request<{ config: SystemConfig }>('/system/config', {

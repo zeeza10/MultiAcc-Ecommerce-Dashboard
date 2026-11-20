@@ -110,6 +110,28 @@ export default function App() {
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
 
+  // Keep the notification bell current while the workspace is open. Only live eBay order alerts are returned by the API.
+  useEffect(() => {
+    let active = true;
+    const refreshNotifications = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await api.getNotifications();
+        if (active) setNotifications(result.notifications);
+      } catch (error) {
+        console.error('Failed to refresh live eBay notifications:', error);
+      }
+    };
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshNotifications(); };
+    const intervalId = window.setInterval(() => { void refreshNotifications(); }, 15000);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [organizationId]);
+
   // Apply one application-wide theme at the document root and persist the choice.
   useEffect(() => {
     document.documentElement.dataset.theme = isDarkTheme ? 'dark' : 'light';
@@ -277,6 +299,24 @@ export default function App() {
     }
   };
 
+  const handleSignOut = async () => {
+    // Detach this browser's push endpoint before ending the authenticated session.
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration('/');
+      const subscription = await registration?.pushManager.getSubscription();
+      if (subscription) {
+        try {
+          await api.removePushSubscription(subscription.endpoint);
+        } finally {
+          await subscription.unsubscribe();
+        }
+      }
+    } catch (error) {
+      console.error('Could not clean up this device push subscription during sign out:', error);
+    }
+    await signOut();
+  };
+
   const handleNavigate = (tab: NavItem, filterState?: any) => {
     setActiveTab(tab);
     setTabFilterState(filterState || null);
@@ -389,7 +429,7 @@ export default function App() {
       <Navbar
         currentUser={currentUser}
         organizationName={organizationName}
-        onSignOut={signOut}
+        onSignOut={handleSignOut}
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}

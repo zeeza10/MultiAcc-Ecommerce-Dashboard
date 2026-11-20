@@ -1,4 +1,8 @@
 -- Store provider-origin metadata without rewriting existing order history.
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'LEGACY',
+  ADD COLUMN IF NOT EXISTS source_event_key text;
+
 -- This migration is code only; it must be reviewed and explicitly deployed before it affects any database.
 ALTER TABLE public.order_status_history
   ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'WORKSPACE',
@@ -97,6 +101,25 @@ BEGIN
       'EBAY', v_source_timestamp
     );
     v_history_recorded := true;
+
+    -- Create the in-app alert in the same transaction as the new Production order.
+    IF EXISTS (
+      SELECT 1 FROM public.marketplace_accounts AS a
+      WHERE a.id = p_marketplace_account_id
+        AND a.organization_id = p_organization_id
+        AND a.environment = 'PRODUCTION'
+        AND a.is_demo = false
+    ) THEN
+      INSERT INTO public.notifications(
+        organization_id, notification_type, title, message, severity,
+        reference_url, source, source_event_key
+      ) VALUES (
+        p_organization_id, 'NEW_EBAY_ORDER', 'New eBay order received',
+        format('Order %s has been received from your connected eBay seller account.', v_order_number),
+        'INFO', '/orders', 'EBAY',
+        'EBAY_ORDER:' || p_marketplace_account_id::text || ':' || v_external_order_id
+      );
+    END IF;
   ELSE
     -- Existing live order: lock it and update only marketplace-owned fields.
     SELECT o.id INTO v_order_id
@@ -211,3 +234,58 @@ GRANT EXECUTE ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) TO 
 
 COMMENT ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) IS
   'Imports new eBay orders and records source-aware status snapshots/changes. Existing orders update only marketplace-owned fields; workspace workflow status is never overwritten. Service-role only.';
+
+
+-- Notification provenance: existing/legacy rows are deliberately not deleted.
+-- Only newly generated, verified eBay Production order alerts are exposed by the UI.
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'LEGACY',
+  ADD COLUMN IF NOT EXISTS source_event_key text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_source_event_key_uidx
+  ON public.notifications (organization_id, source_event_key)
+  WHERE source_event_key IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS notifications_live_ebay_orders_idx
+  ON public.notifications (organization_id, created_at DESC)
+  WHERE source = 'EBAY' AND notification_type = 'NEW_EBAY_ORDER' AND is_dismissed = false;
+
+CREATE TABLE IF NOT EXISTS public.web_push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  endpoint text NOT NULL,
+  p256dh text NOT NULL,
+  auth_secret text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT web_push_subscription_unique UNIQUE (organization_id, user_id, endpoint),
+  CONSTRAINT web_push_subscription_endpoint_https CHECK (endpoint LIKE 'https://%'),
+  CONSTRAINT web_push_subscription_key_lengths CHECK (length(p256dh) BETWEEN 80 AND 200 AND length(auth_secret) BETWEEN 16 AND 100)
+);
+
+CREATE INDEX IF NOT EXISTS web_push_subscriptions_org_user_idx
+  ON public.web_push_subscriptions (organization_id, user_id);
+
+ALTER TABLE public.web_push_subscriptions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.web_push_subscriptions FROM PUBLIC, anon;
+GRANT SELECT, INSERT, DELETE ON public.web_push_subscriptions TO authenticated;
+GRANT ALL ON public.web_push_subscriptions TO service_role;
+
+DROP POLICY IF EXISTS web_push_subscriptions_select_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_select_self
+  ON public.web_push_subscriptions FOR SELECT TO authenticated
+  USING (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
+
+DROP POLICY IF EXISTS web_push_subscriptions_insert_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_insert_self
+  ON public.web_push_subscriptions FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
+
+DROP POLICY IF EXISTS web_push_subscriptions_delete_self ON public.web_push_subscriptions;
+CREATE POLICY web_push_subscriptions_delete_self
+  ON public.web_push_subscriptions FOR DELETE TO authenticated
+  USING (user_id = auth.uid() AND public.has_org_permission(organization_id, 'dashboard.view'));
+
+COMMENT ON TABLE public.web_push_subscriptions IS
+  'Per-user browser push endpoints protected by organization permission and owner-only RLS for authenticated users; service_role sends background notifications.';
