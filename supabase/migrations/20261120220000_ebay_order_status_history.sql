@@ -1,6 +1,6 @@
 -- Store provider-origin metadata without rewriting existing order history.
 ALTER TABLE public.notifications
-  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'LEGACY',
+  ADD COLUMN IF NOT EXISTS source text,
   ADD COLUMN IF NOT EXISTS source_event_key text;
 
 -- This migration is code only; it must be reviewed and explicitly deployed before it affects any database.
