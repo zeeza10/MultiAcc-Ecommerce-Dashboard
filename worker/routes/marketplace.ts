@@ -240,6 +240,8 @@ async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<strin
   }
 }
 async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string, externalOrderId: string, env: WorkerEnv): Promise<void> {
+  // Never surface Sandbox or demo orders as live business notifications.
+  if (account.is_demo || account.environment !== 'PRODUCTION') return;
   const sourceEventKey = `EBAY_ORDER:${account.id}:${externalOrderId}`;
   const title = 'New eBay order received';
   const message = `Order ${orderNumber} has been received from your connected eBay seller account.`;
