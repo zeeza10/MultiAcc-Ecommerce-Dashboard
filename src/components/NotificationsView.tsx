@@ -49,7 +49,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     void navigator.serviceWorker.getRegistration('/').then(async (registration) => {
       if (!registration) return;
       const subscription = await registration.pushManager.getSubscription();
-      if (active) setPushEnabled(Boolean(subscription));
+      if (!active) return;
+      setPushEnabled(Boolean(subscription));
+      // Reconcile an existing browser subscription with the authenticated user's server record.
+      if (subscription) await api.savePushSubscription(subscription.toJSON()).catch(() => undefined);
     }).catch(() => undefined);
     return () => { active = false; };
   }, []);
