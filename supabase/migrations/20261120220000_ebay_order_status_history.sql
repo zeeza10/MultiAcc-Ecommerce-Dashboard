@@ -28,7 +28,6 @@ DECLARE
   v_marketplace_status text;
   v_previous_marketplace_status text;
   v_source_timestamp timestamptz;
-  v_has_workspace_history boolean := false;
   v_inserted boolean := false;
   v_status_changed boolean := false;
   v_history_recorded boolean := false;
@@ -143,18 +142,9 @@ BEGIN
       v_status_changed := true;
     END IF;
 
-    SELECT EXISTS (
-      SELECT 1 FROM public.order_status_history AS h
-      WHERE h.organization_id = p_organization_id
-        AND h.order_id = v_order_id
-        AND h.source = 'WORKSPACE'
-    ) INTO v_has_workspace_history;
-
     UPDATE public.orders AS o
     SET
-      -- Do not let marketplace polling overwrite a status already managed by the workspace.
-      status = CASE WHEN v_has_workspace_history THEN o.status
-                    ELSE COALESCE(NULLIF(p_order ->> 'status',''), o.status) END,
+      -- Keep workspace workflow status independent; only refresh marketplace-owned fields.
       payment_state = COALESCE(NULLIF(p_order ->> 'payment_state',''), o.payment_state),
       raw_payload = COALESCE(p_order -> 'safe_payload', o.raw_payload),
       updated_at = now()
@@ -220,4 +210,4 @@ REVOKE ALL ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) FROM P
 GRANT EXECUTE ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) TO service_role;
 
 COMMENT ON FUNCTION public.import_marketplace_order(uuid, uuid, jsonb) IS
-  'Imports new eBay orders and records source-aware status snapshots/changes. Existing orders update marketplace-owned fields only; workspace-managed statuses are preserved. Service-role only.';
+  'Imports new eBay orders and records source-aware status snapshots/changes. Existing orders update only marketplace-owned fields; workspace workflow status is never overwritten. Service-role only.';
