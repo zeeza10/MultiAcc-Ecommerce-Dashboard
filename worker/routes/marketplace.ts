@@ -256,7 +256,10 @@ async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string,
     source_event_key: sourceEventKey,
   }).select('id').maybeSingle();
   // Notification delivery must never roll back or mark a successfully imported order as failed.
-  if (error || !notification?.id) return;
+  if (error || !notification?.id) {
+    console.warn('A new eBay order was imported, but its in-app notification could not be stored.', error?.code || 'notification_insert_failed');
+    return;
+  }
 
   const { data: members, error: memberError } = await admin.from('organization_members')
     .select('user_id,roles(code)')
@@ -273,7 +276,11 @@ async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string,
     .select('id,endpoint,p256dh,auth_secret')
     .eq('organization_id', account.organization_id)
     .in('user_id', recipientIds);
-  if (subscriptionError || !subscriptions?.length) return;
+  if (subscriptionError) {
+    console.warn('Live eBay order notification was stored, but push subscriptions could not be loaded.');
+    return;
+  }
+  if (!subscriptions?.length) return;
 
   await Promise.all(subscriptions.map(async (subscription: any) => {
     const result = await sendWebPushNotification(subscription, {
@@ -282,6 +289,7 @@ async function notifyNewEbayOrder(admin: any, account: any, orderNumber: string,
       url: '/',
       notificationId: notification.id,
     }, env);
+    if (!result.ok) console.warn('Web Push delivery failed for a live eBay order notification.', result.status || 'vapid_or_crypto_error');
     if (result.status === 404 || result.status === 410) {
       await admin.from('web_push_subscriptions').delete().eq('id', subscription.id);
     }
