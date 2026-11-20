@@ -386,6 +386,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               <div>
                 <div className="flex items-center space-x-2">
                   <h2 className="text-lg font-bold text-gray-900">{selectedOrder.orderNumber}</h2>
+                  <span className="text-[10px] font-semibold text-gray-500">Workspace:</span>
                   {getStatusBadge(selectedOrder.status)}
                   <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-800 font-mono font-medium">
                     {selectedOrder.salesSource}
