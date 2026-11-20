@@ -1,7 +1,7 @@
-import type { AuthContext } from '../types';
+import type { AuthContext, WorkerEnv } from '../types';
 import { json } from '../http';
 
-export async function handleSystemRoute(path: string, request: Request, auth: AuthContext): Promise<Response | null> {
+export async function handleSystemRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
   if (path === '/system/config' && request.method === 'GET') {
     const { data, error } = await auth.repositoryContext.supabase.from('system_settings')
       .select('base_currency,business_timezone,default_vat_rate_percent,adjustment_approval_threshold_value_minor,adjustment_approval_threshold_quantity,active_release_phase,allow_negative_stock,auto_sync_enabled')
@@ -94,18 +94,58 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
     })) });
   }
 
+  if (path === '/notifications/push/public-key' && request.method === 'GET') {
+    return json({ enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT), publicKey: env.VAPID_PUBLIC_KEY || null });
+  }
+
+  if (path === '/notifications/push/subscriptions' && request.method === 'POST') {
+    if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return json({ error: 'Push notifications are not configured on the server yet.' }, 503);
+    const body = await request.json() as Record<string, unknown>;
+    const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
+    const keys = body.keys && typeof body.keys === 'object' ? body.keys as Record<string, unknown> : {};
+    const p256dh = typeof keys.p256dh === 'string' ? keys.p256dh : '';
+    const authSecret = typeof keys.auth === 'string' ? keys.auth : '';
+    let endpointUrl: URL;
+    try { endpointUrl = new URL(endpoint); } catch { return json({ error: 'A valid push endpoint is required.' }, 400); }
+    if (endpointUrl.protocol !== 'https:' || endpoint.length > 2048 || p256dh.length < 80 || p256dh.length > 200 || authSecret.length < 16 || authSecret.length > 100) {
+      return json({ error: 'The browser push subscription is invalid.' }, 400);
+    }
+    const subscription = { organization_id: auth.organizationId, user_id: auth.user.id, endpoint, p256dh, auth_secret: authSecret, updated_at: new Date().toISOString() };
+    const { error } = await auth.repositoryContext.supabase.from('web_push_subscriptions').insert(subscription);
+    if (error) {
+      if (error.code === '23505') {
+        const { data: existing } = await auth.repositoryContext.supabase.from('web_push_subscriptions')
+          .select('id').eq('endpoint', endpoint).eq('user_id', auth.user.id).eq('organization_id', auth.organizationId).maybeSingle();
+        if (existing) return json({ success: true, alreadySubscribed: true });
+        return json({ error: 'This browser push endpoint is already registered to another workspace user.' }, 409);
+      }
+      throw new Error('The browser push subscription could not be saved.');
+    }
+    return json({ success: true });
+  }
+
+  if (path === '/notifications/push/subscriptions' && request.method === 'DELETE') {
+    const body = await request.json() as Record<string, unknown>;
+    const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
+    if (!endpoint || endpoint.length > 2048) return json({ error: 'A valid push endpoint is required.' }, 400);
+    const { error } = await auth.repositoryContext.supabase.from('web_push_subscriptions')
+      .delete().eq('endpoint', endpoint).eq('user_id', auth.user.id).eq('organization_id', auth.organizationId);
+    if (error) throw new Error('The browser push subscription could not be removed.');
+    return json({ success: true });
+  }
+
   if (path === '/notifications' && request.method === 'GET') {
     let notificationsQuery = auth.repositoryContext.supabase.from('notifications')
-      .select('id,notification_type,title,message,severity,reference_url,is_read,is_dismissed,created_at,user_id')
+      .select('id,notification_type,title,message,severity,reference_url,is_read,is_dismissed,created_at,user_id,source')
       .eq('organization_id', auth.organizationId)
-      .eq('is_dismissed', false).order('created_at', { ascending: false }).limit(100);
+      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER').order('created_at', { ascending: false }).limit(100);
     if (auth.user.role === 'CLIENT_USER') notificationsQuery = notificationsQuery.eq('user_id', auth.user.id);
     else notificationsQuery = notificationsQuery.or(`user_id.is.null,user_id.eq.${auth.user.id}`);
     const { data, error } = await notificationsQuery;
     if (error) throw new Error('Notifications could not be loaded.');
     return json({ notifications: (data || []).map(row => ({
       id: row.id, type: row.notification_type, title: row.title, message: row.message,
-      severity: row.severity, referenceUrl: row.reference_url || '', isRead: row.is_read,
+      severity: row.severity, referenceUrl: row.reference_url || '', isRead: row.is_read, source: row.source,
       isDismissed: row.is_dismissed, createdAt: row.created_at,
     })) });
   }
