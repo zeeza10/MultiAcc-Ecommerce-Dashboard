@@ -1,47 +1,50 @@
-# eBay OAuth Integration Readiness
+# eBay Integration — Current Readiness and Remaining Work
 
-## Current verified state
+**Reviewed:** 2026-11-21
+**Runtime:** Cloudflare Worker multiacc-ecommerce-dashboard
+**Status:** Core OAuth and read-only order/inventory synchronization are implemented in the Worker. The integration is not feature-complete across the full eBay seller lifecycle.
 
-- The legacy `server/ebayAdapter.ts` is a simulation, not a real eBay integration. Its `connect()` method marks an account connected and invents a 30-day expiry; its order sync uses hard-coded sample orders.
-- The Cloudflare Worker currently exposes safe read-only marketplace account metadata and sync history. OAuth connect, token refresh and order sync remain intentionally unavailable (501) until a real implementation is ready.
-- The current Cloudflare Worker settings were inspected without reading or exposing secret values. Only `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `ASSETS` bindings were present. No eBay OAuth credentials or token-encryption key are configured.
+## Implemented in the Worker
 
-## Required credentials and bindings
+- Platform-managed SANDBOX and PRODUCTION application credentials are stored encrypted in Supabase; only masked client IDs and verification metadata are exposed to the UI.
+- Account-scoped OAuth start route checks marketplace.manage, binds a random one-time state to user, organization, account and environment, and expires it after ten minutes.
+- OAuth callback consumes the state once, exchanges the code server-side, captures the seller's immutable eBay user ID, encrypts access/refresh tokens, and persists token expiry/scopes.
+- Token refresh uses a database lease to prevent concurrent refreshes, rotates refresh tokens when eBay returns a replacement, and disconnects revoked/expired authorizations.
+- Real Sell Fulfillment order sync uses pagination, a saved cursor/watermark, a rolling two-year start-date clamp, idempotent transactional imports, SKU exception handling, sync-run/checkpoint records, and Production-only new-order in-app/push notifications.
+- Real Inventory API sync reads inventory items and offers and stores listing snapshots and sanitized per-SKU failures.
+- Scheduled sync excludes demo accounts and uses a leased, idempotent job queue with bounded attempts.
+- Raw provider payload access remains restricted to Super Admin; ordinary users receive normalized business data.
 
-Configure these as Cloudflare Worker **Secrets**, not plain-text variables and never in GitHub source or Vite/browser environment variables:
+## Important limitations / not yet complete
 
-- Sandbox eBay Client ID
-- Sandbox eBay Client Secret
-- Sandbox RuName / redirect URI identifier
-- Production eBay Client ID
-- Production eBay Client Secret
-- Production RuName / redirect URI identifier
-- A strong token-encryption key with a documented key version and rotation plan
+1. **Active Listings coverage:** Current listing snapshots are based on Inventory API inventory items/offers. eBay documents that Inventory API does not return listings created through Seller Hub or Trading API unless they are migrated into the Inventory API model. A separate compatibility/read path is required for complete Active Listings coverage; no listing create/revise/publish/delete scope is included in this milestone without approval.
+2. **Returns:** The current /returns module is an internal returns/disposition workflow. It is not yet a complete eBay Return API integration for seller return requests, messages, labels, approvals/declines, received items, and refunds.
+3. **Seller Account:** OAuth captures seller identity and current account metadata, but full seller account settings, selling limits, business policies, payment/fulfilment/return policies, and seller status views still need API coverage.
+4. **Analytics:** Current dashboard/report data is derived from internal orders, inventory and finance tables. eBay Analytics API traffic reports, seller standards profiles, and customer-service metrics are not yet integrated.
+5. **Finances:** Current finance and payout views use internal finance/payout records. eBay Finances API payout, transaction, fee, refund, transfer, and seller-funds data have not yet been imported and reconciled as provider-sourced records.
+6. **Production queue recovery:** Production snapshot showed 1,027 order-sync failure events, 647 dead-letter jobs, 692 queued jobs, and 19 running jobs. The dominant historical order error was eBay 30830 (start date outside the two-year window); Sandbox inventory failures also recorded the offerResults is not defined bug fixed in PR #159. Do not bulk retry or drain these jobs until the fix is deployed and a deduplicated, bounded recovery plan is approved.
 
-The exact binding names will be finalized in the OAuth implementation. Keep Sandbox and Production credentials separate. Do not paste client secrets or seller tokens into chat or commit them to the repository.
+## Milestone 2 implementation order
 
-## Required implementation sequence
+1. Merge/release the Milestone 1 corrective PR after approval; verify the deployed Worker version before queue recovery.
+2. Stabilize order sync: test date normalization/cursor reset, verify real eBay responses, prevent duplicate import, and define safe recovery for old FAILED/DEAD_LETTER/QUEUED jobs.
+3. Complete Active Listings read coverage using the appropriate read-only provider path and preserve provider source/environment/IDs.
+4. Integrate eBay Returns read/workflow operations with explicit mapping to internal return records; keep any seller-impacting mutations (refund/decline/label/message) behind separately approved permissions.
+5. Add Seller Account read models and business-policy/selling-limit metadata.
+6. Integrate Analytics API reports with provider timestamps and marketplace/account scope.
+7. Integrate Finances API payouts/transactions/fees/refunds/transfers/funds summary and reconcile against internal ledger without fabricating amounts.
+8. Add contract tests, pagination/retry tests, tenant isolation, and Preview validation for each integration.
 
-1. Create an account-scoped OAuth start endpoint that checks `marketplace.manage`, validates the account's environment and generates a cryptographically random, one-time state value.
-2. Store OAuth state server-side with a short expiry and bind it to the authenticated user, organization, marketplace account and environment. A callback must reject missing, expired, reused or mismatched state.
-3. Redirect the seller to eBay's consent page with the exact configured RuName and least-privilege scopes.
-4. Handle the callback without trusting browser-supplied organization/account identifiers; resolve them only from the stored one-time state.
-5. Exchange the one-time authorization code server-side. Never persist the authorization code.
-6. Encrypt access and refresh tokens before storing them in `marketplace_credentials`; store key version, scopes and token expiry. Never return token values to the browser or logs.
-7. Implement refresh-token rotation and revoked-token handling. Mark the marketplace account as expired/disconnected and require fresh consent if eBay revokes the refresh token.
-8. Add real eBay Sell Fulfillment API order sync with pagination, idempotency, SKU exception handling, sync-run records, retry limits and audit events. Remove simulated adapter behavior only after parity tests pass.
+## OAuth and scope safety
 
-## Security and operational rules
+The current consent scope list includes the base, Fulfillment read-only, Inventory read-only, Account read-only, and Commerce Identity read-only scopes. Returns, Analytics and Finances need an explicit scope/API compatibility review. Do not silently widen scopes or force seller re-consent. Seller-impacting actions must be treated as write operations and require product/security approval.
 
-- Use the Authorization Code Grant for seller-owned data. Application/client-credentials tokens are not a substitute for seller consent.
-- Validate OAuth `state` to mitigate CSRF.
-- Keep tokens and client secrets server-side only. Redact authorization codes, tokens and sensitive buyer data from logs.
-- Use the correct Sandbox or Production OAuth and API endpoints for each account; never mix environment tokens.
-- Do not mark an account CONNECTED until eBay returns valid token material and the token has been encrypted and persisted successfully.
-- Do not start production seller authorization until Sandbox flow and order import have passed end-to-end tests.
+## Official eBay references
 
-## Official references
-
-- eBay Authorization and OAuth grant flows: https://developer.ebay.com/develop/guides/sell/authorization
-- eBay OAuth credentials and environment separation: https://developer.ebay.com/api-docs/static/oauth-credentials.html
-- eBay OAuth token types: https://developer.ebay.com/api-docs/static/oauth-token-types.html
+- Authorization and OAuth: https://developer.ebay.com/develop/guides/sell/authorization
+- Inventory API coverage and migration limits: https://developer.ebay.com/api-docs/sell/inventory/overview.html
+- Trading API GetMyeBaySelling: https://developer.ebay.com/DevZone/XML/docs/Reference/eBay/GetMyeBaySelling.html
+- Return API: https://developer.ebay.com/develop/api/sell/sell_return
+- Analytics API: https://developer.ebay.com/develop/api/sell/analytics_api
+- Finances API: https://developer.ebay.com/develop/api/sell/finances_api
+- Fulfillment API two-year order search limit: https://developer.ebay.com/develop/api/sell/fulfillment_api/order/getOrders
