@@ -15,6 +15,10 @@
 - Scheduled sync excludes demo accounts and uses a leased, idempotent job queue with bounded attempts.
 - Raw provider payload access remains restricted to Super Admin; ordinary users receive normalized business data.
 
+## Milestone 2.1 implementation in progress
+
+PR #160 adds permanent/transient failure classification (including no automatic retry for eBay 30830), a separate last-attempt timestamp, an atomic per-account scheduled enqueue RPC, queue coalescing that preserves old job rows as DEAD_LETTER audit records, and one-job-per-account claim selection. It also treats fully imported orders with SKU mapping exceptions as completed sync work rather than retrying them. The database migration must be approved and applied before the Worker deployment; neither has been applied to Production yet.
+
 ## Important limitations / not yet complete
 
 1. **Active Listings coverage:** Current listing snapshots are based on Inventory API inventory items/offers. eBay documents that Inventory API does not return listings created through Seller Hub or Trading API unless they are migrated into the Inventory API model. A separate compatibility/read path is required for complete Active Listings coverage; no listing create/revise/publish/delete scope is included in this milestone without approval.
