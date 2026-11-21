@@ -673,10 +673,11 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
     for (const listing of parsed.listings) {
       const itemId = typeof listing.itemId === 'string' ? listing.itemId : '';
       if (!itemId) continue;
+      const { rawXml, ...listingFields } = listing;
       await saveEbayProviderSnapshot(
         admin, account, 'ACTIVE_LISTING_TRADING', itemId, batchId,
-        { ...listing, source: 'EBAY_TRADING_API', siteId },
-        listing,
+        { ...listingFields, source: 'EBAY_TRADING_API', siteId },
+        { xml: typeof rawXml === 'string' ? rawXml : null },
         null,
       );
       fetched++;
@@ -739,6 +740,7 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
         ...buildEbayPostOrderHeaders(accessToken, account.marketplace),
       },
     });
+    if (response.status === 204) break;
     if (!response.ok) throw await readEbayOrdersApiError(response);
     const payload = await response.json() as Record<string, any>;
     const members = Array.isArray(payload.members) ? payload.members : [];
