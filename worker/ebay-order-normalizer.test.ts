@@ -90,6 +90,16 @@ describe('eBay order provider-data normalization', () => {
     assert.equal(JSON.stringify(result.exceptions).includes('GB123456789'), false);
   });
 
+  it('adds seller-collected and eBay-collected taxes when no order tax total is supplied', () => {
+    const order = {
+      lineItems: [{
+        taxes: [{ amount: { value: '2.00', currency: 'GBP' } }],
+        ebayCollectAndRemitTaxes: [{ amount: { value: '3.00', currency: 'GBP' } }],
+      }],
+    };
+    assert.equal(ebayOrderTaxMinor(order), 500);
+  });
+
   it('calculates provider tax and net shipping from the supplied breakdown', () => {
     const order = {
       pricingSummary: {
