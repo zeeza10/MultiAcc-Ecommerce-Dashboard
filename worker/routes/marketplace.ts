@@ -7,6 +7,7 @@ import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
 import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
 import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
 import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
+import { buildEbayPostOrderHeaders, subtractUtcMonthsClamped } from '../ebay-post-order';
 import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
@@ -714,8 +715,7 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
   const admin = createServiceClient(env);
   const batchId = crypto.randomUUID();
   const endDate = new Date();
-  const startDate = new Date(endDate);
-  startDate.setUTCMonth(startDate.getUTCMonth() - 18);
+  const startDate = subtractUtcMonthsClamped(endDate, 18);
   const startIso = startDate.toISOString();
   const endIso = endDate.toISOString();
   const limit = 200;
@@ -731,15 +731,12 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
     endpoint.searchParams.set('creation_date_range_from', startIso);
     endpoint.searchParams.set('creation_date_range_to', endIso);
     endpoint.searchParams.set('role', 'BUYER');
-    endpoint.searchParams.set('fieldgroups', 'SUMMARY');
     endpoint.searchParams.set('limit', String(limit));
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'X-EBAY-C-MARKETPLACE-ID': account.marketplace === 'EBAY_UK' ? 'EBAY_GB' : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US',
-        Accept: 'application/json',
+        ...buildEbayPostOrderHeaders(accessToken, account.marketplace),
       },
     });
     if (!response.ok) throw await readEbayOrdersApiError(response);
@@ -862,7 +859,7 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
 }
 
 async function fetchEbayFinanceJson(accessToken: string, path: string, marketplaceId: string, env: WorkerEnv): Promise<Record<string, any>> {
-  const url = `https://api.ebay.com${path}`;
+  const url = new URL(path, 'https://apiz.ebay.com').toString();
   const signatureHeaders = await createEbayFinanceSignatureHeaders('GET', url, env);
   const response = await fetch(url, {
     method: 'GET',
@@ -873,6 +870,7 @@ async function fetchEbayFinanceJson(accessToken: string, path: string, marketpla
       ...signatureHeaders,
     },
   });
+  if (response.status === 204) return {};
   if (!response.ok) throw await readEbayOrdersApiError(response);
   const payload: unknown = await response.json();
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -905,7 +903,11 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
   const resources: Array<{ type: string; key: string; path: string }> = [
     { type: 'FINANCE_SUMMARY', key: 'SELLER_FUNDS_CURRENT', path: '/sell/finances/v1/seller_funds_summary' },
     { type: 'FINANCE_SUMMARY', key: 'PAYOUT_SUMMARY_CURRENT', path: '/sell/finances/v1/payout_summary' },
-    { type: 'FINANCE_SUMMARY', key: 'TRANSACTION_SUMMARY_90_DAYS', path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}` },
+    ...['PAYOUT', 'FUNDS_PROCESSING', 'FUNDS_AVAILABLE_FOR_PAYOUT', 'FUNDS_ON_HOLD', 'COMPLETED', 'FAILED'].map(status => ({
+      type: 'FINANCE_SUMMARY',
+      key: `TRANSACTION_SUMMARY_${status}_90_DAYS`,
+      path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionStatus:{${status}}`)}&filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
+    })),
   ];
   const synced: string[] = [];
   const failed: Array<{ resource: string; message: string }> = [];
