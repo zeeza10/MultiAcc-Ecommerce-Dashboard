@@ -15,9 +15,13 @@
 - Scheduled sync excludes demo accounts and uses a leased, idempotent job queue with bounded attempts.
 - Raw provider payload access remains restricted to Super Admin; ordinary users receive normalized business data.
 
+## Production-only implementation policy
+
+The active integration is Production only. No Supabase Development Branch or test/sandbox seller account is required. New Production database migrations are labelled `PRODUCTION` in their filename and PR description, reviewed in GitHub, then applied to the existing Production project. Existing historical non-Production records are retained but excluded from future synchronization and queue claims.
+
 ## Milestone 2.1 implementation in progress
 
-PR #160 adds permanent/transient failure classification (including no automatic retry for eBay 30830), a separate last-attempt timestamp, an atomic per-account scheduled enqueue RPC, queue coalescing that preserves old job rows as DEAD_LETTER audit records, and one-job-per-account claim selection. It also treats fully imported orders with SKU mapping exceptions as completed sync work rather than retrying them. The database migration must be approved and applied before the Worker deployment; neither has been applied to Production yet.
+PR #160 adds permanent/transient failure classification (including no automatic retry for eBay 30830), a separate last-attempt timestamp, an atomic per-account scheduled enqueue RPC, queue coalescing that preserves old job rows as DEAD_LETTER audit records, and one-job-per-account claim selection. It also treats fully imported orders with SKU mapping exceptions as completed sync work rather than retrying them. The Production migration `20261121170000_bound_marketplace_sync_queue_and_retries` is now present in the live Production migration history. The follow-on Production-only queue migration and provider-snapshot migration are in the current implementation PR and must be applied before the new Worker version is deployed.
 
 ## Important limitations / not yet complete
 
@@ -26,7 +30,7 @@ PR #160 adds permanent/transient failure classification (including no automatic 
 3. **Seller Account:** OAuth captures seller identity and current account metadata, but full seller account settings, selling limits, business policies, payment/fulfilment/return policies, and seller status views still need API coverage.
 4. **Analytics:** Current dashboard/report data is derived from internal orders, inventory and finance tables. eBay Analytics API traffic reports, seller standards profiles, and customer-service metrics are not yet integrated.
 5. **Finances:** Current finance and payout views use internal finance/payout records. eBay Finances API payout, transaction, fee, refund, transfer, and seller-funds data have not yet been imported and reconciled as provider-sourced records.
-6. **Production queue recovery:** Production snapshot showed 1,027 order-sync failure events, 647 dead-letter jobs, 692 queued jobs, and 19 running jobs. The dominant historical order error was eBay 30830 (start date outside the two-year window); Sandbox inventory failures also recorded the offerResults is not defined bug fixed in PR #159. Do not bulk retry or drain these jobs until the fix is deployed and a deduplicated, bounded recovery plan is approved.
+6. **Production queue recovery:** Production snapshot showed 1,027 order-sync failure events, 647 dead-letter jobs, 692 queued jobs, and 19 running jobs. The dominant historical order error was eBay 30830 (start date outside the two-year window); Historical inventory failures also recorded the offerResults is not defined bug fixed in PR #159. Do not bulk retry or drain these jobs until the fix is deployed and a deduplicated, bounded recovery plan is approved.
 
 ## Milestone 2 implementation order
 
