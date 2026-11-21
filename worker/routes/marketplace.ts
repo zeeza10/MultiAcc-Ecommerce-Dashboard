@@ -1861,20 +1861,22 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
 
   if (path === '/ebay/sku-mappings' && request.method === 'GET') {
     const accountId = new URL(request.url).searchParams.get('accountId');
-    let query = auth.repositoryContext.supabase
+    if (!accountId || accountId === 'ALL') return json({ error: 'Select one seller account to read its SKU mappings.' }, 400);
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase
+      .from('marketplace_accounts').select('id,environment,is_demo,auth_status')
+      .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError) throw accountError;
+    if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production seller account mappings can be read here.' }, 409);
+    }
+    const query = auth.repositoryContext.supabase
       .from('marketplace_sku_mappings')
       .select('id,marketplace_account_id,product_id,external_sku,external_listing_id,listing_title,created_at')
       .eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId)
       .order('created_at', { ascending: false })
       .limit(1000);
-    if (accountId && accountId !== 'ALL') {
-      const { data: account, error: accountError } = await auth.repositoryContext.supabase
-        .from('marketplace_accounts').select('id')
-        .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
-      if (accountError) throw accountError;
-      if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
-      query = query.eq('marketplace_account_id', accountId);
-    }
     const { data: mappings, error } = await query;
     if (error) throw new Error('Marketplace SKU mappings could not be loaded.');
     const productIds = [...new Set((mappings || []).map(row => row.product_id))];
