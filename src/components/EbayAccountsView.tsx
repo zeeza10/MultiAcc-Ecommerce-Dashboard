@@ -7,6 +7,7 @@ import {
   Activity,
   XCircle,
   Trash2,
+  Search,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -1020,7 +1021,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
             <div className="bg-white rounded-lg border p-6 text-center text-xs text-slate-500">
               Loading Production marketplace accounts…
             </div>
-          ) : (initialSection ? !moduleAccountId || !accounts.some(acc => acc.id === moduleAccountId) : accounts.length === 0) ? (
+          ) : (initialSection ? !moduleAccountId || !accounts.some(acc => acc.id === moduleAccountId && acc.authStatus === 'CONNECTED') : accounts.length === 0) ? (
             <div className="bg-white rounded-lg border border-dashed p-8 text-center">
               <Store className="mx-auto mb-2 h-7 w-7 text-slate-400" />
               <p className="text-sm font-medium text-slate-700">
@@ -1031,7 +1032,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={initialSection ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
               {(initialSection ? accounts.filter(acc => acc.id === moduleAccountId) : accounts).map((acc, index) => {
                 const isSyncing = syncingAccountId === acc.id;
 
