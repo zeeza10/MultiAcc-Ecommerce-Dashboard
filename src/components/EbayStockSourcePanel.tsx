@@ -33,6 +33,7 @@ interface EbayStockSourcePanelProps {
   selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   localRecords?: any[];
   mode: 'PRODUCTS' | 'INVENTORY';
+  onAllocationSaved?: () => void | Promise<void>;
 }
 
 const money = (value: unknown, currency = 'GBP') => {
@@ -44,7 +45,7 @@ const money = (value: unknown, currency = 'GBP') => {
 
 const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
 
-export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], mode }) => {
+export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], mode, onAllocationSaved }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,8 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState('');
+  const [allocationInputs, setAllocationInputs] = useState<Record<string, { allocated: string; reserved: string }>>({});
+  const [savingAllocationKey, setSavingAllocationKey] = useState('');
 
   const products = useMemo<ProductOption[]>(() => {
     const seen = new Set<string>();
@@ -172,6 +175,43 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
     }
   };
 
+  const saveAllocation = async (row: ListingRow, mapping: SkuMapping) => {
+    const key = rowKey(row);
+    const current = localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+    const values = allocationInputs[key] || {
+      allocated: String(current?.onHand ?? 0),
+      reserved: String(current?.reserved ?? 0),
+    };
+    const allocatedQuantity = Number(values.allocated);
+    const reservedQuantity = Number(values.reserved);
+    if (!Number.isSafeInteger(allocatedQuantity) || !Number.isSafeInteger(reservedQuantity)
+      || allocatedQuantity < 0 || reservedQuantity < 0 || reservedQuantity > allocatedQuantity) {
+      setError('Allocated and reserved quantities must be valid non-negative whole numbers.');
+      return;
+    }
+    setSavingAllocationKey(key);
+    setError('');
+    setNotice('');
+    try {
+      await api.allocateStoreInventory({
+        marketplaceAccountId: row.accountId,
+        productId: mapping.productId,
+        allocatedQuantity,
+        reservedQuantity,
+      });
+      setAllocationInputs(currentInputs => ({
+        ...currentInputs,
+        [key]: { allocated: String(allocatedQuantity), reserved: String(reservedQuantity) },
+      }));
+      setNotice(`Store allocation saved for ${row.sku}. Physical warehouse stock was not changed.`);
+      void onAllocationSaved?.();
+    } catch (err: any) {
+      setError(err?.message || 'Store allocation could not be saved. Check available physical stock and permissions.');
+    } finally {
+      setSavingAllocationKey('');
+    }
+  };
+
   return (
     <section className="rounded-xl border border-indigo-100 bg-white shadow-sm overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 to-white p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -197,10 +237,10 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>
-            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Store Allocation' : 'Physical Available'}</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th>
+            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Store Available' : 'Physical Available'}</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th><th className="px-4 py-3 font-semibold">Allocation Controls</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
+            {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
               rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
               rows.map((row, index) => {
                 const key = rowKey(row);
@@ -231,13 +271,32 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                         <button type="button" onClick={() => void saveMapping(row)} disabled={!suggestedProductId || savingKey === key} className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{savingKey === key ? 'Saving…' : 'Map'}</button>
                       </div>}
                   </td>
+                  <td className="min-w-[190px] px-4 py-3">
+                    {mode === 'INVENTORY' && selectedStoreId !== 'ALL' && mapping ? (() => {
+                      const current = localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+                      const values = allocationInputs[key] || {
+                        allocated: String(current?.onHand ?? 0),
+                        reserved: String(current?.reserved ?? 0),
+                      };
+                      return <div className="flex items-center gap-1.5">
+                        <input type="number" min="0" step="1" aria-label={`Allocated quantity for ${row.sku}`} value={values.allocated}
+                          onChange={event => setAllocationInputs(currentInputs => ({ ...currentInputs, [key]: { ...values, allocated: event.target.value } }))}
+                          className="w-16 rounded-md border border-slate-300 px-1.5 py-1 text-[11px]" />
+                        <input type="number" min="0" step="1" aria-label={`Reserved quantity for ${row.sku}`} value={values.reserved}
+                          onChange={event => setAllocationInputs(currentInputs => ({ ...currentInputs, [key]: { ...values, reserved: event.target.value } }))}
+                          className="w-16 rounded-md border border-slate-300 px-1.5 py-1 text-[11px]" />
+                        <button type="button" onClick={() => void saveAllocation(row, mapping)} disabled={savingAllocationKey === key}
+                          className="rounded-md bg-indigo-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{savingAllocationKey === key ? '…' : 'Save'}</button>
+                      </div>;
+                    })() : <span className="text-[10px] text-slate-400">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Map SKU first' : 'Select one seller in Inventory to allocate'}</span>}
+                  </td>
                 </tr>;
               })}
           </tbody>
         </table>
       </div>
       <div className="flex flex-col gap-1 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 sm:flex-row sm:justify-between">
-        <span>Mapping links seller SKU to an internal product. eBay quantity is never posted to physical stock ledger.</span>
+        <span>Mapping links seller SKU to an internal product. Store allocations are limited by available physical stock and never alter the physical stock ledger.</span>
         <span>{updatedAt ? `Loaded ${new Date(updatedAt).toLocaleString()}` : 'Not loaded yet'}</span>
       </div>
     </section>

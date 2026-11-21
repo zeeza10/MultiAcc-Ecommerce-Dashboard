@@ -155,13 +155,30 @@ export async function handleInventoryRoute(path: string, request: Request, url: 
     const body = await request.json() as Record<string, unknown>;
     const allocated = Number(body.allocatedQuantity);
     const reserved = Number(body.reservedQuantity || 0);
+    const marketplaceAccountId = String(body.marketplaceAccountId || '').trim();
+    const productId = String(body.productId || '').trim();
+    if (!marketplaceAccountId || !productId) return json({ error: 'A marketplace seller account and internal product are required.' }, 400);
     if (!Number.isSafeInteger(allocated) || !Number.isSafeInteger(reserved) || allocated < 0 || reserved < 0 || reserved > allocated) {
       return json({ error: 'Allocated and reserved quantities must be valid whole numbers.' }, 400);
     }
+    const [accountResult, productResult] = await Promise.all([
+      auth.repositoryContext.supabase.from('marketplace_accounts').select('id,environment,is_demo')
+        .eq('id', marketplaceAccountId).eq('organization_id', auth.organizationId).maybeSingle(),
+      auth.repositoryContext.supabase.from('products').select('id,data_environment')
+        .eq('id', productId).eq('organization_id', auth.organizationId).maybeSingle(),
+    ]);
+    if (accountResult.error) throw accountResult.error;
+    if (productResult.error) throw productResult.error;
+    if (!accountResult.data || !productResult.data) return json({ error: 'The selected seller account or internal product was not found in this workspace.' }, 404);
+    const accountEnvironment = accountResult.data.is_demo ? 'DEMO'
+      : accountResult.data.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+    if (productResult.data.data_environment !== accountEnvironment) {
+      return json({ error: 'Marketplace allocations cannot cross Demo, Sandbox and Production environments.' }, 409);
+    }
     const { data, error } = await auth.repositoryContext.supabase.rpc('set_marketplace_inventory_allocation', {
       p_organization_id: auth.organizationId,
-      p_marketplace_account_id: String(body.marketplaceAccountId || ''),
-      p_product_id: String(body.productId || ''),
+      p_marketplace_account_id: marketplaceAccountId,
+      p_product_id: productId,
       p_allocated_quantity: allocated,
       p_reserved_quantity: reserved,
       p_source: String(body.source || 'MANUAL'),
