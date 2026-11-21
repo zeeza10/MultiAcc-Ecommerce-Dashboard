@@ -132,12 +132,13 @@ export default function App() {
       }
     };
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshNotifications(); };
-    const intervalId = window.setInterval(() => { void refreshNotifications(); }, 15000);
+    const onWindowFocus = () => { void refreshNotifications(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
     return () => {
       active = false;
-      window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
     };
   }, [organizationId]);
 
@@ -203,7 +204,7 @@ export default function App() {
       active = false;
       window.removeEventListener('oria-orders-updated', refreshOrderCount);
     };
-  }, [permissions, selectedStoreId, selectedEnvironment, activeTab]);
+  }, [permissions, selectedStoreId, selectedEnvironment]);
 
   useEffect(() => {
     if (!globalSearch.trim()) {
@@ -490,13 +491,9 @@ export default function App() {
         {/* Center Main View */}
         <main aria-busy={pendingApiRequests > 0} className="relative flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
           {pendingApiRequests > 0 && (
-            <div className="workspace-loading-overlay" role="status" aria-live="polite" aria-atomic="true">
-              <div className="workspace-loading-card">
-                <LoaderCircle className="h-9 w-9 animate-spin text-indigo-600" aria-hidden="true" />
-                <span className="text-sm font-semibold">Loading data…</span>
-                <span className="text-xs text-slate-500">Please wait while this section updates</span>
-                <span className="sr-only">{pendingApiRequests} requests in progress</span>
-              </div>
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-0.5 overflow-hidden" role="status" aria-live="polite" aria-label="Updating data">
+              <div className="h-full w-1/3 animate-[loading-progress_1.2s_ease-in-out_infinite] rounded-full bg-indigo-600" />
+              <span className="sr-only">{pendingApiRequests} requests in progress</span>
             </div>
           )}
           {activeTab === 'dashboard' && (
@@ -699,9 +696,7 @@ export default function App() {
         config={config}
         selectedStoreId={selectedStoreId}
         onSuccess={() => {
-          if (activeTab === 'adjustments' || activeTab === 'inventory') {
-            window.location.reload();
-          }
+          window.dispatchEvent(new Event('oria-inventory-updated'));
         }}
       />
 
@@ -714,9 +709,6 @@ export default function App() {
         selectedEnvironment={selectedEnvironment}
         onSuccess={() => {
           window.dispatchEvent(new Event('oria-orders-updated'));
-          if (activeTab === 'orders') {
-            window.location.reload();
-          }
         }}
       />
     </div>
