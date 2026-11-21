@@ -37,10 +37,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
   useEffect(() => {
     void loadNotifications();
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadNotifications(false);
-    }, 15000);
-    return () => window.clearInterval(intervalId);
   }, [currentUser.id]);
 
   useEffect(() => {
