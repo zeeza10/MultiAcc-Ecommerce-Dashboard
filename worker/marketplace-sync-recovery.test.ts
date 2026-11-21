@@ -8,7 +8,7 @@ describe('Production sync-run recovery selection', () => {
   it('recovers stale runs when no live job lease exists', () => {
     const ids = getAbandonedProductionSyncRunIds([
       { id: 'old', marketplace_account_id: 'account-a', started_at: '2026-11-21T14:00:00.000Z' },
-      { id: 'recent', marketplace_account_id: 'account-a', started_at: '2026-11-21T14:25:00.000Z' },
+      { id: 'recent', marketplace_account_id: 'account-a', started_at: '2026-11-21T14:35:00.000Z' },
     ], [], cutoff);
     assert.deepEqual(ids, ['old']);
   });
