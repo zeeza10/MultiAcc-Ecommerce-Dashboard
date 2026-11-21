@@ -28,12 +28,15 @@ describe('eBay Trading active listing parser', () => {
     assert.equal(result.ack, 'Success');
     assert.equal(result.totalPages, 1);
     assert.equal(result.totalEntries, 1);
-    assert.deepEqual(result.listings[0], {
+    const { rawXml, ...normalized } = result.listings[0];
+    assert.deepEqual(normalized, {
       itemId: '123456789', sku: 'SKU-1', title: 'Tom & Jerry', quantity: 8, quantitySold: 3,
       listingType: 'FixedPriceItem', listingStatus: 'Active', currentPrice: '12.50', currency: 'GBP',
       startTime: '2026-11-20T10:00:00.000Z', endTime: '2026-12-20T10:00:00.000Z',
       viewItemUrl: null, galleryUrl: 'https://img.example/item.jpg',
     });
+    assert.equal(typeof rawXml, 'string');
+    assert.ok(String(rawXml).includes('<ItemID>123456789</ItemID>'));
   });
 
   it('does not invent item IDs, prices, currencies or quantities', () => {
