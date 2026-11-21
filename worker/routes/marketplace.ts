@@ -731,11 +731,16 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
     endpoint.searchParams.set('creation_date_range_from', startIso);
     endpoint.searchParams.set('creation_date_range_to', endIso);
     endpoint.searchParams.set('role', 'BUYER');
+    endpoint.searchParams.set('fieldgroups', 'SUMMARY');
     endpoint.searchParams.set('limit', String(limit));
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'X-EBAY-C-MARKETPLACE-ID': account.marketplace === 'EBAY_UK' ? 'EBAY_GB' : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US',
+        Accept: 'application/json',
+      },
     });
     if (!response.ok) throw await readEbayOrdersApiError(response);
     const payload = await response.json() as Record<string, any>;
