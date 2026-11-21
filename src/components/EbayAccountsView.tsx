@@ -1252,14 +1252,53 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             ) : (analyticsByAccount[acc.id] || []).length === 0 ? (
                               <p className="text-xs text-slate-500">No synchronized analytics are available. Reconnect the seller account to grant the Analytics read-only permission, then run Sync Production Data.</p>
                             ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {(analyticsByAccount[acc.id] || []).map((resource: any) => (
-                                  <div key={resource.type + resource.key} className="rounded border border-slate-200 bg-white p-2">
-                                    <div className="text-[11px] font-semibold text-slate-800">{String(resource.type).replaceAll('_', ' ')}</div>
-                                    <div className="text-[11px] text-slate-600">{resource.key}</div>
-                                    <div className="mt-1 text-[10px] text-slate-400">Synced: {resource.syncedAt ? new Date(resource.syncedAt).toLocaleString() : '—'}</div>
-                                  </div>
-                                ))}
+                              <div className="space-y-2">
+                                {(analyticsByAccount[acc.id] || []).map((resource: any) => {
+                                  const snapshot = resource.snapshot || {};
+                                  const metrics = Array.isArray(snapshot.metrics) ? snapshot.metrics : [];
+                                  const records = Array.isArray(snapshot.records) ? snapshot.records : [];
+                                  const summary = resource.type === 'ANALYTICS_SELLER_STANDARDS'
+                                    ? [snapshot.sellerLevel, snapshot.rating, snapshot.program, snapshot.cycle].filter(Boolean).join(' · ')
+                                    : resource.type === 'ANALYTICS_CUSTOMER_SERVICE'
+                                      ? [snapshot.rating, snapshot.metricType, snapshot.evaluationType, snapshot.metric?.value ?? snapshot.metric?.metricValue].filter(value => value !== null && value !== undefined && value !== '').join(' · ')
+                                      : `${records.length} daily traffic record(s)`;
+                                  return (
+                                    <div key={resource.type + resource.key} className="rounded border border-slate-200 bg-white p-2">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                          <div className="text-[11px] font-semibold text-slate-800">{String(resource.type).replaceAll('_', ' ')}</div>
+                                          <div className="text-[11px] text-slate-600">{resource.key}</div>
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">Synced: {resource.syncedAt ? new Date(resource.syncedAt).toLocaleString() : '—'}</div>
+                                      </div>
+                                      {summary && <div className="mt-1 text-[11px] text-slate-600">{summary}</div>}
+                                      {resource.type === 'ANALYTICS_TRAFFIC' && records.length > 0 && (
+                                        <div className="mt-2 overflow-x-auto">
+                                          <table className="min-w-full text-left text-[10px]">
+                                            <thead className="bg-slate-50 text-slate-600">
+                                              <tr>
+                                                <th className="p-1.5">Date</th>
+                                                {metrics.map((metric: any, metricIndex: number) => (
+                                                  <th key={metric.key || metricIndex} className="p-1.5 whitespace-nowrap">{metric.localizedName || metric.key || `Metric ${metricIndex + 1}`}</th>
+                                                ))}
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                              {records.map((record: any, recordIndex: number) => (
+                                                <tr key={recordIndex}>
+                                                  <td className="p-1.5 whitespace-nowrap">{record.dimensionValues?.[0]?.value ?? record.dimensionValues?.[0] ?? '—'}</td>
+                                                  {(record.metricValues || []).map((value: any, metricIndex: number) => (
+                                                    <td key={metricIndex} className="p-1.5 tabular-nums">{typeof value === 'object' && value !== null ? value.value ?? '—' : value}</td>
+                                                  ))}
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
