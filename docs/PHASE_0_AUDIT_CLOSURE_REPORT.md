@@ -121,9 +121,9 @@ The module mapping above is a code-level contract inventory. This PR expands per
 - The Cloudflare build for that main-branch commit failed on the malformed eBay listings permission regex. It did not deploy successfully.
 - PR #159 corrects the eBay listings permission regex and adds fail-closed route coverage.
 - The Worker build command now runs `npm run lint && npm test && vite build`, so type checking and automated tests are part of the Cloudflare build gate.
-- Cloudflare Preview for source commit `8dc3b5773b967465714d87ae0f38f56566612394` completed successfully: `tsc --noEmit` passed, **82 tests passed / 0 failed**, Vite build succeeded, and `wrangler preview` deployment completed.
+- Cloudflare Preview for the latest PR head `674f2c370a501804bfa1c39fa8cf93e4f73366d9` completed successfully: `tsc --noEmit` passed, **82 tests passed / 0 failed**, Vite build succeeded, and `wrangler preview` deployment completed.
 - That test suite includes all mapped Worker route/method permission cases, unsupported method/path variants, and the implemented report ID range R-01 through R-14.
-- Preview intentionally lacks Production-only eBay OAuth and rate-limit bindings; therefore this is build/test/preview evidence, not a live Production API smoke test.
+- Latest Preview URL: `https://fix-ebay-listings-route-regex-multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev`. Preview intentionally lacks Production-only eBay OAuth and rate-limit bindings; therefore this is build/test/preview evidence, not a live Production API smoke test.
 - GitHub Actions were not manually triggered because the repository's monthly Actions minutes were exhausted.
 - No successful Production deployment of the PR #158 changes has been confirmed.
 - No Production migration was applied; no eBay sync, queue retry, scheduler, OAuth scope change, or Production business-data write was run. The three new migrations remain pending.
