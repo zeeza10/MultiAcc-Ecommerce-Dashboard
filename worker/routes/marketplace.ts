@@ -374,7 +374,11 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       if (!response.ok) throw await readEbayOrdersApiError(response);
       const page = await response.json() as { orders?: any[]; total?: number };
       const orders = Array.isArray(page.orders) ? page.orders : [];
-      total = Number(page.total ?? (offset + orders.length)); fetched += orders.length; progress.fetched = fetched; pages++;
+      total = Number(page.total ?? (offset + orders.length));
+      if (orders.length === 0 && offset < total) {
+        throw new EbayOrdersApiError(503, 'EBAY_ORDER_EMPTY_PAGE', 'eBay returned an empty order page before the reported total was reached.');
+      }
+      fetched += orders.length; progress.fetched = fetched; pages++;
       for (const order of orders) {
         const externalId = typeof order.orderId === 'string' ? order.orderId : '';
         if (!externalId) continue;
@@ -414,6 +418,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
           );
           if (created) exceptions++;
         }
+        progress.exceptions = exceptions;
         const items = lineResult.items;
         const payload = {
           external_order_id: externalId, order_number: `EB-${account.id.slice(0, 6)}-${externalId}`,
@@ -529,6 +534,10 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     if (!response.ok) throw await readEbayOrdersApiError(response);
     const page = await response.json() as { inventoryItems?: any[]; total?: number };
     const items = Array.isArray(page.inventoryItems) ? page.inventoryItems : [];
+    const total = Number(page.total ?? (offset + items.length));
+    if (items.length === 0 && offset < total) {
+      throw new EbayOrdersApiError(503, 'EBAY_INVENTORY_EMPTY_PAGE', 'eBay returned an empty inventory page before the reported total was reached.');
+    }
     fetched += items.length; progress.fetched = fetched;
     pages++;
 
@@ -576,7 +585,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
         external_sku: sku,
         inventory_item: item,
         offers,
-        total_ship_to_location_quantity: Number.isFinite(Number(quantityValue)) ? Math.max(0, Math.trunc(Number(quantityValue))) : null,
+        total_ship_to_location_quantity: typeof quantityValue === 'number' && Number.isFinite(quantityValue) && quantityValue >= 0 ? Math.trunc(quantityValue) : null,
         listing_status: failedOffers.some((entry) => entry.sku === sku) ? 'UNKNOWN' : (listingStatuses.includes('PUBLISHED') ? 'PUBLISHED' : (listingStatuses[0] || 'NOT_LISTED')),
         source_updated_at: item.product?.aspects?.updatedAt || null,
         synced_at: syncedAt,
@@ -601,7 +610,6 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
       if (saveError) throw new Error(saveError.message || 'eBay inventory and listing snapshots could not be saved.');
     }
     offset += items.length;
-    const total = Number(page.total ?? offset);
     hasMore = items.length === 10 || offset < total;
     progress.stage = 'INVENTORY_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
