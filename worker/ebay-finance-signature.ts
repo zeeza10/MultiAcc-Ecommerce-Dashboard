@@ -19,16 +19,29 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
 
-export function decodeEbayPrivateKeyPem(pem: string): Uint8Array {
-  const match = pem.trim().match(/^-----BEGIN PRIVATE KEY-----([\s\S]+)-----END PRIVATE KEY-----$/);
-  if (!match) throw new Error('The eBay signing private key is not valid PKCS#8 PEM.');
-  const encoded = match[1].replace(/\s+/g, '');
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error('The eBay signing private key PEM is malformed.');
-  try {
-    return decodeBase64(encoded);
-  } catch {
-    throw new Error('The eBay signing private key PEM is malformed.');
+export function decodeEbayPrivateKeyPem(pemOrBase64: string): Uint8Array {
+  const value = pemOrBase64.trim();
+  const pemMatch = value.match(/^-----BEGIN PRIVATE KEY-----([\\s\\S]+)-----END PRIVATE KEY-----$/);
+  // eBay Key Management API returns privateKey as base64-encoded PKCS#8 DER,
+  // not PEM text. Accept both formats because existing encrypted records
+  // contain the API's original base64 value.
+  const encoded = (pemMatch ? pemMatch[1] : value).replace(/\\s+/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    throw new Error('The eBay signing private key is not valid base64 PKCS#8 data.');
   }
+  let der: Uint8Array;
+  try {
+    der = decodeBase64(encoded);
+  } catch {
+    throw new Error('The eBay signing private key is not valid base64 PKCS#8 data.');
+  }
+  // PKCS#8 PrivateKeyInfo is an ASN.1 SEQUENCE. WebCrypto performs the full
+  // structural and Ed25519 algorithm validation during importKey below.
+  if (der.length < 32 || der[0] !== 0x30) {
+    throw new Error('The eBay signing private key is not valid PKCS#8 DER.');
+  }
+  return der;
+}
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
