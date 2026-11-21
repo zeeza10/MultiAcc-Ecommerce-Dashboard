@@ -109,7 +109,7 @@ export function buildEbaySignatureComponents(method: 'GET', requestUrl: string, 
     `"@path": ${url.pathname}${url.search}`,
     `"@authority": ${url.host}`,
     `"@signature-params": ${components};created=${created}`,
-  ].join('\\n');
+  ].join('\n');
   return { signatureInput, signatureBase };
 }
 
