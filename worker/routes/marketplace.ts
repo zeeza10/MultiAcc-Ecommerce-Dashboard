@@ -4,6 +4,12 @@ import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { normalizeEbayOrderStartDate } from '../ebay-order-date';
 import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
+import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
+import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
+import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
+import { buildEbayPostOrderHeaders, subtractUtcMonthsClamped } from '../ebay-post-order';
+import { ebayAnalyticsMarketplaceId, ebaySellerStandardsProgram } from '../ebay-analytics';
+import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -18,10 +24,13 @@ const OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
   'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.return.read',
+  'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.finances',
 ];
 
 function isEnvironment(value: unknown): value is EbayEnvironment {
-  return value === 'SANDBOX' || value === 'PRODUCTION';
+  return value === 'PRODUCTION';
 }
 
 function isPlatformAdmin(auth: AuthContext, env: WorkerEnv): boolean {
@@ -54,7 +63,7 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
     if (error) throw new Error('eBay integration configuration could not be loaded.');
     const byEnvironment = new Map((data || []).map((row: any) => [row.environment, row]));
     return json({
-      environments: ['SANDBOX', 'PRODUCTION'].map((environment) => {
+      environments: ['PRODUCTION'].map((environment) => {
         const row: any = byEnvironment.get(environment);
         return { environment, configured: Boolean(row), credentialsVerified: Boolean(row?.credentials_verified_at), credentialsVerifiedAt: row?.credentials_verified_at || null, clientIdMasked: row?.client_id_masked || '', credentialVersion: row?.credential_version || 0, updatedAt: row?.updated_at || null };
       }),
@@ -541,6 +550,549 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
   return { fetched, offersFetched, pagesPending: hasMore, failedSkus: [...failedSkus] };
 }
 
+async function fetchEbayAccountJson(accessToken: string, path: string): Promise<Record<string, unknown>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(`https://api.ebay.com${path}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw await readEbayOrdersApiError(response);
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('eBay returned an invalid seller account response.');
+    }
+    return payload as Record<string, unknown>;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function syncSellerAccountSettings(account: any, env: WorkerEnv): Promise<{ batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  const accessToken = await getSellerAccessToken(env, account);
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const batchId = crypto.randomUUID();
+  const admin = createServiceClient(env);
+  const resources = [
+    { type: 'SELLER_PRIVILEGE', path: '/sell/account/v1/privilege' },
+    { type: 'SELLER_SUBSCRIPTION', path: '/sell/account/v1/subscription' },
+    { type: 'SELLER_PAYMENT_POLICY', path: `/sell/account/v1/payment_policy?marketplace_id=${marketplaceId}` },
+    { type: 'SELLER_FULFILLMENT_POLICY', path: `/sell/account/v1/fulfillment_policy?marketplace_id=${marketplaceId}` },
+    { type: 'SELLER_RETURN_POLICY', path: `/sell/account/v1/return_policy?marketplace_id=${marketplaceId}` },
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayAccountJson(accessToken, resource.path);
+      await saveEbayProviderSnapshot(
+        admin, account, resource.type, 'CURRENT', batchId,
+        normalizeEbaySellerAccountResource(resource.type, payload, marketplaceId),
+        payload,
+      );
+      synced.push(resource.type);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_ACCOUNT_API_FAILED');
+      failed.push({ resource: resource.type, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'SELLER_ACCOUNT_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.type, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'SELLER_ACCOUNT_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `Seller account sync stored ${synced.length} of ${resources.length} read-only resources.`,
+    metadata: { syncBatchId: batchId, syncedResources: synced, failedResources: failed.map(item => item.resource), environment: 'PRODUCTION' },
+  });
+  return { batchId, synced, failed };
+}
+
+async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<{ batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  const accessToken = await getSellerAccessToken(env, account);
+  const siteId = ebayTradingSiteId(account.marketplace);
+  const admin = createServiceClient(env);
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,last_successful_at,consecutive_failures')
+    .eq('marketplace_account_id', account.id)
+    .eq('organization_id', account.organization_id)
+    .eq('resource_type', 'ACTIVE_LISTINGS_TRADING')
+    .maybeSingle();
+  if (checkpointError) throw new Error('The active listing sync checkpoint could not be loaded.');
+
+  const saved = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
+    ? checkpoint.cursor_state as Record<string, unknown> : {};
+  const savedActiveBatch = typeof saved.activeBatchId === 'string' ? saved.activeBatchId : '';
+  const savedNextPage = Number(saved.nextPageNumber);
+  const lastCompletedBatchId = typeof saved.lastCompletedBatchId === 'string' ? saved.lastCompletedBatchId : '';
+  const resuming = Boolean(savedActiveBatch && Number.isSafeInteger(savedNextPage) && savedNextPage >= 1);
+  const batchId = resuming ? savedActiveBatch : crypto.randomUUID();
+  let pageNumber = resuming ? savedNextPage : 1;
+  let totalPages = pageNumber;
+  let totalEntries = 0;
+  let fetched = 0;
+  let pagesFetched = 0;
+  let partial = false;
+  const maxPagesPerRun = 10;
+  let consecutiveFailures = Number(checkpoint?.consecutive_failures || 0);
+
+  const saveCheckpoint = async (cursorState: Record<string, unknown>, completed: boolean, consecutiveFailures: number) => {
+    const { error } = await admin.from('marketplace_sync_checkpoints').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      resource_type: 'ACTIVE_LISTINGS_TRADING',
+      data_environment: 'PRODUCTION',
+      cursor_state: cursorState,
+      last_attempt_at: new Date().toISOString(),
+      last_successful_at: completed ? new Date().toISOString() : (checkpoint?.last_successful_at || null),
+      consecutive_failures: consecutiveFailures,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'marketplace_account_id,resource_type' });
+    if (error) throw new Error('The active listing sync checkpoint could not be saved.');
+  };
+
+  await saveCheckpoint({
+    activeBatchId: batchId,
+    nextPageNumber: pageNumber,
+    ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}),
+  }, false, Number(checkpoint?.consecutive_failures || 0));
+
+  while (pagesFetched < maxPagesPerRun && pageNumber <= totalPages) {
+    const body = `<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ActiveList>
+    <Include>true</Include>
+    <Pagination>
+      <EntriesPerPage>200</EntriesPerPage>
+      <PageNumber>${pageNumber}</PageNumber>
+    </Pagination>
+  </ActiveList>
+</GetMyeBaySellingRequest>`;
+    const response = await fetch('https://api.ebay.com/ws/api.dll', {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
+        'X-EBAY-API-SITEID': siteId,
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '1477',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml',
+        Accept: 'text/xml',
+      },
+      body,
+    });
+    if (!response.ok) throw new EbayOrdersApiError(response.status, null, 'eBay Trading API active listings request failed.');
+    const xml = await response.text();
+    const parsed = parseTradingActiveListings(xml);
+    if (parsed.ack === 'Failure' || parsed.ack === 'Error') {
+      throw new Error('eBay Trading API rejected the active listings request.');
+    }
+    if (parsed.ack === 'PartialFailure') partial = true;
+    totalEntries = parsed.totalEntries || totalEntries;
+    totalPages = parsed.totalPages || Math.max(1, Math.ceil(totalEntries / 200));
+    pagesFetched++;
+
+    for (const listing of parsed.listings) {
+      const itemId = typeof listing.itemId === 'string' ? listing.itemId : '';
+      if (!itemId) continue;
+      const { rawXml, ...listingFields } = listing;
+      await saveEbayProviderSnapshot(
+        admin, account, 'ACTIVE_LISTING_TRADING', itemId, batchId,
+        { ...listingFields, source: 'EBAY_TRADING_API', siteId },
+        { xml: typeof rawXml === 'string' ? rawXml : null },
+        null,
+      );
+      fetched++;
+    }
+
+    // Re-read a partial-failure page on the next run; item upserts are idempotent.
+    const nextPageNumber = partial ? pageNumber : pageNumber + 1;
+    const pagesPending = partial || nextPageNumber <= totalPages;
+    const cursorState = pagesPending
+      ? { activeBatchId: batchId, nextPageNumber, ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}) }
+      : { lastCompletedBatchId: batchId };
+    consecutiveFailures = partial ? consecutiveFailures + 1 : 0;
+    await saveCheckpoint(cursorState, !pagesPending, consecutiveFailures);
+    if (partial) break;
+    pageNumber = nextPageNumber;
+  }
+
+  const pagesPending = partial || pageNumber <= totalPages;
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'ACTIVE_LISTINGS_SYNC_COMPLETED',
+    severity: pagesPending ? 'WARNING' : 'INFO',
+    message: `Trading API active listings sync stored ${fetched} listings from ${pagesFetched} page(s).`,
+    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, nextPageNumber: pagesPending ? pageNumber : null, endpoint: 'Trading:GetMyeBaySelling', environment: 'PRODUCTION' },
+  });
+  return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
+}
+
+async function assertEbaySellerScope(account: any, scope: string, env: WorkerEnv): Promise<void> {
+  const admin = createServiceClient(env);
+  const { data, error } = await admin.from('marketplace_credentials')
+    .select('scopes').eq('marketplace_account_id', account.id).eq('organization_id', account.organization_id).maybeSingle();
+  if (error) throw new Error('The seller authorization scopes could not be verified.');
+  const scopes = Array.isArray(data?.scopes) ? data.scopes : [];
+  if (!scopes.includes(scope)) {
+    throw new EbayOrdersApiError(403, null, 'Reconnect this Production seller account to grant the additional read-only eBay permission required for this module.');
+  }
+}
+
+async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const endDate = new Date();
+  const startDate = subtractUtcMonthsClamped(endDate, 18);
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+  const limit = 200;
+  const maxPages = 20;
+  let offset = 0;
+  let totalEntries = 0;
+  let totalPages = 1;
+  let pagesFetched = 0;
+  let fetched = 0;
+
+  while (pagesFetched < Math.min(totalPages, maxPages)) {
+    const endpoint = new URL('https://api.ebay.com/post-order/v2/return/search');
+    endpoint.searchParams.set('creation_date_range_from', startIso);
+    endpoint.searchParams.set('creation_date_range_to', endIso);
+    endpoint.searchParams.set('role', 'BUYER');
+    endpoint.searchParams.set('limit', String(limit));
+    endpoint.searchParams.set('offset', String(offset));
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        ...buildEbayPostOrderHeaders(accessToken, account.marketplace),
+      },
+    });
+    if (response.status === 204) break;
+    if (!response.ok) throw await readEbayOrdersApiError(response);
+    const payload = await response.json() as Record<string, any>;
+    const members = Array.isArray(payload.members) ? payload.members : [];
+    const pagination = payload.paginationOutput && typeof payload.paginationOutput === 'object' ? payload.paginationOutput : {};
+    totalEntries = Number.isFinite(Number(pagination.totalEntries)) ? Number(pagination.totalEntries) : totalEntries;
+    totalPages = Number.isFinite(Number(pagination.totalPages)) && Number(pagination.totalPages) > 0
+      ? Number(pagination.totalPages) : Math.max(1, Math.ceil(totalEntries / limit));
+    pagesFetched++;
+
+    for (const member of members) {
+      const returnId = typeof member.returnId === 'string' ? member.returnId.trim() : '';
+      if (!returnId) continue;
+      const creation = member.creationInfo && typeof member.creationInfo === 'object' ? member.creationInfo : {};
+      const item = creation.item && typeof creation.item === 'object' ? creation.item : {};
+      const sellerRefund = member.sellerTotalRefund && typeof member.sellerTotalRefund === 'object' ? member.sellerTotalRefund : {};
+      const actionTypes = Array.isArray(member.sellerAvailableOptions)
+        ? member.sellerAvailableOptions.map((option: any) => option?.actionType).filter((value: unknown) => typeof value === 'string')
+        : [];
+      const normalized = {
+        returnId,
+        orderId: typeof member.orderId === 'string' ? member.orderId : null,
+        status: typeof member.status === 'string' ? member.status : null,
+        state: typeof member.state === 'string' ? member.state : null,
+        currentType: typeof member.currentType === 'string' ? member.currentType : null,
+        creationDate: typeof creation.creationDate?.value === 'string' ? creation.creationDate.value : null,
+        itemId: typeof item.itemId === 'string' ? item.itemId : null,
+        transactionId: typeof item.transactionId === 'string' ? item.transactionId : null,
+        quantity: (typeof item.returnQuantity === 'number' && Number.isSafeInteger(item.returnQuantity))
+          ? item.returnQuantity
+          : (typeof item.returnQuantity === 'string' && item.returnQuantity.trim() !== '' && Number.isSafeInteger(Number(item.returnQuantity)) ? Number(item.returnQuantity) : null),
+        reason: typeof creation.reason === 'string' ? creation.reason : null,
+        reasonType: typeof creation.reasonType === 'string' ? creation.reasonType : null,
+        sellerResponseDue: typeof member.sellerResponseDue?.respondByDate?.value === 'string' ? member.sellerResponseDue.respondByDate.value : null,
+        sellerActionTypes: actionTypes,
+        estimatedRefund: sellerRefund.estimatedRefundAmount && typeof sellerRefund.estimatedRefundAmount === 'object' ? sellerRefund.estimatedRefundAmount : null,
+        actualRefund: sellerRefund.actualRefundAmount && typeof sellerRefund.actualRefundAmount === 'object' ? sellerRefund.actualRefundAmount : null,
+        timeoutDate: typeof member.timeoutDate?.value === 'string' ? member.timeoutDate.value : null,
+        caseId: typeof member.escalationInfo?.caseId === 'string' ? member.escalationInfo.caseId : null,
+        source: 'EBAY_POST_ORDER_API',
+      };
+      await saveEbayProviderSnapshot(admin, account, 'EBAY_RETURN', returnId, batchId, normalized, member);
+      fetched++;
+    }
+
+    offset += members.length;
+    if (!members.length || offset >= totalEntries) break;
+  }
+
+  const pagesPending = pagesFetched < totalPages;
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_RETURNS_SYNC_COMPLETED',
+    severity: pagesPending ? 'WARNING' : 'INFO',
+    message: `eBay return sync stored ${fetched} return records from ${pagesFetched} page(s).`,
+    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, endpoint: 'post-order/v2/return/search', environment: 'PRODUCTION' },
+  });
+  return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
+}
+
+async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly', env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const marketplaceId = ebayAnalyticsMarketplaceId(account.marketplace);
+  const standardsProgram = ebaySellerStandardsProgram(account.marketplace);
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 30);
+  const analyticsDateRange = `[${start.toISOString().replace('Z', '+00:00')}..${end.toISOString().replace('Z', '+00:00')}]`;
+  const resources = [
+    {
+      type: 'ANALYTICS_TRAFFIC',
+      externalId: 'LAST_30_DAYS',
+      path: `/sell/analytics/v1/traffic_report?dimension=DAY&filter=${encodeURIComponent(`marketplace_ids:{${marketplaceId}},date_range:${analyticsDateRange}`)}&metric=LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE`,
+    },
+    { type: 'ANALYTICS_SELLER_STANDARDS', externalId: 'PROGRAM_CURRENT', path: `/sell/analytics/v1/seller_standards_profile/${standardsProgram}/CURRENT` },
+    { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_AS_DESCRIBED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_AS_DESCRIBED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
+    { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_RECEIVED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_RECEIVED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayAccountJson(accessToken, resource.path);
+      await saveEbayProviderSnapshot(
+        admin, account, resource.type, resource.externalId, batchId,
+        normalizeEbayAnalyticsResource(resource.type, payload, marketplaceId), payload,
+      );
+      synced.push(resource.externalId);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_ANALYTICS_API_FAILED');
+      failed.push({ resource: resource.externalId, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'EBAY_ANALYTICS_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.externalId, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_ANALYTICS_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `eBay Analytics sync stored ${synced.length} of ${resources.length} resources.`,
+    metadata: { syncBatchId: batchId, syncedResources: synced, failedResources: failed.map(item => item.resource), environment: 'PRODUCTION' },
+  });
+  return { batchId, synced, failed };
+}
+
+async function fetchEbayFinanceJson(accessToken: string, path: string, marketplaceId: string, env: WorkerEnv): Promise<Record<string, any>> {
+  const url = new URL(path, 'https://apiz.ebay.com').toString();
+  const signatureHeaders = await createEbayFinanceSignatureHeaders('GET', url, env);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
+      Accept: 'application/json',
+      ...signatureHeaders,
+    },
+  });
+  if (response.status === 204) return {};
+  if (!response.ok) throw await readEbayOrdersApiError(response);
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('eBay returned an invalid Finances API response.');
+  }
+  return payload as Record<string, any>;
+}
+
+async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
+  batchId: string;
+  payouts: number;
+  transactions: number;
+  synced: string[];
+  failed: Array<{ resource: string; message: string }>;
+  pagesPending: boolean;
+}> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.finances', env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 90);
+  const dateRange = `[${start.toISOString()}..${end.toISOString()}]`;
+  const resources: Array<{ type: string; key: string; path: string }> = [
+    { type: 'FINANCE_SUMMARY', key: 'SELLER_FUNDS_CURRENT', path: '/sell/finances/v1/seller_funds_summary' },
+    { type: 'FINANCE_SUMMARY', key: 'PAYOUT_SUMMARY_CURRENT', path: '/sell/finances/v1/payout_summary' },
+    ...['PAYOUT', 'FUNDS_PROCESSING', 'FUNDS_AVAILABLE_FOR_PAYOUT', 'FUNDS_ON_HOLD', 'COMPLETED', 'FAILED'].map(status => {
+      const transactionType = status === 'COMPLETED' || status === 'FAILED' ? 'TRANSFER' : 'SALE';
+      return {
+        type: 'FINANCE_SUMMARY',
+        key: `TRANSACTION_SUMMARY_${status}_90_DAYS`,
+        path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionStatus:{${status}}`)}&filter=${encodeURIComponent(`transactionType:{${transactionType}}`)}&filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
+      };
+    }),
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  let payoutCount = 0;
+  let transactionCount = 0;
+
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayFinanceJson(accessToken, resource.path, marketplaceId, env);
+      await saveEbayProviderSnapshot(admin, account, resource.type, resource.key, batchId,
+        normalizeEbayFinanceSummary(resource.key, payload, marketplaceId), payload);
+      synced.push(resource.key);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_FINANCES_API_FAILED');
+      failed.push({ resource: resource.key, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'EBAY_FINANCES_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.key, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+
+  const limit = 100;
+  const maxPages = 20;
+  let payoutPagesPending = false;
+  let transactionPagesPending = false;
+
+  const importPagedRecords = async (
+    basePath: string,
+    collectionKey: 'payouts' | 'transactions',
+    resourceType: 'FINANCE_PAYOUT' | 'FINANCE_TRANSACTION',
+  ): Promise<{ count: number; pagesPending: boolean }> => {
+    let offset = 0;
+    let totalEntries = 0;
+    let pages = 0;
+    let count = 0;
+    let more = true;
+    while (more && pages < maxPages) {
+      const separator = basePath.includes('?') ? '&' : '?';
+      const path = `${basePath}${separator}limit=${limit}&offset=${offset}`;
+      const payload = await fetchEbayFinanceJson(accessToken, path, marketplaceId, env);
+      const rows = Array.isArray(payload[collectionKey]) ? payload[collectionKey] : [];
+      const paginationTotal = payload.total ?? payload.totalEntries ?? payload.paginationOutput?.totalEntries;
+      if (Number.isFinite(Number(paginationTotal)) && Number(paginationTotal) >= 0) totalEntries = Number(paginationTotal);
+      pages++;
+      for (const record of rows) {
+        const externalId = resourceType === 'FINANCE_PAYOUT'
+          ? (typeof record.payoutId === 'string' ? record.payoutId : '')
+          : (typeof record.transactionId === 'string' ? record.transactionId : '');
+        if (!externalId) continue;
+        const normalized = resourceType === 'FINANCE_PAYOUT'
+          ? {
+              payoutId: externalId,
+              payoutStatus: record.payoutStatus ?? null,
+              payoutDate: record.payoutDate ?? null,
+              amount: record.amount ?? null,
+              transactionCount: record.transactionCount ?? null,
+              source: 'EBAY_FINANCES_API',
+            }
+          : {
+              transactionId: externalId,
+              transactionType: record.transactionType ?? null,
+              transactionDate: record.transactionDate ?? null,
+              amount: record.amount ?? null,
+              totalFeeAmount: record.totalFeeAmount ?? null,
+              orderId: record.orderId ?? null,
+              payoutId: record.payoutId ?? null,
+              references: Array.isArray(record.references)
+                ? record.references.map((reference: any) => ({ referenceType: reference?.referenceType ?? null, referenceId: reference?.referenceId ?? null }))
+                : [],
+              source: 'EBAY_FINANCES_API',
+            };
+        await saveEbayProviderSnapshot(admin, account, resourceType, externalId, batchId, normalized, record);
+        count++;
+      }
+      offset += rows.length;
+      more = rows.length === limit && (totalEntries === 0 || offset < totalEntries);
+      if (!rows.length) more = false;
+    }
+    return { count, pagesPending: more || (totalEntries > offset) };
+  };
+
+  try {
+    const result = await importPagedRecords('/sell/finances/v1/payout', 'payouts', 'FINANCE_PAYOUT');
+    payoutCount = result.count;
+    payoutPagesPending = result.pagesPending;
+    synced.push('PAYOUTS');
+  } catch (error) {
+    const failure = getEbaySyncFailure(error, 'EBAY_PAYOUTS_SYNC_FAILED');
+    failed.push({ resource: 'PAYOUTS', message: failure.message });
+    await admin.from('marketplace_integration_events').insert({
+      organization_id: account.organization_id, marketplace_account_id: account.id,
+      event_type: 'EBAY_FINANCES_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+      message: failure.message, metadata: { resource: 'PAYOUTS', endpoint: '/sell/finances/v1/payout', httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+    });
+  }
+
+  try {
+    const result = await importPagedRecords(
+      `/sell/finances/v1/transaction?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
+      'transactions',
+      'FINANCE_TRANSACTION',
+    );
+    transactionCount = result.count;
+    transactionPagesPending = result.pagesPending;
+    synced.push('TRANSACTIONS_90_DAYS');
+  } catch (error) {
+    const failure = getEbaySyncFailure(error, 'EBAY_TRANSACTIONS_SYNC_FAILED');
+    failed.push({ resource: 'TRANSACTIONS_90_DAYS', message: failure.message });
+    await admin.from('marketplace_integration_events').insert({
+      organization_id: account.organization_id, marketplace_account_id: account.id,
+      event_type: 'EBAY_FINANCES_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+      message: failure.message, metadata: { resource: 'TRANSACTIONS_90_DAYS', endpoint: '/sell/finances/v1/transaction', httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+    });
+  }
+
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_FINANCES_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `eBay Finances sync stored ${payoutCount} payouts and ${transactionCount} transactions.`,
+    metadata: { syncBatchId: batchId, payoutCount, transactionCount, payoutPagesPending, transactionPagesPending, syncedResources: synced, failedResources: failed.map(item => item.resource), dateRange, environment: 'PRODUCTION' },
+  });
+  return { batchId, payouts: payoutCount, transactions: transactionCount, synced, failed, pagesPending: payoutPagesPending || transactionPagesPending };
+}
+
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
   const configResponse = await handleIntegrationConfig(path, request, auth, env);
   if (configResponse) return configResponse;
@@ -601,10 +1153,10 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const marketplace = body?.marketplace;
     const environment = body?.environment;
-    if (!name || name.length > 120 || !['EBAY_UK', 'EBAY_US', 'EBAY_DE'].includes(String(marketplace)) || !isEnvironment(environment)) {
+    if (!name || name.length > 120 || !['EBAY_UK', 'EBAY_US', 'EBAY_DE'].includes(String(marketplace)) || environment !== 'PRODUCTION') {
       return json({ error: 'Provide an account name, supported eBay marketplace and environment.' }, 400);
     }
-    if (environment === 'PRODUCTION' && env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') {
+    if (env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') {
       return json({ error: 'Production eBay authorization is locked until the eBay production keyset is activated and deletion-notification compliance is verified.' }, 403);
     }
     const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').insert({
@@ -716,6 +1268,188 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
 
+  const sellerAccountMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/seller-account$/);
+  if (sellerAccountMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo,auth_status').eq('id', sellerAccountMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production seller account data is available in this workspace.' }, 409);
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,resource_type,external_id,sync_batch_id,snapshot,provider_updated_at,synced_at')
+      .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
+      .in('resource_type', ['SELLER_PRIVILEGE','SELLER_SUBSCRIPTION','SELLER_PAYMENT_POLICY','SELLER_FULFILLMENT_POLICY','SELLER_RETURN_POLICY'])
+      .order('synced_at', { ascending: false });
+    if (error) throw new Error('eBay seller account snapshots could not be loaded.');
+    const latest = new Map<string, any>();
+    for (const row of data || []) if (!latest.has(row.resource_type)) latest.set(row.resource_type, row);
+    return json({
+      accountId: account.id,
+      environment: 'PRODUCTION',
+      lastSyncedAt: [...latest.values()].map((row: any) => row.synced_at).sort().at(-1) || null,
+      resources: [...latest.values()].map((row: any) => ({
+        type: row.resource_type, snapshot: row.snapshot, providerUpdatedAt: row.provider_updated_at, syncedAt: row.synced_at,
+      })),
+    });
+  }
+
+  if (sellerAccountMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', sellerAccountMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerAccountSettings(account, env);
+    return json({ success: result.failed.length === 0, ...result });
+  }
+
+  const returnsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-returns$/);
+  if (returnsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,environment,marketplace,is_demo,auth_status')
+      .eq('id', returnsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerReturns(account, env);
+    return json({ success: !result.pagesPending, ...result });
+  }
+
+  const returnsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/returns$/);
+  if (returnsReadMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = returnsReadMatch[1];
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production return data is available.' }, 409);
+    const admin = createServiceClient(env);
+    const { data: latest, error: latestError } = await admin.from('marketplace_provider_snapshots')
+      .select('sync_batch_id,synced_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
+      .order('synced_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestError) throw new Error('eBay return snapshots could not be loaded.');
+    if (!latest?.sync_batch_id) return json({ returns: [], total: 0, lastSyncedAt: null });
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
+      .eq('sync_batch_id', latest.sync_batch_id).order('synced_at', { ascending: false }).limit(500);
+    if (error) throw new Error('eBay return snapshots could not be loaded.');
+    return json({ returns: (data || []).map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })), total: data?.length || 0, lastSyncedAt: latest.synced_at });
+  }
+
+  const financeSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-finances$/);
+  if (financeSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', financeSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerFinances(account, env);
+    return json({ success: result.failed.length === 0, ...result });
+  }
+
+  const financeReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/finances$/);
+  if (financeReadMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = financeReadMatch[1];
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production finance data is available.' }, 409);
+    const admin = createServiceClient(env);
+    const { data: latest, error: latestError } = await admin.from('marketplace_provider_snapshots')
+      .select('sync_batch_id,synced_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId)
+      .in('resource_type', ['FINANCE_PAYOUT','FINANCE_TRANSACTION','FINANCE_SUMMARY'])
+      .order('synced_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestError) throw new Error('eBay Finance snapshots could not be loaded.');
+    if (!latest?.sync_batch_id) return json({ payouts: [], transactions: [], summaries: [], lastSyncedAt: null });
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,resource_type,external_id,snapshot,synced_at')
+      .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+      .eq('sync_batch_id', latest.sync_batch_id)
+      .in('resource_type', ['FINANCE_PAYOUT','FINANCE_TRANSACTION','FINANCE_SUMMARY'])
+      .order('synced_at', { ascending: false }).limit(1000);
+    if (error) throw new Error('eBay Finance snapshots could not be loaded.');
+    const rows = data || [];
+    return json({
+      payouts: rows.filter((row: any) => row.resource_type === 'FINANCE_PAYOUT').map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })),
+      transactions: rows.filter((row: any) => row.resource_type === 'FINANCE_TRANSACTION').map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })),
+      summaries: rows.filter((row: any) => row.resource_type === 'FINANCE_SUMMARY').map((row: any) => ({ key: row.external_id, ...row.snapshot, syncedAt: row.synced_at })),
+      lastSyncedAt: latest.synced_at,
+    });
+  }
+
+  const analyticsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-analytics$/);
+  if (analyticsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', analyticsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerAnalytics(account, env);
+    return json({ success: result.failed.length === 0, ...result });
+  }
+
+  const analyticsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/analytics$/);
+  if (analyticsReadMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = analyticsReadMatch[1];
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production analytics data is available.' }, 409);
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,resource_type,external_id,snapshot,provider_updated_at,synced_at')
+      .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+      .in('resource_type', ['ANALYTICS_TRAFFIC','ANALYTICS_SELLER_STANDARDS','ANALYTICS_CUSTOMER_SERVICE'])
+      .order('synced_at', { ascending: false }).limit(50);
+    if (error) throw new Error('eBay Analytics snapshots could not be loaded.');
+    const latest = new Map<string, any>();
+    for (const row of data || []) {
+      const key = `${row.resource_type}:${row.external_id}`;
+      if (!latest.has(key)) latest.set(key, row);
+    }
+    return json({ resources: [...latest.values()].map((row: any) => ({
+      type: row.resource_type, key: row.external_id, snapshot: row.snapshot,
+      providerUpdatedAt: row.provider_updated_at, syncedAt: row.synced_at,
+    })) });
+  }
+
+  const activeListingsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-active-listings$/);
+  if (activeListingsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', activeListingsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncTradingActiveListings(account, env);
+    return json({ success: !result.pagesPending, ...result });
+  }
+
   const listingsMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/listings$/);
   if (listingsMatch && request.method === 'GET') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
@@ -735,6 +1469,60 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    const { data: tradingCheckpoint, error: tradingCheckpointError } = await admin.from('marketplace_sync_checkpoints')
+      .select('cursor_state').eq('marketplace_account_id', account.id)
+      .eq('organization_id', auth.organizationId).eq('resource_type', 'ACTIVE_LISTINGS_TRADING').maybeSingle();
+    if (tradingCheckpointError) throw new Error('The active listing checkpoint could not be loaded.');
+    const tradingCursor = tradingCheckpoint?.cursor_state && typeof tradingCheckpoint.cursor_state === 'object'
+      ? tradingCheckpoint.cursor_state as Record<string, unknown> : {};
+    const preferredTradingBatchId = typeof tradingCursor.lastCompletedBatchId === 'string'
+      ? tradingCursor.lastCompletedBatchId
+      : typeof tradingCursor.activeBatchId === 'string' ? tradingCursor.activeBatchId : null;
+    const { data: latestTradingBatch, error: latestTradingBatchError } = await admin.from('marketplace_provider_snapshots')
+      .select('sync_batch_id').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
+      .order('synced_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestTradingBatchError) throw new Error('Trading API active listing snapshots could not be loaded.');
+    const tradingBatchId = preferredTradingBatchId || latestTradingBatch?.sync_batch_id || null;
+    const { data: tradingRows, error: tradingError } = tradingBatchId
+      ? await admin.from('marketplace_provider_snapshots')
+          .select('external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
+          .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
+          .eq('sync_batch_id', tradingBatchId).order('synced_at', { ascending: false })
+      : { data: [], error: null };
+    if (tradingError) throw new Error('Trading API active listing snapshots could not be loaded.');
+    const inventoryListingIds = new Set((data || []).flatMap((row: any) =>
+      (Array.isArray(row.offers) ? row.offers : []).map((offer: any) => String(offer.listingId || '')).filter(Boolean)
+    ));
+    const tradingListings = (tradingRows || []).filter((row: any) => !inventoryListingIds.has(row.external_id)).map((row: any) => {
+      const item = row.snapshot && typeof row.snapshot === 'object' ? row.snapshot as Record<string, any> : {};
+      const quantity = typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : null;
+      const sold = typeof item.quantitySold === 'number' && Number.isFinite(item.quantitySold) ? item.quantitySold : null;
+      const availableQuantity = quantity !== null && sold !== null ? quantity - sold : null;
+      const hasPrice = item.currentPrice !== null && item.currentPrice !== undefined && item.currency;
+      return {
+        offerId: row.external_id,
+        itemId: row.external_id,
+        sku: typeof item.sku === 'string' ? item.sku : '',
+        title: typeof item.title === 'string' ? item.title : '',
+        description: '',
+        imageUrls: typeof item.galleryUrl === 'string' ? [item.galleryUrl] : [],
+        condition: '',
+        inventoryQuantity: quantity,
+        listingStatus: typeof item.listingStatus === 'string' ? item.listingStatus : '',
+        offers: hasPrice ? [{
+          listingId: row.external_id,
+          ...(availableQuantity !== null ? { availableQuantity } : {}),
+          pricingSummary: { price: { value: String(item.currentPrice), currency: String(item.currency) } },
+        }] : [],
+        source: 'TRADING_API',
+        listingStartTime: item.startTime || null,
+        syncedAt: row.synced_at,
+        syncStatus: 'SYNCED',
+        syncError: null,
+        syncErrorDetails: null,
+      };
+    });
     const { data: skuFailureEvents, error: skuEventsError } = await admin.from('marketplace_integration_events')
       .select('message,metadata,created_at,error_code')
       .eq('organization_id', auth.organizationId)
@@ -774,7 +1562,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           occurredAt: failure.created_at,
         } : null,
       }); }),
-      total: count || 0,
+      tradingListings,
+      tradingTotal: tradingListings.length,
+      total: (count || 0) + tradingListings.length,
       limit,
       offset,
     });
@@ -785,8 +1575,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
     const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').select('id,organization_id,environment,is_demo,auth_status,marketplace').eq('id', syncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
-    if (account.is_demo || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected eBay seller account can be synchronized.' }, 409);
-    if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
+    if (account.is_demo || account.environment !== 'PRODUCTION' || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected Production eBay seller account can be synchronized.' }, 409);
     const ordersProgress = createEbaySyncProgress();
     let ordersResult: Record<string, unknown>;
     try {
@@ -871,8 +1660,8 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .select('id,name,environment,is_demo,marketplace').eq('id', connectMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.is_demo) return json({ error: 'Demo accounts cannot be connected. Create a real seller account entry first.' }, 400);
-    if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
-    if (account.environment === 'PRODUCTION' && env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') return json({ error: 'Production eBay authorization is disabled until eBay activates the production keyset and compliance is complete.' }, 403);
+    if (account.environment !== 'PRODUCTION') return json({ error: 'Only Production eBay seller accounts can be connected.' }, 409);
+    if (env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') return json({ error: 'Production eBay authorization is disabled until eBay activates the production keyset and compliance is complete.' }, 403);
     const credentials = await getPlatformCredentials(env, account.environment);
     if (!credentials) return json({ error: `eBay ${account.environment} application credentials have not been configured.` }, 409);
     const state = randomState();
@@ -968,8 +1757,8 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
   const { data: accounts, error } = await admin.from('marketplace_accounts')
     .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,last_sync_attempt_at,auto_sync_interval_minutes')
     .eq('is_demo', false).eq('auth_status', 'CONNECTED')
-    .eq('environment', 'PRODUCTION')
-    .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']);
+    .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE'])
+    .eq('environment', 'PRODUCTION');
   if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
   for (const account of accounts || []) {
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
@@ -996,7 +1785,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         .eq('environment', 'PRODUCTION').eq('is_demo', false)
         .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']).maybeSingle();
       if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
-        || !isEnvironment(account.environment)) {
+        || account.environment !== 'PRODUCTION') {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
       const attemptAt = new Date().toISOString();

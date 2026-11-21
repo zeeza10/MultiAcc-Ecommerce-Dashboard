@@ -119,6 +119,18 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [listingSnapshots, setListingSnapshots] = useState<Record<string, any[]>>({});
   const [listingTotals, setListingTotals] = useState<Record<string, number>>({});
   const [listingLoadingAccountId, setListingLoadingAccountId] = useState<string | null>(null);
+  const [expandedSellerAccountId, setExpandedSellerAccountId] = useState<string | null>(null);
+  const [sellerAccountSnapshots, setSellerAccountSnapshots] = useState<Record<string, any[]>>({});
+  const [sellerAccountLoadingId, setSellerAccountLoadingId] = useState<string | null>(null);
+  const [expandedReturnsAccountId, setExpandedReturnsAccountId] = useState<string | null>(null);
+  const [returnsByAccount, setReturnsByAccount] = useState<Record<string, any[]>>({});
+  const [returnsLoadingId, setReturnsLoadingId] = useState<string | null>(null);
+  const [expandedAnalyticsAccountId, setExpandedAnalyticsAccountId] = useState<string | null>(null);
+  const [analyticsByAccount, setAnalyticsByAccount] = useState<Record<string, any[]>>({});
+  const [analyticsLoadingId, setAnalyticsLoadingId] = useState<string | null>(null);
+  const [expandedFinanceAccountId, setExpandedFinanceAccountId] = useState<string | null>(null);
+  const [financesByAccount, setFinancesByAccount] = useState<Record<string, any>>({});
+  const [financeLoadingId, setFinanceLoadingId] = useState<string | null>(null);
 
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
@@ -209,8 +221,27 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
     try {
       const res = await api.syncEbayAccount(accountId);
-
-      setSyncResult(res);
+      let activeListings: any = null;
+      let activeListingsError = '';
+      let sellerAccount: any = null;
+      let sellerAccountError = '';
+      let ebayReturns: any = null;
+      let ebayReturnsError = '';
+      let ebayAnalytics: any = null;
+      let ebayAnalyticsError = '';
+      let ebayFinances: any = null;
+      let ebayFinancesError = '';
+      try { activeListings = await api.syncEbayActiveListings(accountId); }
+      catch (error: any) { activeListingsError = error?.message || 'Trading API active listings sync failed.'; }
+      try { sellerAccount = await api.syncEbaySellerAccount(accountId); }
+      catch (error: any) { sellerAccountError = error?.message || 'Seller account settings sync failed.'; }
+      try { ebayReturns = await api.syncEbayReturns(accountId); }
+      catch (error: any) { ebayReturnsError = error?.message || 'eBay Returns sync failed.'; }
+      try { ebayAnalytics = await api.syncEbayAnalytics(accountId); }
+      catch (error: any) { ebayAnalyticsError = error?.message || 'eBay Analytics sync failed.'; }
+      try { ebayFinances = await api.syncEbayFinances(accountId); }
+      catch (error: any) { ebayFinancesError = error?.message || 'eBay Finances sync failed.'; }
+      setSyncResult({ ...res, activeListings, activeListingsError, sellerAccount, sellerAccountError, ebayReturns, ebayReturnsError, ebayAnalytics, ebayAnalyticsError, ebayFinances, ebayFinancesError });
 
       setListingSnapshots(current => {
         const next = { ...current };
@@ -278,7 +309,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
       setListingSnapshots(current => ({
         ...current,
-        [accountId]: result.listings || [],
+        [accountId]: [...(result.listings || []), ...(result.tradingListings || [])],
       }));
 
       setListingTotals(current => ({
@@ -291,6 +322,62 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     } finally {
       setListingLoadingAccountId(null);
     }
+  };
+
+  const handleToggleSellerAccount = async (accountId: string) => {
+    if (expandedSellerAccountId === accountId) { setExpandedSellerAccountId(null); return; }
+    setExpandedSellerAccountId(accountId);
+    if (sellerAccountSnapshots[accountId]) return;
+    setSellerAccountLoadingId(accountId);
+    try {
+      const result = await api.getEbaySellerAccount(accountId);
+      setSellerAccountSnapshots(current => ({ ...current, [accountId]: result.resources || [] }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load seller account settings: ${err.message}`);
+      setExpandedSellerAccountId(null);
+    } finally { setSellerAccountLoadingId(null); }
+  };
+
+  const handleToggleReturns = async (accountId: string) => {
+    if (expandedReturnsAccountId === accountId) { setExpandedReturnsAccountId(null); return; }
+    setExpandedReturnsAccountId(accountId);
+    if (returnsByAccount[accountId]) return;
+    setReturnsLoadingId(accountId);
+    try {
+      const result = await api.getEbayReturns(accountId);
+      setReturnsByAccount(current => ({ ...current, [accountId]: result.returns || [] }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load eBay returns: ${err.message}`);
+      setExpandedReturnsAccountId(null);
+    } finally { setReturnsLoadingId(null); }
+  };
+
+  const handleToggleAnalytics = async (accountId: string) => {
+    if (expandedAnalyticsAccountId === accountId) { setExpandedAnalyticsAccountId(null); return; }
+    setExpandedAnalyticsAccountId(accountId);
+    if (analyticsByAccount[accountId]) return;
+    setAnalyticsLoadingId(accountId);
+    try {
+      const result = await api.getEbayAnalytics(accountId);
+      setAnalyticsByAccount(current => ({ ...current, [accountId]: result.resources || [] }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load eBay Analytics: ${err.message}`);
+      setExpandedAnalyticsAccountId(null);
+    } finally { setAnalyticsLoadingId(null); }
+  };
+
+  const handleToggleFinance = async (accountId: string) => {
+    if (expandedFinanceAccountId === accountId) { setExpandedFinanceAccountId(null); return; }
+    setExpandedFinanceAccountId(accountId);
+    if (financesByAccount[accountId]) return;
+    setFinanceLoadingId(accountId);
+    try {
+      const result = await api.getEbayFinances(accountId);
+      setFinancesByAccount(current => ({ ...current, [accountId]: result }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load eBay Finances: ${err.message}`);
+      setExpandedFinanceAccountId(null);
+    } finally { setFinanceLoadingId(null); }
   };
 
   const handleReconnect = async (accountId: string) => {
@@ -670,6 +757,66 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
             <div className="rounded-md border border-slate-200 p-3 space-y-1">
               <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Active Listings (Trading API)</span>
+                <span className="text-[10px] font-bold">{syncResult.activeListingsError ? 'FAILED' : syncResult.activeListings ? (syncResult.activeListings.pagesPending ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Retrieved: {syncResult.activeListings?.fetched ?? 0}
+                {' · '}Provider total: {syncResult.activeListings?.totalEntries ?? '—'}
+                {' · '}Pages: {syncResult.activeListings?.pagesFetched ?? 0}
+                {syncResult.activeListings?.pagesPending ? ' · More pages pending' : ''}
+              </p>
+              {syncResult.activeListingsError && <p className="text-[11px] text-rose-700">{syncResult.activeListingsError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Seller Account & Policies</span>
+                <span className="text-[10px] font-bold">{syncResult.sellerAccountError ? 'FAILED' : syncResult.sellerAccount ? (syncResult.sellerAccount.failed?.length ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Read-only resources stored: {syncResult.sellerAccount?.synced?.length ?? 0}
+                {' · '}Failed: {syncResult.sellerAccount?.failed?.length ?? 0}
+              </p>
+              {syncResult.sellerAccountError && <p className="text-[11px] text-rose-700">{syncResult.sellerAccountError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">eBay Returns</span>
+                <span className="text-[10px] font-bold">{syncResult.ebayReturnsError ? 'RECONNECT / FAILED' : syncResult.ebayReturns ? (syncResult.ebayReturns.pagesPending ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Imported: {syncResult.ebayReturns?.fetched ?? 0}
+                {' · '}Provider total: {syncResult.ebayReturns?.totalEntries ?? '—'}
+                {' · '}Pages: {syncResult.ebayReturns?.pagesFetched ?? 0}
+              </p>
+              {syncResult.ebayReturnsError && <p className="text-[11px] text-rose-700">{syncResult.ebayReturnsError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">eBay Analytics</span>
+                <span className="text-[10px] font-bold">{syncResult.ebayAnalyticsError ? 'RECONNECT / FAILED' : syncResult.ebayAnalytics ? (syncResult.ebayAnalytics.failed?.length ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Resources stored: {syncResult.ebayAnalytics?.synced?.length ?? 0}
+                {' · '}Failed: {syncResult.ebayAnalytics?.failed?.length ?? 0}
+              </p>
+              {syncResult.ebayAnalyticsError && <p className="text-[11px] text-rose-700">{syncResult.ebayAnalyticsError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">eBay Finances (Signed API)</span>
+                <span className="text-[10px] font-bold">{syncResult.ebayFinancesError ? 'RECONNECT / FAILED' : syncResult.ebayFinances ? (syncResult.ebayFinances.failed?.length ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Payouts: {syncResult.ebayFinances?.payouts ?? 0}
+                {' · '}Transactions: {syncResult.ebayFinances?.transactions ?? 0}
+                {syncResult.ebayFinances?.pagesPending ? ' · More pages pending' : ''}
+                {' · '}Failed: {syncResult.ebayFinances?.failed?.length ?? 0}
+              </p>
+              {syncResult.ebayFinancesError && <p className="text-[11px] text-rose-700">{syncResult.ebayFinancesError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-900">
                   Inventory & Listings
                 </span>
@@ -896,32 +1043,182 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
                     {acc.authStatus === 'CONNECTED' && (
                       <div className="pt-2 border-t border-gray-100">
-                        <button
-                          onClick={() => handleToggleListings(acc.id)}
-                          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
-                        >
+                        <div className="flex flex-wrap items-center gap-4">
+                          <button
+                            onClick={() => handleToggleReturns(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedReturnsAccountId === acc.id ? 'Hide eBay Returns' : 'View eBay Returns'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleFinance(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedFinanceAccountId === acc.id ? 'Hide Finances' : 'View Finances'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleAnalytics(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedAnalyticsAccountId === acc.id ? 'Hide Analytics' : 'View Analytics'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleSellerAccount(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedSellerAccountId === acc.id ? 'Hide Seller Account Settings' : 'View Seller Account Settings'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleListings(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
                           {expandedListingsAccountId === acc.id
                             ? 'Hide Sync Listings'
                             : `View Sync Listings (${listingTotals[acc.id] ?? 'Load'})`}
                         </button>
+                        </div>
+
+                        {expandedReturnsAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                            <div className="text-xs font-semibold text-slate-800">Production eBay Returns</div>
+                            {returnsLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading eBay returns…</p>
+                            ) : (returnsByAccount[acc.id] || []).length === 0 ? (
+                              <p className="text-xs text-slate-500">No synchronized return records are available. Run Sync Production Data to import returns.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {(returnsByAccount[acc.id] || []).map((ret: any) => (
+                                  <div key={ret.returnId} className="rounded border border-slate-200 bg-white p-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <div><div className="text-[10px] text-slate-500">Return ID</div><div className="text-xs font-mono text-slate-800">{ret.returnId}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Order / Item</div><div className="text-xs text-slate-800">{ret.orderId || '—'} / {ret.itemId || '—'}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Status / Reason</div><div className="text-xs text-slate-800">{ret.status || ret.state || '—'} · {ret.reason || '—'}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Requested</div><div className="text-xs text-slate-800">{ret.creationDate ? new Date(ret.creationDate).toLocaleString() : '—'}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Seller response due</div><div className="text-xs text-slate-800">{ret.sellerResponseDue ? new Date(ret.sellerResponseDue).toLocaleString() : '—'}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Seller actions / estimated refund</div><div className="text-xs text-slate-800">{Array.isArray(ret.sellerActionTypes) ? ret.sellerActionTypes.join(', ') : '—'} · {ret.estimatedRefund?.value ?? ret.actualRefund?.value ?? '—'} {ret.estimatedRefund?.currency ?? ret.actualRefund?.currency ?? ''}</div></div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {expandedFinanceAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                            <div className="text-xs font-semibold text-slate-800">Production eBay Financial Data</div>
+                            {financeLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading finance records…</p>
+                            ) : !financesByAccount[acc.id] ? (
+                              <p className="text-xs text-slate-500">No synchronized finance data is available. Reconnect the seller account to grant the Finance permission, then run Sync Production Data.</p>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {(financesByAccount[acc.id].summaries || []).map((summary: any) => (
+                                    <div key={summary.key} className="rounded border border-slate-200 bg-white p-2">
+                                      <div className="text-[11px] font-semibold text-slate-800">{String(summary.key).replaceAll('_', ' ')}</div>
+                                      <div className="text-[10px] text-slate-500">Provider summary received · {summary.syncedAt ? new Date(summary.syncedAt).toLocaleString() : '—'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-xs font-semibold text-slate-800">Payouts ({financesByAccount[acc.id].payouts?.length || 0})</div>
+                                <div className="space-y-1">
+                                  {(financesByAccount[acc.id].payouts || []).map((payout: any) => (
+                                    <div key={payout.payoutId || payout.id} className="rounded border border-slate-200 bg-white p-2 flex flex-wrap justify-between gap-2 text-xs">
+                                      <span className="font-mono">{payout.payoutId || payout.id}</span>
+                                      <span>{payout.payoutStatus || '—'}</span>
+                                      <span>{payout.amount?.value ?? '—'} {payout.amount?.currency ?? ''}</span>
+                                      <span>{payout.payoutDate ? new Date(payout.payoutDate).toLocaleDateString() : '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-xs font-semibold text-slate-800">Transactions ({financesByAccount[acc.id].transactions?.length || 0})</div>
+                                <div className="space-y-1 max-h-64 overflow-auto">
+                                  {(financesByAccount[acc.id].transactions || []).map((transaction: any) => (
+                                    <div key={transaction.transactionId || transaction.id} className="rounded border border-slate-200 bg-white p-2 grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                                      <span className="font-mono">{transaction.transactionId || transaction.id}</span>
+                                      <span>{transaction.transactionType || '—'}</span>
+                                      <span>{transaction.amount?.value ?? '—'} {transaction.amount?.currency ?? ''}</span>
+                                      <span>{transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleString() : '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {expandedAnalyticsAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                            <div className="text-xs font-semibold text-slate-800">Production eBay Analytics</div>
+                            {analyticsLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading analytics…</p>
+                            ) : (analyticsByAccount[acc.id] || []).length === 0 ? (
+                              <p className="text-xs text-slate-500">No synchronized analytics are available. Reconnect the seller account to grant the Analytics read-only permission, then run Sync Production Data.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {(analyticsByAccount[acc.id] || []).map((resource: any) => (
+                                  <div key={resource.type + resource.key} className="rounded border border-slate-200 bg-white p-2">
+                                    <div className="text-[11px] font-semibold text-slate-800">{String(resource.type).replaceAll('_', ' ')}</div>
+                                    <div className="text-[11px] text-slate-600">{resource.key}</div>
+                                    <div className="mt-1 text-[10px] text-slate-400">Synced: {resource.syncedAt ? new Date(resource.syncedAt).toLocaleString() : '—'}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {expandedSellerAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                            <div className="text-xs font-semibold text-slate-800">Production Seller Account Data</div>
+                            {sellerAccountLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading seller account settings…</p>
+                            ) : (sellerAccountSnapshots[acc.id] || []).length === 0 ? (
+                              <p className="text-xs text-slate-500">No synchronized seller settings are available yet. Run Sync Production Data to retrieve them.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {(sellerAccountSnapshots[acc.id] || []).map((resource: any) => {
+                                  const data = resource.snapshot || {};
+                                  const collection = Array.isArray(data.policies) ? data.policies : [];
+                                  const policyNames = Array.isArray(collection) ? collection.map((policy: any) => policy.name).filter((name: any) => typeof name === 'string') : [];
+                                  const label = String(resource.type || '').replaceAll('_', ' ').toLowerCase();
+                                  const summary = Array.isArray(collection)
+                                    ? `${collection.length} policy record(s)`
+                                    : resource.type === 'SELLER_PRIVILEGE'
+                                      ? (data.sellerRegistrationCompleted === true ? 'Seller registration completed' : 'Registration status returned by eBay')
+                                      : resource.type === 'SELLER_SUBSCRIPTION'
+                                        ? `${Array.isArray(data.subscriptions) ? data.subscriptions.length : 0} subscription record(s)`
+                                        : 'Latest provider settings retrieved';
+                                  return (
+                                    <div key={resource.type} className="rounded border border-slate-200 bg-white p-2">
+                                      <div className="text-[11px] font-semibold text-slate-800 capitalize">{label}</div>
+                                      <div className="text-[11px] text-slate-600">{summary}</div>
+                                      {policyNames.length > 0 && <div className="mt-1 text-[10px] text-slate-500">{policyNames.slice(0, 6).join(' · ')}</div>}
+                                      <div className="mt-1 text-[10px] text-slate-400">Synced: {resource.syncedAt ? new Date(resource.syncedAt).toLocaleString() : '—'}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {expandedListingsAccountId === acc.id && (
                           <div className="mt-3 overflow-x-auto">
                             {listingLoadingAccountId === acc.id ? (
                               <p className="text-xs text-slate-500 py-3">
-                                Loading seller inventory and listings…
+                                Loading Production inventory and listings…
                               </p>
                             ) : (
                               <>
                                 <div className="text-[11px] text-slate-500 mb-2">
-                                  Total synced inventory records: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
+                                  Total synced Production listings: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
                                 </div>
 
                                 <table className="w-full text-left text-[11px]">
                                   <thead className="bg-slate-50 text-slate-600">
                                     <tr>
                                       <th className="p-2">#</th>
-                                      <th className="p-2">SKU</th>
+                                      <th className="p-2">SKU / Item ID</th>
                                       <th className="p-2">Product</th>
                                       <th className="p-2">Sync Status</th>
                                       <th className="p-2">eBay Listing Status</th>
@@ -934,7 +1231,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                     {(listingSnapshots[acc.id] || []).map((listing: any, listingIndex: number) => (
                                       <tr key={listing.offerId || listing.sku || listingIndex}>
                                         <td className="p-2">{listingIndex + 1}</td>
-                                        <td className="p-2 font-mono">{listing.sku}</td>
+                                        <td className="p-2 font-mono">{listing.sku || listing.itemId || "—"}</td>
                                         <td className="p-2 min-w-40">{listing.title || '—'}</td>
                                         <td className="p-2">
                                           <span title={listing.syncError || undefined} className={`rounded px-1.5 py-0.5 font-semibold ${listing.syncStatus === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
