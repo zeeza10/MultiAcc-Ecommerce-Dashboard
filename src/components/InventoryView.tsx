@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL } from '../types';
+import { EbayStockSourcePanel } from './EbayStockSourcePanel';
 
 interface InventoryViewProps {
   currentUser: User;
@@ -116,6 +117,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} localRecords={balances} mode="INVENTORY" />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
