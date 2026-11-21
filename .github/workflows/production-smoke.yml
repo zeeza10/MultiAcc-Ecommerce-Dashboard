@@ -1,7 +1,13 @@
 name: Production Worker Security Smoke Test
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Deploy Cloudflare Worker
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read

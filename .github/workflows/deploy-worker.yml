@@ -1,7 +1,13 @@
 name: Deploy Cloudflare Worker
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Verify application
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
