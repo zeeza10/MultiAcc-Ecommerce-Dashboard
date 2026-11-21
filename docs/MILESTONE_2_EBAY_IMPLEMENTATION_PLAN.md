@@ -14,7 +14,7 @@
 
 | Work package | Implementation | Acceptance evidence |
 |---|---|---|
-| M2.1 Order sync stabilization | Verify deployed date clamp; repair cursor recovery and classify 30830 as non-retryable until cursor reset; isolate order success from inventory failure; deduplicate queue recovery | Sandbox API tests, idempotency tests, no repeated 30830, recovery dry-run report |
+| M2.1 Order sync stabilization | **Implementation started in PR #160:** classify permanent vs transient eBay errors; stop automatic retries for 30830/HTTP 4xx; separate last-attempt from last-success timestamps; atomically enqueue one active scheduled job per seller; coalesce redundant queued/failed jobs without deleting records; claim at most one job per seller per scheduler pass; treat imported orders with SKU exceptions as completed sync work | Cloudflare Preview typecheck/tests/build; SQL migration review; Sandbox API/idempotency tests; no repeated 30830; recovery dry-run report |
 | M2.2 Active Listings | Add read-only compatibility coverage for Seller Hub/Trading API listings not represented in Inventory API; normalize source IDs/SKUs/status/price/currency without inventing fields | Compare provider counts and sample records against Seller Hub for approved test seller |
 | M2.3 Returns | Import seller return requests/status/line items and map to internal returns; preserve provider IDs and status history | Sandbox contract tests, idempotent return import, tenant isolation |
 | M2.4 Seller Account | Read seller identity, selling limits/status, business policies and account capabilities | Read-only provider snapshot and UI coverage |
@@ -33,4 +33,4 @@
 
 ## First implementation slice
 
-Start with M2.1: verify the deployed order date clamp and harden cursor/error recovery. The Production event history shows eBay 30830 for start dates outside the two-year API window. The Worker source already contains a rolling two-year clamp; verify the deployed Worker version and make cursor restart/error classification deterministic. Do not execute the queue recovery yet.
+Start with M2.1. The Worker already clamps order search dates to the rolling two-year window. The new implementation adds deterministic permanent/transient retry classification and prevents repeated scheduled queue creation. Its SQL migration is intentionally not applied to Production in this PR; the migration must be reviewed and approved before deploying the Worker code because the Worker uses the new database column and RPC. No queue recovery or Production eBay sync is performed.
