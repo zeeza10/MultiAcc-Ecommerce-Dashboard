@@ -208,7 +208,7 @@ Spot checks confirmed organization/role checks in sensitive functions including 
 
 ### 10.4 Live migration history
 
-Supabase currently reports 78 applied migration-history entries, from `20261110150000` through `20261119214407`. The live history includes several repeated/similarly named migrations, so compare by exact version and filename rather than migration name alone. The GitHub migration directory listing was not available from the repository search result in this pass; therefore exact GitHub-to-live parity is **not yet verified**. Do not apply, repair, or replay migrations as part of this audit.
+Supabase currently reports 83 applied migration-history entries, from `20261110150000` through `20261119214407`. The live history includes several repeated/similarly named migrations, so compare by exact version and filename rather than migration name alone. The GitHub migration directory listing was not available from the repository search result in this pass; therefore exact GitHub-to-live parity is **not yet verified**. Do not apply, repair, or replay migrations as part of this audit.
 
 ### 10.5 Phase 0 disposition
 
@@ -217,7 +217,7 @@ The audit baseline and concrete defects are now documented. Phase 0 is **audit-b
 1. Add route contract tests for every frontend API method; first fix the two missing permission-map entries above.
 2. Review all 34 SECURITY DEFINER function bodies and grants, not just spot checks.
 3. Run two-organization positive/negative RLS tests for Super Admin, Ops Manager, Finance User, Warehouse Staff, Viewer and Client 3PL roles.
-4. Obtain the exact GitHub migration file inventory and compare every version with the 78 live history entries.
+4. Obtain the exact GitHub migration file inventory and compare every version with the 83 live history entries.
 5. Verify module UI → API → Worker handler → repository/table mappings and record acceptance tests.
 
 No Production business data, credentials, OAuth grants, schema, migration state, Cloudflare configuration, or deployments were changed by this supplemental audit.
