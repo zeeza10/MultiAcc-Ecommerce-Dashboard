@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --host 127.0.0.1",
-    "build": "vite build",
+    "build": "npm run lint && npm test && vite build",
     "preview": "npm run build && vite preview --host 127.0.0.1",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",

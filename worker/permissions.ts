@@ -2,7 +2,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && /^\/(auth\/me|me)\/?$/.test(path)) return null;
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
-  if (method === 'GET' && /^\\/ebay\\/accounts\\/[^/]+\\/listings$/.test(path)) return 'marketplace.view';
+  if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/listings$/.test(path)) return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/integration/events') return 'marketplace.view';
   if (method === 'POST' && path === '/ebay/accounts') return 'marketplace.manage';
   if (method === 'DELETE' && /^\/ebay\/accounts\/[^/]+$/.test(path)) return null;
@@ -61,7 +61,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'POST' && path.startsWith('/payouts/') && path.endsWith('/confirm-deposit')) return 'finance.manage';
   if (method === 'GET' && path === '/payouts') return 'finance.view';
   if (method === 'GET' && path === '/reconciliation') return 'finance.view';
-  if (method === 'GET' && path.startsWith('/reports/R-') && path.length === 13 && !Number.isNaN(Number(path.slice(-2)))) return 'reports.view';
+  if (method === 'GET' && /^\/reports\/R-(0[1-9]|1[0-4])$/.test(path)) return 'reports.view';
   if (method === 'GET' && path === '/dropshipping/calculations') return 'orders.view';
   if (method === 'POST' && path === '/dropshipping/calculations') return 'products.create';
   if (method === 'GET' && path === '/warehouses') return 'inventory.view';
