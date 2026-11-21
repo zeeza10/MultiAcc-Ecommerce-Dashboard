@@ -30,6 +30,7 @@ type ProductOption = { id: string; sku: string; name: string };
 
 interface EbayStockSourcePanelProps {
   selectedStoreId: string;
+  selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   localRecords?: any[];
   mode: 'PRODUCTS' | 'INVENTORY';
 }
@@ -43,7 +44,7 @@ const money = (value: unknown, currency = 'GBP') => {
 
 const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
 
-export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, localRecords = [], mode }) => {
+export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], mode }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,14 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
   }, [localRecords]);
 
   const load = useCallback(async () => {
+    if (selectedEnvironment !== 'PRODUCTION') {
+      setRows([]);
+      setMappings([]);
+      setUpdatedAt(null);
+      setLoading(false);
+      setError('Switch the dashboard environment to Production to view and map live eBay seller listings. Demo and Sandbox data remain isolated.');
+      return;
+    }
     setLoading(true);
     setError('');
     setNotice('');
@@ -101,7 +110,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
             itemId: listing.itemId || listing.offerId,
             status: String(listing.listingStatus || 'UNKNOWN'),
             quantity: listing.inventoryQuantity == null ? null : Number(listing.inventoryQuantity),
-            price: listing.offers?.[0]?.pricingSummary?.price?.value ?? listing.offers?.[0]?.price?.value,
+            price: (listing.offers?.[0]?.pricingSummary?.price?.value ?? listing.offers?.[0]?.price?.value) == null ? undefined : String(listing.offers?.[0]?.pricingSummary?.price?.value ?? listing.offers?.[0]?.price?.value),
             currency: listing.offers?.[0]?.pricingSummary?.price?.currency ?? listing.offers?.[0]?.price?.currency ?? 'GBP',
             syncedAt: listing.syncedAt,
           };
@@ -117,7 +126,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
     } finally {
       setLoading(false);
     }
-  }, [selectedStoreId]);
+  }, [selectedStoreId, selectedEnvironment]);
 
   useEffect(() => { void load(); }, [load]);
 

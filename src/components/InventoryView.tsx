@@ -117,7 +117,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
-      <EbayStockSourcePanel selectedStoreId={selectedStoreId} localRecords={balances} mode="INVENTORY" />
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={balances} mode="INVENTORY" />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
