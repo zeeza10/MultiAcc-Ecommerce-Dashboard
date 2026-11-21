@@ -130,7 +130,8 @@ export function buildEbaySignatureComponents(method: 'GET', requestUrl: string, 
   const signatureBase = [
     `"x-ebay-signature-key": ${jwe}`,
     `"@method": ${method}`,
-    `"@path": ${url.pathname}${url.search}`,
+    // RFC 9421 @path contains only the path component; query parameters are not part of @path.
+    `"@path": ${url.pathname || '/'}`,
     `"@authority": ${url.host}`,
     `"@signature-params": ${components};created=${created}`,
   ].join('\n');
