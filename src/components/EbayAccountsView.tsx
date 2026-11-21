@@ -135,6 +135,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [expandedFinanceAccountId, setExpandedFinanceAccountId] = useState<string | null>(null);
   const [financesByAccount, setFinancesByAccount] = useState<Record<string, any>>({});
   const [financeLoadingId, setFinanceLoadingId] = useState<string | null>(null);
+  const [financeSyncingId, setFinanceSyncingId] = useState<string | null>(null);
+  const [financeSyncResult, setFinanceSyncResult] = useState<Record<string, any>>({});
 
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
@@ -408,6 +410,24 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       setSyncFeedback(`Could not load eBay Analytics: ${err.message}`);
       setExpandedAnalyticsAccountId(null);
     } finally { setAnalyticsLoadingId(null); }
+  };
+
+  const handleSyncFinance = async (accountId: string) => {
+    setFinanceSyncingId(accountId);
+    setSyncFeedback(null);
+    try {
+      const result = await api.syncEbayFinances(accountId);
+      setFinanceSyncResult(current => ({ ...current, [accountId]: result }));
+      const saved = await api.getEbayFinances(accountId);
+      setFinancesByAccount(current => ({ ...current, [accountId]: saved }));
+      if (result.failed?.length) {
+        setSyncFeedback(`Finance sync completed with ${result.failed.length} failed resource(s). Review the error details below.`);
+      }
+    } catch (error: any) {
+      setSyncFeedback(error?.message || 'eBay Finance-only sync failed.');
+    } finally {
+      setFinanceSyncingId(null);
+    }
   };
 
   const handleToggleFinance = async (accountId: string) => {
@@ -1199,11 +1219,39 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
                         {expandedFinanceAccountId === acc.id && (
                           <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
-                            <div className="text-xs font-semibold text-slate-800">Production eBay Financial Data</div>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs font-semibold text-slate-800">Production Financial Data</div>
+                              <button
+                                type="button"
+                                onClick={() => void handleSyncFinance(acc.id)}
+                                disabled={financeSyncingId === acc.id || financeLoadingId === acc.id || acc.authStatus !== 'CONNECTED'}
+                                className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${financeSyncingId === acc.id ? 'animate-spin' : ''}`} />
+                                {financeSyncingId === acc.id ? 'Syncing Finances…' : 'Sync Finances Only'}
+                              </button>
+                            </div>
+                            {financeSyncResult[acc.id] && (
+                              <div className={`rounded-md border p-2 text-[11px] ${financeSyncResult[acc.id].failed?.length ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                                <div className="font-semibold">
+                                  {financeSyncResult[acc.id].failed?.length ? 'Finance sync partial' : 'Finance sync completed'}
+                                </div>
+                                <div>
+                                  Payouts: {financeSyncResult[acc.id].payouts ?? 0}
+                                  {' · '}Transactions: {financeSyncResult[acc.id].transactions ?? 0}
+                                  {' · '}Failed: {financeSyncResult[acc.id].failed?.length ?? 0}
+                                </div>
+                                {(financeSyncResult[acc.id].failed || []).map((item: any, index: number) => (
+                                  <div key={item.resource || index} className="mt-1 break-words">
+                                    {item.resource}: {item.message}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {financeLoadingId === acc.id ? (
                               <p className="text-xs text-slate-500">Loading finance records…</p>
                             ) : !financesByAccount[acc.id] ? (
-                              <p className="text-xs text-slate-500">No synchronized finance data is available. Reconnect the seller account to grant the Finance permission, then run Sync Production Data.</p>
+                              <p className="text-xs text-slate-500">No synchronized finance data is available yet. Use Sync Finances Only above to fetch this account's Finance data.</p>
                             ) : (
                               <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
