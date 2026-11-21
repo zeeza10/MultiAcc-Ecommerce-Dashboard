@@ -61,6 +61,7 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   const [returnRequestId, setReturnRequestId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (defaultSubTab) {
@@ -74,22 +75,31 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.all([
+      const [supRes, poRes, retRes, ordRes, prodRes] = await Promise.allSettled([
         api.getSuppliers(selectedStoreId),
         api.getPurchaseOrders(selectedStoreId),
         api.getReturns(selectedStoreId),
         api.getOrders({ accountId: selectedStoreId }),
         api.getProducts(selectedStoreId),
       ]);
-      setSuppliers(supRes.suppliers || []);
-      setPurchaseOrders(poRes.purchaseOrders || []);
-      setProducts(prodRes.products || []);
-      setReceipts(poRes.receipts || []);
-      setReturns(retRes.returns || []);
-      setOrders(ordRes.orders || []);
+      const failures: string[] = [];
+      if (supRes.status === 'fulfilled') setSuppliers(supRes.value.suppliers || []);
+      else failures.push('Suppliers could not be loaded.');
+      if (poRes.status === 'fulfilled') {
+        setPurchaseOrders(poRes.value.purchaseOrders || []);
+        setReceipts(poRes.value.receipts || []);
+      } else failures.push('Purchase Orders and Goods Receipts could not be loaded.');
+      if (retRes.status === 'fulfilled') setReturns(retRes.value.returns || []);
+      else failures.push('Returns could not be loaded.');
+      if (ordRes.status === 'fulfilled') setOrders(ordRes.value.orders || []);
+      else failures.push('Orders could not be loaded.');
+      if (prodRes.status === 'fulfilled') setProducts(prodRes.value.products || []);
+      else failures.push('Production Products/SKUs could not be loaded.');
+      if (failures.length) setLoadError(failures.join(' '));
     } catch (err) {
-      console.error('Failed to load buying & returns data:', err);
+      setLoadError(err instanceof Error ? err.message : 'Buying and Returns data could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -312,6 +322,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   }).format(minor / 100);
 
   return (
+    <>
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

@@ -66,21 +66,27 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     setLedger([]);
     setProfitRows([]);
     try {
-      const [invRes, payRes, expRes, ledRes, profRes] = await Promise.all([
+      const [invRes, payRes, expRes, ledRes, profRes] = await Promise.allSettled([
         api.getInvoices(selectedStoreId), api.getPayments(selectedStoreId),
         isClientUser ? Promise.resolve({ expenses: [] }) : api.getExpenses(selectedStoreId),
         isClientUser ? Promise.resolve({ ledger: [] }) : api.getFinancialLedger(selectedStoreId),
         isClientUser ? Promise.resolve({ data: [] }) : api.getReport('R-13', { accountId: selectedStoreId }),
       ]);
-      setInvoices(invRes.invoices || []);
-      setPayments(payRes.payments || []);
-      setExpenses(expRes.expenses || []);
-      setLedger(ledRes.ledger || []);
-      setProfitRows(profRes.data || []);
+      const failures: string[] = [];
+      if (invRes.status === 'fulfilled') {
+        setInvoices(invRes.value.invoices || []);
+        if (invRes.value.invoices?.length) setSelectedInvoiceForPay(invRes.value.invoices[0].id);
+      } else failures.push('Invoices could not be loaded.');
+      if (payRes.status === 'fulfilled') setPayments(payRes.value.payments || []);
+      else failures.push('Payments could not be loaded.');
+      if (expRes.status === 'fulfilled') setExpenses(expRes.value.expenses || []);
+      else failures.push('Expenses could not be loaded.');
+      if (ledRes.status === 'fulfilled') setLedger(ledRes.value.ledger || []);
+      else failures.push('Financial ledger could not be loaded.');
+      if (profRes.status === 'fulfilled') setProfitRows(profRes.value.data || []);
+      else failures.push('Profitability report could not be loaded.');
+      if (failures.length) setLoadError(failures.join(' '));
       if (isClientUser && !['INVOICES', 'PAYMENTS'].includes(activeTab)) setActiveTab('INVOICES');
-      if (invRes.invoices && invRes.invoices.length > 0) {
-        setSelectedInvoiceForPay(invRes.invoices[0].id);
-      }
     } catch (err) {
       console.error('Failed to load finance data:', err);
       setLoadError(err instanceof Error ? err.message : 'Finance data could not be loaded. Check your connection and selected store.');

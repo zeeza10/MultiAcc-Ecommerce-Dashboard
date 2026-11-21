@@ -25,6 +25,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
 }) => {
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedAdj, setSelectedAdj] = useState<StockAdjustment | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
@@ -36,11 +37,12 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
 
   const loadAdjustments = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const res = await api.getAdjustments();
       setAdjustments(res.adjustments || []);
     } catch (err) {
-      console.error('Failed to load adjustments:', err);
+      setLoadError(err instanceof Error ? err.message : 'Stock adjustments could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -98,6 +100,7 @@ export const AdjustmentsView: React.FC<AdjustmentsViewProps> = ({
 
   return (
     <div className="space-y-4">
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadAdjustments()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

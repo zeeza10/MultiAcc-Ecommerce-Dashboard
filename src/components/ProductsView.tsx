@@ -35,6 +35,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [products, setProducts] = useState<any[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [filterLowStockOnly, setFilterLowStockOnly] = useState(initialFilter?.filter === 'LOW_STOCK');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -56,6 +57,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   const loadProducts = async () => {
     setLoading(true);
+    setLoadError('');
     setProducts([]);
     try {
       const [res, clientRes] = await Promise.all([
@@ -65,7 +67,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
       setProducts(res.products || []);
       setClients(clientRes.clients || []);
     } catch (err) {
-      console.error('Failed to load products:', err);
+      setLoadError(err instanceof Error ? err.message : 'Production Product/SKU catalog could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -157,6 +159,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   return (
     <div className="space-y-4">
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadProducts()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={products} allocationRecords={[]} onCreateProduct={(listing) => { setNewSku(listing.sku.toUpperCase()); setNewName(listing.title); setShowAddModal(true); }} mode="PRODUCTS" />
 
       {/* Top Header */}
