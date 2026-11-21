@@ -241,7 +241,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
-              rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
+              rows.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
               rows.map((row, index) => {
                 const key = rowKey(row);
                 const mapping = mappingByKey.get(key);
