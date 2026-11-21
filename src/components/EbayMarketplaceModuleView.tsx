@@ -68,7 +68,7 @@ function TrafficChart({ resources }: { resources: any[] }) {
   const metrics = Array.isArray(snapshot.metrics) ? snapshot.metrics : [];
   const records = Array.isArray(snapshot.records) ? snapshot.records : [];
   const metricIndex = metrics.findIndex((m: any) => /view|visit|impression/i.test(String(m.key || m.localizedName)));
-  const values = records.map((r: any) => {
+  const values: Array<{ date: string; value: number }> = records.map((r: any) => {
     const raw = r.metricValues?.[metricIndex >= 0 ? metricIndex : 0];
     const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
     return { date: r.dimensionValues?.[0]?.value ?? r.dimensionValues?.[0] ?? '', value: Number.isFinite(n) ? n : 0 };
@@ -76,15 +76,15 @@ function TrafficChart({ resources }: { resources: any[] }) {
   if (!values.length) return <EmptyState title="Traffic trend is not available yet" detail="A chart will appear when eBay Analytics returns dated traffic records and metric values for this account."/>;
   const width = 760, height = 220, pad = 24;
   const max = Math.max(1, ...values.map(v => v.value));
-  const points = values.map((v, i) => ({ ...v, x: pad + (values.length === 1 ? 0 : i * (width - pad * 2) / (values.length - 1)), y: height - pad - (v.value / max) * (height - pad * 2) }));
-  const line = points.map(p => `${p.x},${p.y}`).join(' ');
+  const points: Array<{ date: string; value: number; x: number; y: number }> = values.map((v: { date: string; value: number }, i: number) => ({ ...v, x: pad + (values.length === 1 ? 0 : i * (width - pad * 2) / (values.length - 1)), y: height - pad - (v.value / max) * (height - pad * 2) }));
+  const line = points.map((p: { x: number; y: number }) => `${p.x},${p.y}`).join(' ');
   const area = `${pad},${height-pad} ${line} ${points[points.length-1].x},${height-pad}`;
   return <div className={panel + ' p-4 sm:p-5'}>
     <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-semibold text-slate-900">Traffic performance</h3><p className="mt-1 text-xs text-slate-500">{metrics[metricIndex >= 0 ? metricIndex : 0]?.localizedName || metrics[0]?.key || 'Reported metric'} · actual eBay records</p></div><span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{values.length} data points</span></div>
     <div className="mt-4 w-full overflow-hidden"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="eBay traffic trend chart" className="h-auto w-full">
       {[0,1,2,3].map(i => <line key={i} x1={pad} x2={width-pad} y1={pad+i*(height-pad*2)/3} y2={pad+i*(height-pad*2)/3} stroke="#e2e8f0" strokeDasharray="4 5"/>)} 
       <polygon points={area} fill="#6366f1" opacity=".10"/><polyline points={line} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-      {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4" fill="#4f46e5" stroke="white" strokeWidth="2"><title>{p.date}: {p.value}</title></circle>)}
+      {points.map((p: { x: number; y: number; date: string; value: number },i: number)=><circle key={i} cx={p.x} cy={p.y} r="4" fill="#4f46e5" stroke="white" strokeWidth="2"><title>{p.date}: {p.value}</title></circle>)}
     </svg></div>
     <div className="mt-2 flex justify-between gap-2 text-[10px] text-slate-400"><span>{values[0].date}</span><span>{values[values.length-1].date}</span></div>
   </div>;
