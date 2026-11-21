@@ -121,7 +121,7 @@ The module mapping above is a code-level contract inventory. This PR expands per
 - The Cloudflare build for that main-branch commit failed on the malformed eBay listings permission regex. It did not deploy successfully.
 - PR #159 corrects the eBay listings permission regex and adds fail-closed route coverage.
 - The Worker build command now runs `npm run lint && npm test && vite build`, so type checking and automated tests are part of the Cloudflare build gate.
-- Cloudflare Preview for the latest PR head `674f2c370a501804bfa1c39fa8cf93e4f73366d9` completed successfully: `tsc --noEmit` passed, **82 tests passed / 0 failed**, Vite build succeeded, and `wrangler preview` deployment completed.
+- Cloudflare Preview for PR head `cdc53f469b154fdf68ada747d43640ff23c5bf16` completed successfully: `tsc --noEmit` passed, **82 tests passed / 0 failed**, Vite build succeeded, and `wrangler preview` deployment completed.
 - That test suite includes all mapped Worker route/method permission cases, unsupported method/path variants, and the implemented report ID range R-01 through R-14.
 - Latest Preview URL: `https://fix-ebay-listings-route-regex-multiacc-ecommerce-dashboard.zeeshan-m-personal.workers.dev`. Preview intentionally lacks Production-only eBay OAuth and rate-limit bindings; therefore this is build/test/preview evidence, not a live Production API smoke test.
 - GitHub Actions were not manually triggered because the repository's monthly Actions minutes were exhausted.
@@ -136,12 +136,26 @@ The module mapping above is a code-level contract inventory. This PR expands per
 | P0 | Complete write-path/API tenant isolation tests across active roles in a disposable test environment | Automated results proving tenant A cannot read or write tenant B |
 | P0 | Merge PR #159 only after its latest Cloudflare Preview passes | Latest PR head has successful typecheck, test suite, Vite build, and Preview deployment |
 | P0 | Approve and verify Production deployment after merge | Production Worker build/deploy success and read-only smoke checks |
-| P1 | Enable Supabase Leaked Password Protection | Supabase Auth security setting enabled and security advisor warning cleared |
 | P1 | Add a real customer-master API/UI backed by `customers` and `customer_addresses` if customer CRUD is in scope | Customer CRUD contract tests and role coverage |
 | P1 | Add full endpoint/role contract tests and verify every visible UI action | Test matrix with no unexpected 501/404 paths |
+
+**Milestone 1 decision:** the technical audit inventory and security review are complete. PR #159 was merged on 2026-11-21 at merge commit `642ae09a627fb7823a1fb3cf9de66b39f445df82`. Its latest Preview build passed TypeScript, 82 automated tests, Vite build, and Preview deployment. The three forward-only migrations remain unapplied in Production; Production post-migration verification is still a release action, not an audit-discovery task.
 
 **Completed in this PR branch:** migration version inventory reconciliation, full SECURITY DEFINER review, static RLS/grant review, 53-table two-tenant read-isolation test across five roles (265 checks) with rollback, representative cross-tenant product INSERT/UPDATE/DELETE rejection test with rollback, permission-override policy correction, Worker route permission coverage, and Cloudflare Preview evidence for the earlier fully-tested source commit.
 
 ## Safety boundary
 
 This report does not authorize Production migration execution, merge, Production deployment, eBay synchronization, OAuth scope changes, queue retries, or scheduler execution. Those actions remain separate approvals. Existing Production records and raw provider payloads must be preserved.
+
+## 8. Read-only Production marketplace snapshot (2026-11-21)
+
+The following was queried from Supabase metadata and aggregate operational records only. No tokens, secrets, buyer PII, or raw provider payloads were selected.
+
+- eBay application credentials are present and marked verified for both SANDBOX and PRODUCTION (masked client IDs only inspected; credential versions 6 and 9 respectively).
+- Real non-demo accounts: 3 PRODUCTION connected, 3 PRODUCTION disconnected; 5 SANDBOX connected, 4 SANDBOX disconnected. Three additional SANDBOX demo records remain stored but are excluded from live UI workflows.
+- Integration events include 1,027 ORDER_SYNC_FAILED records, with the dominant provider error EBAY_API_30830: eBay rejects order searches whose start date is outside its rolling two-year limit. The latest such event was recorded on 2026-11-19.
+- SANDBOX inventory failures include the code-level offerResults is not defined exception (92 logged events across five accounts); the corrective scope fix was merged in PR #159 and its Preview build passes.
+- Sync jobs: 282 SUCCEEDED, 64 FAILED, 647 DEAD_LETTER, 692 QUEUED, and 19 RUNNING at the time of inspection. All observed jobs use the SCHEDULED trigger. At the snapshot time, 4 RUNNING leases were expired and 15 were still leased; 692 queued and 64 failed jobs were due.
+- No jobs were retried, no queue state was changed, and no scheduler was invoked during the audit.
+
+These figures are a point-in-time snapshot, not a claim that all historical jobs represent unique orders. Milestone 2 must repair the cause, then propose a controlled recovery plan that deduplicates and bounds retries before any production queue action.
