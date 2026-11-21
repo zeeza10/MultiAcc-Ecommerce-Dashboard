@@ -28,7 +28,7 @@ describe('eBay Finance RFC9421 request signatures', () => {
 
 describe('eBay signing private-key PEM parsing', () => {
   it('decodes the PKCS#8 PEM body without storing or exposing key material', () => {
-    const pem = '-----BEGIN PRIVATE KEY-----\nAQIDBA==\n-----END PRIVATE KEY-----';
+    const pem = '-----BEGIN PRIVATE KEY-----\nAQIDBA==\n-----END PRIVATE KEY-----\n';
     assert.deepEqual([...decodeEbayPrivateKeyPem(pem)], [1, 2, 3, 4]);
   });
 
