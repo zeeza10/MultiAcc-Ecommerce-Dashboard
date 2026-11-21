@@ -88,9 +88,18 @@ Current live metadata:
 - 32 are executable by `authenticated`; 14 are executable by `service_role` (some grants overlap).
 - A database-wide static invariant query found no authenticated-executable function whose definition lacked both an `auth.uid()` identity check and an organization-permission helper reference.
 
-Focused semantic review covered the organization bootstrap, membership activation/archive/suspension, role assignment/management, invitations, permission overrides, organization permission helpers, and the service-only marketplace import/queue/credential functions. Service-only functions inspected explicitly validate the `service_role` JWT claim; trigger-only functions have no direct anon/authenticated execute grant.
+All 42 function definitions were reviewed, including organization bootstrap and membership lifecycle, role/permission administration, client scoping, order and purchasing transactions, stock adjustments, return disposition, finance postings, marketplace inventory/finance allocation, sync queue/token refresh, order import, credential storage, and trigger-only helpers.
 
-**Status:** Function metadata and access invariants verified; focused semantic review completed; the requested function-by-function semantic review of all 42 functions is not yet complete and remains a release gate. Static pattern checks are not a substitute for full logic review.
+Key invariants confirmed:
+- Every function has an explicit empty `search_path`.
+- No function is executable by `anon`.
+- All authenticated-executable functions bind the caller through `auth.uid()` and/or the organization permission helper; `private.has_org_permission` checks active membership and permission overrides.
+- Service-only marketplace queue, token refresh, order import, and credential-write functions explicitly validate the `service_role` JWT claim.
+- Trigger-only functions are not directly executable by anon/authenticated users.
+- High-impact transactional functions scope source records and writes by organization, validate related entities, and use locks/idempotency where required. Marketplace finance allocation is additionally constrained by its validation trigger, source-type/positive-amount constraints, source organization/currency matching, and allocation ceiling.
+- Stock adjustment approval enforces role restrictions and separation of duties; order transitions validate status progression and apply stock/accounting changes transactionally.
+
+No critical privilege-escalation or cross-organization bypass was identified in the reviewed function definitions. This is a static semantic review; runtime cross-tenant testing remains separately gated by the absence of a second test organization.
 
 ## 5. API contract, permission map, and handler checks
 
@@ -119,7 +128,7 @@ The module mapping above is a code-level contract inventory. Full request/respon
 |---|---|---|
 | P0 | Obtain a disposable second organization/test environment and run cross-tenant read/write isolation tests for each active role | Automated test results proving tenant A cannot read/write tenant B |
 | P0 | Reconcile the three live-only and four GitHub-only migration versions | Reviewed migration parity report; no destructive history rewrite |
-| P0 | Complete line-by-line semantic review of all 42 SECURITY DEFINER functions | Function-by-function checklist with grants, identity checks, tenant scope, permission checks, and side effects |
+| P0 | Preserve the completed SECURITY DEFINER review as a regression baseline | Re-run grant/search_path/tenant-scope checks whenever SECURITY DEFINER functions change |
 | P0 | Fresh Cloudflare Preview build for the latest PR #159 head | Successful build and deployment for the latest commit |
 | P0 | Obtain approval, then apply the reviewed pending Production migrations | Migration history and post-migration schema checks |
 | P1 | Enable Supabase Leaked Password Protection | Supabase Auth security advisor warning cleared |
