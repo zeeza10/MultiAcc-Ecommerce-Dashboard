@@ -1368,7 +1368,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     return json({ success: !result.pagesPending, ...result });
   }
 
-  const returnsReadMatch = path.match(/^\\/ebay\\/accounts\\/([^/]+)\\/returns$/);
+  const returnsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/returns$/);
   if (returnsReadMatch && request.method === 'GET') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
       return json({ error: 'Marketplace view permission is required.' }, 403);
