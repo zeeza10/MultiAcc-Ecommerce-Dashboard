@@ -74,20 +74,27 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
     setLoading(true);
     setLoadError('');
     try {
-      const [payoutRes, recRes, accountRes, ledgerRes, configRes] = await Promise.all([
+      const [payoutRes, recRes, accountRes, ledgerRes, configRes] = await Promise.allSettled([
         api.getPayouts(storeFilter), api.getReconciliations(storeFilter),
-        // Resolve the ledger with the same store/environment filter as payouts and reconciliation.
         api.getEbayAccounts(), api.getFinancialLedger(storeFilter), api.getConfig(),
       ]);
-      setPayouts(payoutRes.payouts || []);
-      setBalances(payoutRes.balances || null);
-      setReconciliations(recRes.reconciliations || []);
-      const connectedProductionAccounts = (accountRes.accounts || []).filter((account: any) =>
+      const failures: string[] = [];
+      if (payoutRes.status === 'fulfilled') {
+        setPayouts(payoutRes.value.payouts || []);
+        setBalances(payoutRes.value.balances || null);
+      } else failures.push('Internal payout records could not be loaded.');
+      if (recRes.status === 'fulfilled') setReconciliations(recRes.value.reconciliations || []);
+      else failures.push('Reconciliation records could not be loaded.');
+      if (ledgerRes.status === 'fulfilled') setLedger(ledgerRes.value.ledger || []);
+      else failures.push('Financial ledger could not be loaded.');
+      const accounts = accountRes.status === 'fulfilled' ? accountRes.value.accounts || [] : [];
+      if (accountRes.status === 'rejected') failures.push('Connected eBay seller accounts could not be loaded.');
+      const connectedProductionAccounts = accounts.filter((account: any) =>
         account.environment === 'PRODUCTION' && !account.isDemo &&
         account.authStatus === 'CONNECTED' &&
         (storeFilter === 'ALL' || account.id === storeFilter)
       );
-      setAccounts(accountRes.accounts || []);
+      setAccounts(accounts);
       const providerResults = await Promise.allSettled(connectedProductionAccounts.map(async (account: any) => ({
         accountId: account.id,
         accountName: account.name || account.sellerUsername || 'eBay Seller',
@@ -99,11 +106,13 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
       setProviderSummaries(providerData.flatMap(item => (item.summaries || []).map((row: any) => ({ ...row, accountId: item.accountId, accountName: item.accountName }))));
       const syncDates = providerData.map(item => item.lastSyncedAt).filter(Boolean).sort();
       setProviderFinanceLastSyncedAt(syncDates.length ? syncDates[syncDates.length - 1] : null);
-      setProviderFinanceError(providerResults.some(result => result.status === 'rejected')
-        ? 'Some connected seller finance feeds could not be read. Check marketplace.view permission and seller sync status.'
-        : '');
-      setLedger(ledgerRes.ledger || []);
-      setCurrency(String(configRes.config?.baseCurrency || payoutRes.payouts?.[0]?.currency || 'GBP').toUpperCase());
+      const providerFailures = providerResults.some(result => result.status === 'rejected');
+      setProviderFinanceError(providerFailures ? 'Some connected seller finance feeds could not be read. Check marketplace.view permission and seller sync status.' : '');
+      if (providerFailures) failures.push('Some eBay provider finance feeds could not be loaded.');
+      if (configRes.status === 'fulfilled') {
+        setCurrency(String(configRes.value.config?.baseCurrency || (payoutRes.status === 'fulfilled' ? payoutRes.value.payouts?.[0]?.currency : undefined) || 'GBP').toUpperCase());
+      } else failures.push('Workspace currency settings could not be loaded.');
+      if (failures.length) setLoadError(failures.join(' '));
     } catch (err) {
       console.error('Failed to load eBay payouts data:', err);
       setLoadError(err instanceof Error ? err.message : 'Payout and reconciliation data could not be loaded.');

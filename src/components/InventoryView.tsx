@@ -36,6 +36,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const loadInventoryData = async () => {
     setLoading(true);
+    setLoadError('');
     setBalances([]);
     setPhysicalBalances([]);
     setProducts([]);
@@ -53,20 +55,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       const selectedBalancesRequest = selectedStoreId === 'ALL'
         ? physicalBalancesRequest
         : api.getBalances(selectedStoreId, selectedEnvironment);
-      const [balRes, physicalRes, ledRes, clientRes, productRes] = await Promise.all([
+      const [balRes, physicalRes, ledRes, clientRes, productRes] = await Promise.allSettled([
         selectedBalancesRequest,
         physicalBalancesRequest,
         api.getStockLedger(selectedStoreId, selectedEnvironment),
-        api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
+        api.get3PLClients(selectedStoreId),
         api.getProducts(selectedStoreId, selectedEnvironment),
       ]);
-      setBalances(balRes.balances);
-      setPhysicalBalances(physicalRes.balances || []);
-      setProducts(productRes.products || []);
-      setLedger(ledRes.ledger);
-      setClients(clientRes.clients || []);
+      const failures: string[] = [];
+      if (balRes.status === 'fulfilled') setBalances(balRes.value.balances || []);
+      else failures.push('Selected-seller inventory balances could not be loaded.');
+      if (physicalRes.status === 'fulfilled') setPhysicalBalances(physicalRes.value.balances || []);
+      else failures.push('Physical warehouse stock could not be loaded.');
+      if (ledRes.status === 'fulfilled') setLedger(ledRes.value.ledger || []);
+      else failures.push('Stock ledger could not be loaded.');
+      if (clientRes.status === 'fulfilled') setClients(clientRes.value.clients || []);
+      else setClients([]);
+      if (productRes.status === 'fulfilled') setProducts(productRes.value.products || []);
+      else failures.push('Production Product/SKU catalog could not be loaded.');
+      if (failures.length) setLoadError(failures.join(' '));
     } catch (err) {
-      console.error('Failed to load inventory:', err);
+      setLoadError(err instanceof Error ? err.message : 'Inventory data could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +141,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     <div className="space-y-4">
       <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={physicalBalances} allocationRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
 
-      {!loading && products.length === 0 && balances.length === 0 && ledger.length === 0 && (
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadInventoryData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
+      {!loading && !loadError && products.length === 0 && balances.length === 0 && ledger.length === 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           <p className="font-semibold">Production inventory has no internal Product or stock records yet.</p>
           <p className="mt-1">Create real Products/SKUs first, then use a Purchase Order and Goods Receiving or an approved Stock Adjustment to record physical stock. eBay quantities are not treated as warehouse stock.</p>
