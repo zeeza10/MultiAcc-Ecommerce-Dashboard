@@ -1,4 +1,4 @@
-import { decryptEbayValue, encryptEbayValue, getPlatformCredentials } from './ebay-security';
+import { createServiceClient, decryptEbayValue, encryptEbayValue, getPlatformCredentials } from './ebay-security';
 import type { WorkerEnv } from './types';
 
 type SigningKeyRecord = {
@@ -42,8 +42,7 @@ async function mintEbayApplicationToken(clientId: string, clientSecret: string):
 }
 
 async function loadOrCreateSigningKey(env: WorkerEnv): Promise<SigningKeyRecord> {
-  const { createServiceClient } = await import('./ebay-security');
-  const admin = createServiceClient(env);
+    const admin = createServiceClient(env);
   const { data: existing, error } = await admin.from('ebay_application_signing_keys')
     .select('signing_key_id,private_key_ciphertext,public_key_jwe,expires_at')
     .eq('environment', 'PRODUCTION').eq('is_active', true).maybeSingle();
