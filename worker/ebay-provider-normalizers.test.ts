@@ -27,6 +27,32 @@ describe('eBay provider snapshot normalization', () => {
     assert.equal(JSON.stringify(result).includes('do-not-expose'), false);
   });
 
+  it('normalizes the documented eBay Analytics traffic report header and daily metric rows', () => {
+    const result = normalizeEbayAnalyticsResource('ANALYTICS_TRAFFIC', {
+      reportType: 'TRAFFIC',
+      header: {
+        dimensionKeys: [{ key: 'DAY', localizedName: 'day', dataType: 'DATE' }],
+        metrics: [{ key: 'TOTAL_IMPRESSION_TOTAL', localizedName: 'Total impressions', dataType: 'NUMBER' }],
+      },
+      records: [{
+        dimensionValues: [{ value: '2026-11-20', applicable: true }],
+        metricValues: [{ value: 150, applicable: true }],
+      }],
+      startDate: '2026-11-01T00:00:00.000Z',
+      endDate: '2026-11-20T23:59:59.000Z',
+      lastUpdatedDate: '2026-11-21T00:00:00.000Z',
+      sellerEmail: 'private@example.test',
+    }, 'EBAY_GB');
+    assert.deepEqual(result.dimensionKeys, [{ key: 'DAY', localizedName: 'day', dataType: 'DATE' }]);
+    assert.deepEqual(result.metrics, [{ key: 'TOTAL_IMPRESSION_TOTAL', localizedName: 'Total impressions', dataType: 'NUMBER' }]);
+    assert.deepEqual(result.records, [{
+      dimensionValues: [{ value: '2026-11-20', applicable: true }],
+      metricValues: [{ value: 150, applicable: true }],
+    }]);
+    assert.equal(result.reportType, 'TRAFFIC');
+    assert.equal(JSON.stringify(result).includes('private@example.test'), false);
+  });
+
   it('keeps finance amounts and counts while excluding bank and buyer details', () => {
     const result = normalizeEbayFinanceSummary('SELLER_FUNDS_CURRENT', {
       availableFunds: { value: 12.34, currency: 'GBP', bankAccountNumber: '12345678' },
