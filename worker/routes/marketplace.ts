@@ -952,11 +952,14 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
   const resources: Array<{ type: string; key: string; path: string }> = [
     { type: 'FINANCE_SUMMARY', key: 'SELLER_FUNDS_CURRENT', path: '/sell/finances/v1/seller_funds_summary' },
     { type: 'FINANCE_SUMMARY', key: 'PAYOUT_SUMMARY_CURRENT', path: '/sell/finances/v1/payout_summary' },
-    ...['PAYOUT', 'FUNDS_PROCESSING', 'FUNDS_AVAILABLE_FOR_PAYOUT', 'FUNDS_ON_HOLD', 'COMPLETED', 'FAILED'].map(status => ({
-      type: 'FINANCE_SUMMARY',
-      key: `TRANSACTION_SUMMARY_${status}_90_DAYS`,
-      path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionStatus:{${status}}`)}&filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
-    })),
+    ...['PAYOUT', 'FUNDS_PROCESSING', 'FUNDS_AVAILABLE_FOR_PAYOUT', 'FUNDS_ON_HOLD', 'COMPLETED', 'FAILED'].map(status => {
+      const transactionType = status === 'COMPLETED' || status === 'FAILED' ? 'TRANSFER' : 'SALE';
+      return {
+        type: 'FINANCE_SUMMARY',
+        key: `TRANSACTION_SUMMARY_${status}_90_DAYS`,
+        path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionStatus:{${status}}`)}&filter=${encodeURIComponent(`transactionType:{${transactionType}}`)}&filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
+      };
+    }),
   ];
   const synced: string[] = [];
   const failed: Array<{ resource: string; message: string }> = [];
