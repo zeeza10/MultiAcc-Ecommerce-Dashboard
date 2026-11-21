@@ -838,7 +838,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 Fetched: {syncResult.orders?.fetched ?? 0}
                 {' · '}Imported: {syncResult.orders?.imported ?? 0}
                 {' · '}Duplicates: {syncResult.orders?.skipped ?? 0}
-                {' · '}SKU exceptions: {syncResult.orders?.exceptions ?? 0}
+                {' · '}Order exceptions: {syncResult.orders?.exceptions ?? 0}
                 {syncResult.orders?.pagesPending ? ' · More order pages pending' : ''}
               </p>
 
@@ -977,7 +977,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           }`}
         >
           <AlertTriangle className="w-4 h-4" />
-          <span>Unmapped SKU Exception Queue ({pendingExceptions.length} pending)</span>
+          <span>eBay Order Exception Queue ({pendingExceptions.length} pending)</span>
         </button>
       </div>
 
@@ -1646,7 +1646,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">
             <strong>Exception Queue Purpose (SRS FR-EBAY-07, N-04):</strong>{' '}
-            Orders containing marketplace SKUs that have not been mapped to the internal catalog are safely isolated here. Mapping an external SKU creates a permanent link in MarketplaceSkuMap and retroactively links held orders.
+            Unmapped SKUs and incomplete provider order lines are isolated here. Only an actual provider SKU can be mapped to an internal product; missing prices, quantities, titles or SKUs remain review exceptions and are never filled with guessed values.
           </div>
 
           <div className="text-[11px] text-slate-500">
@@ -1704,14 +1704,16 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {exc.status === 'PENDING' && (
+                        {exc.status === 'PENDING' && exc.type === 'UNMAPPED_SKU' ? (
                           <button
                             onClick={() => setSelectedException(exc)}
                             className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition shadow-2xs"
                           >
                             Map to Internal SKU
                           </button>
-                        )}
+                        ) : exc.status === 'PENDING' ? (
+                          <span className="text-[10px] text-amber-700 font-semibold">Provider data review</span>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -1719,7 +1721,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                   {exceptions.length === 0 && (
                     <tr>
                       <td colSpan={7} className="p-5 text-center text-slate-500">
-                        No SKU exceptions found.
+                        No pending marketplace exceptions.
                       </td>
                     </tr>
                   )}
