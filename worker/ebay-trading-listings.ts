@@ -8,11 +8,11 @@ export type EbayProviderAccount = {
   auth_status: string;
 };
 
-export function ebaySiteMarketplaceId(marketplace: EbayMarketplaceCode): string {
+export function ebayTradingSiteId(marketplace: EbayMarketplaceCode): string {
   switch (marketplace) {
-    case 'EBAY_UK': return 'EBAY_GB';
-    case 'EBAY_US': return 'EBAY_US';
-    case 'EBAY_DE': return 'EBAY_DE';
+    case 'EBAY_UK': return '3';
+    case 'EBAY_US': return '0';
+    case 'EBAY_DE': return '77';
   }
 }
 
