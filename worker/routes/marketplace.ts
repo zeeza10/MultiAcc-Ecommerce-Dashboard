@@ -20,6 +20,8 @@ const OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
   'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.return.read',
+  'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
 ];
 
 function isEnvironment(value: unknown): value is EbayEnvironment {
@@ -688,6 +690,166 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
     metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, endpoint: 'Trading:GetMyeBaySelling', environment: 'PRODUCTION' },
   });
   return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
+}
+
+async function assertEbaySellerScope(account: any, scope: string, env: WorkerEnv): Promise<void> {
+  const admin = createServiceClient(env);
+  const { data, error } = await admin.from('marketplace_credentials')
+    .select('scopes').eq('marketplace_account_id', account.id).eq('organization_id', account.organization_id).maybeSingle();
+  if (error) throw new Error('The seller authorization scopes could not be verified.');
+  const scopes = Array.isArray(data?.scopes) ? data.scopes : [];
+  if (!scopes.includes(scope)) {
+    throw new EbayOrdersApiError(403, null, 'Reconnect this Production seller account to grant the additional read-only eBay permission required for this module.');
+  }
+}
+
+async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.return.read', env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setUTCMonth(startDate.getUTCMonth() - 18);
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+  const limit = 200;
+  const maxPages = 20;
+  let offset = 0;
+  let totalEntries = 0;
+  let totalPages = 1;
+  let pagesFetched = 0;
+  let fetched = 0;
+
+  while (pagesFetched < Math.min(totalPages, maxPages)) {
+    const endpoint = new URL('https://api.ebay.com/post-order/v2/return/search');
+    endpoint.searchParams.set('creation_date_range_from', startIso);
+    endpoint.searchParams.set('creation_date_range_to', endIso);
+    endpoint.searchParams.set('role', 'BUYER');
+    endpoint.searchParams.set('limit', String(limit));
+    endpoint.searchParams.set('offset', String(offset));
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    });
+    if (!response.ok) throw await readEbayOrdersApiError(response);
+    const payload = await response.json() as Record<string, any>;
+    const members = Array.isArray(payload.members) ? payload.members : [];
+    const pagination = payload.paginationOutput && typeof payload.paginationOutput === 'object' ? payload.paginationOutput : {};
+    totalEntries = Number.isFinite(Number(pagination.totalEntries)) ? Number(pagination.totalEntries) : totalEntries;
+    totalPages = Number.isFinite(Number(pagination.totalPages)) && Number(pagination.totalPages) > 0
+      ? Number(pagination.totalPages) : Math.max(1, Math.ceil(totalEntries / limit));
+    pagesFetched++;
+
+    for (const member of members) {
+      const returnId = typeof member.returnId === 'string' ? member.returnId.trim() : '';
+      if (!returnId) continue;
+      const creation = member.creationInfo && typeof member.creationInfo === 'object' ? member.creationInfo : {};
+      const item = creation.item && typeof creation.item === 'object' ? creation.item : {};
+      const sellerRefund = member.sellerTotalRefund && typeof member.sellerTotalRefund === 'object' ? member.sellerTotalRefund : {};
+      const actionTypes = Array.isArray(member.sellerAvailableOptions)
+        ? member.sellerAvailableOptions.map((option: any) => option?.actionType).filter((value: unknown) => typeof value === 'string')
+        : [];
+      const normalized = {
+        returnId,
+        orderId: typeof member.orderId === 'string' ? member.orderId : null,
+        status: typeof member.status === 'string' ? member.status : null,
+        state: typeof member.state === 'string' ? member.state : null,
+        currentType: typeof member.currentType === 'string' ? member.currentType : null,
+        creationDate: typeof creation.creationDate?.value === 'string' ? creation.creationDate.value : null,
+        itemId: typeof item.itemId === 'string' ? item.itemId : null,
+        transactionId: typeof item.transactionId === 'string' ? item.transactionId : null,
+        quantity: Number.isSafeInteger(Number(item.returnQuantity)) ? Number(item.returnQuantity) : null,
+        reason: typeof creation.reason === 'string' ? creation.reason : null,
+        reasonType: typeof creation.reasonType === 'string' ? creation.reasonType : null,
+        sellerResponseDue: typeof member.sellerResponseDue?.respondByDate?.value === 'string' ? member.sellerResponseDue.respondByDate.value : null,
+        sellerActionTypes: actionTypes,
+        estimatedRefund: sellerRefund.estimatedRefundAmount && typeof sellerRefund.estimatedRefundAmount === 'object' ? sellerRefund.estimatedRefundAmount : null,
+        actualRefund: sellerRefund.actualRefundAmount && typeof sellerRefund.actualRefundAmount === 'object' ? sellerRefund.actualRefundAmount : null,
+        timeoutDate: typeof member.timeoutDate?.value === 'string' ? member.timeoutDate.value : null,
+        caseId: typeof member.escalationInfo?.caseId === 'string' ? member.escalationInfo.caseId : null,
+        source: 'EBAY_POST_ORDER_API',
+      };
+      await saveEbayProviderSnapshot(admin, account, 'EBAY_RETURN', returnId, batchId, normalized, member);
+      fetched++;
+    }
+
+    offset += members.length;
+    if (!members.length || offset >= totalEntries) break;
+  }
+
+  const pagesPending = pagesFetched < totalPages;
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_RETURNS_SYNC_COMPLETED',
+    severity: pagesPending ? 'WARNING' : 'INFO',
+    message: `eBay return sync stored ${fetched} return records from ${pagesFetched} page(s).`,
+    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, endpoint: 'post-order/v2/return/search', environment: 'PRODUCTION' },
+  });
+  return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
+}
+
+async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly', env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 30);
+  const ymd = (date: Date) => date.toISOString().slice(0, 10).replaceAll('-', '');
+  const resources = [
+    {
+      type: 'ANALYTICS_TRAFFIC',
+      externalId: 'LAST_30_DAYS',
+      path: `/sell/analytics/v1/traffic_report?dimension=DAY&filter=${encodeURIComponent(`marketplace_ids:{${marketplaceId}},date_range:[${ymd(start)}..${ymd(end)}]`)}&metric=LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE`,
+    },
+    { type: 'ANALYTICS_SELLER_STANDARDS', externalId: 'PROGRAM_CURRENT', path: `/sell/analytics/v1/seller_standards_profile/PROGRAM_${marketplaceId.replace('EBAY_', '')}/CURRENT` },
+    { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_AS_DESCRIBED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_AS_DESCRIBED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
+    { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_RECEIVED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_RECEIVED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayAccountJson(accessToken, resource.path);
+      await saveEbayProviderSnapshot(
+        admin, account, resource.type, resource.externalId, batchId,
+        { data: payload, marketplaceId, source: 'EBAY_ANALYTICS_API' }, payload,
+      );
+      synced.push(resource.externalId);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_ANALYTICS_API_FAILED');
+      failed.push({ resource: resource.externalId, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'EBAY_ANALYTICS_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.externalId, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_ANALYTICS_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `eBay Analytics sync stored ${synced.length} of ${resources.length} resources.`,
+    metadata: { syncBatchId: batchId, syncedResources: synced, failedResources: failed.map(item => item.resource), environment: 'PRODUCTION' },
+  });
+  return { batchId, synced, failed };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
