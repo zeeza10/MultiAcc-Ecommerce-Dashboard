@@ -9,6 +9,7 @@ import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-l
 import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
 import { buildEbayPostOrderHeaders, subtractUtcMonthsClamped } from '../ebay-post-order';
 import { ebayAnalyticsMarketplaceId, ebaySellerStandardsProgram } from '../ebay-analytics';
+import { getAbandonedProductionSyncRunIds } from '../marketplace-sync-recovery';
 import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
@@ -1760,6 +1761,51 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
     .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE'])
     .eq('environment', 'PRODUCTION');
   if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
+
+  // Recover operational sync-run rows left RUNNING by an execution that ended
+  // before it could finalize. Never touch business orders or a run protected by
+  // a currently valid Production job lease.
+  const productionAccountIds = (accounts || []).map((account: any) => account.id);
+  if (productionAccountIds.length) {
+    const recoveryNow = new Date();
+    const recoveryNowIso = recoveryNow.toISOString();
+    const recoveryCutoffIso = new Date(recoveryNow.getTime() - 15 * 60_000).toISOString();
+    const [{ data: activeLeases, error: leaseError }, { data: staleRuns, error: runError }] = await Promise.all([
+      admin.from('marketplace_sync_jobs')
+        .select('marketplace_account_id,updated_at')
+        .in('marketplace_account_id', productionAccountIds)
+        .eq('status', 'RUNNING')
+        .gt('locked_until', recoveryNowIso),
+      admin.from('marketplace_sync_runs')
+        .select('id,marketplace_account_id,started_at')
+        .in('marketplace_account_id', productionAccountIds)
+        .eq('status', 'RUNNING')
+        .lt('started_at', recoveryCutoffIso),
+    ]);
+    if (leaseError || runError) throw new Error('Abandoned Production sync runs could not be inspected safely.');
+    const abandonedRunIds = getAbandonedProductionSyncRunIds(staleRuns || [], activeLeases || [], recoveryCutoffIso);
+    if (abandonedRunIds.length) {
+      const { error: recoverError } = await admin.from('marketplace_sync_runs')
+        .update({
+          status: 'FAILED',
+          completed_at: recoveryNowIso,
+          last_error_code: 'SYNC_RUN_ABANDONED',
+          last_error_message: 'The Worker execution ended before this sync run could be finalized. The attempt is preserved as failed; provider and business records were not deleted.',
+        })
+        .in('id', abandonedRunIds)
+        .eq('status', 'RUNNING');
+      if (recoverError) throw new Error('Abandoned Production sync runs could not be finalized.');
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: (accounts || [])[0].organization_id,
+        marketplace_account_id: null,
+        event_type: 'SYNC_RUN_RECOVERY_COMPLETED',
+        severity: 'WARNING',
+        message: `Recovered ${abandonedRunIds.length} abandoned Production sync-run record(s); no business data was changed.`,
+        metadata: { recoveredRunCount: abandonedRunIds.length, environment: 'PRODUCTION', recoveredRunIds: abandonedRunIds },
+      });
+    }
+  }
+
   for (const account of accounts || []) {
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
     const lastAttempt = account.last_sync_attempt_at || account.last_sync_at;
