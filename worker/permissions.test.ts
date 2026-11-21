@@ -26,6 +26,8 @@ describe('Worker route permission policy', () => {
   it('requires separate permissions for finance, marketplace, audit and fulfilment data', () => {
     assert.equal(permissionByRoute('GET', '/finance/invoices'), 'finance.view');
     assert.equal(permissionByRoute('GET', '/ebay/accounts'), 'marketplace.view');
+    assert.equal(permissionByRoute('GET', '/ebay/sku-mappings'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/sku-mappings'), 'marketplace.manage');
     assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/listings'), 'marketplace.view');
     assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync-active-listings'), 'marketplace.manage');
     assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/seller-account'), 'marketplace.view');
@@ -60,6 +62,8 @@ describe('Worker route permission policy', () => {
       ['GET', '/dashboard/kpis', 'dashboard.view'],
       ['GET', '/dashboard/charts', 'dashboard.view'],
       ['GET', '/ebay/accounts', 'marketplace.view'],
+      ['GET', '/ebay/sku-mappings', 'marketplace.view'],
+      ['POST', '/ebay/sku-mappings', 'marketplace.manage'],
       ['GET', '/ebay/accounts/account-id/listings', 'marketplace.view'],
       ['GET', '/ebay/integration/events', 'marketplace.view'],
       ['POST', '/ebay/accounts', 'marketplace.manage'],

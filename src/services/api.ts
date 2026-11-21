@@ -190,6 +190,11 @@ export const api = {
     request<{ accountId: string; environment: 'PRODUCTION'; lastSyncedAt: string | null; resources: Array<{ type: string; snapshot: Record<string, unknown>; providerUpdatedAt: string | null; syncedAt: string }> }>(`/ebay/accounts/${id}/seller-account`),
   connectEbayAccount: (id: string) =>
     request<{ authorizationUrl: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
+  getEbaySkuMappings: (accountId?: string) => request<{ mappings: Array<{ id: string; marketplaceAccountId: string; productId: string; externalSku: string; externalListingId: string; listingTitle: string; internalSku: string; internalName: string; createdAt: string }> }>(`/ebay/sku-mappings${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
+  createEbaySkuMapping: (payload: { marketplaceAccountId: string; productId: string; externalSku: string; externalListingId?: string; listingTitle?: string }) =>
+    request<{ mapping: { id: string; marketplaceAccountId: string; productId: string; externalSku: string; externalListingId: string; listingTitle: string; internalSku: string; internalName: string; createdAt: string } }>('/ebay/sku-mappings', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
   getExceptions: (accountId?: string) => request<{ exceptions: ExceptionItem[] }>(`/ebay/exceptions${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
   resolveException: (id: string, targetProductId: string, resolutionNote?: string) =>
     request<{ success: boolean; exception: ExceptionItem }>(`/ebay/exceptions/${id}/resolve`, {

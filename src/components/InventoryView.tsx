@@ -117,7 +117,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
-      <EbayStockSourcePanel selectedStoreId={selectedStoreId} localRecords={balances} mode="INVENTORY" />
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -212,7 +212,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="py-2.5 px-3">SKU Code</th>
                   <th className="py-2.5 px-3">Ownership</th>
                   <th className="py-2.5 px-3">Available (Sellable)</th>
-                  <th className="py-2.5 px-3">On Hand (Physical)</th>
+                  <th className="py-2.5 px-3">{selectedStoreId === 'ALL' ? 'On Hand (Physical)' : 'Allocated to Store'}</th>
                   <th className="py-2.5 px-3">Reserved</th>
                   <th className="py-2.5 px-3">Incoming (PO)</th>
                   <th className="py-2.5 px-3">Damaged</th>

@@ -1859,6 +1859,92 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     })) });
   }
 
+  if (path === '/ebay/sku-mappings' && request.method === 'GET') {
+    const accountId = new URL(request.url).searchParams.get('accountId');
+    if (!accountId || accountId === 'ALL') return json({ error: 'Select one seller account to read its SKU mappings.' }, 400);
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase
+      .from('marketplace_accounts').select('id,environment,is_demo,auth_status')
+      .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError) throw accountError;
+    if (!account) return json({ error: 'The selected marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production seller account mappings can be read here.' }, 409);
+    }
+    const query = auth.repositoryContext.supabase
+      .from('marketplace_sku_mappings')
+      .select('id,marketplace_account_id,product_id,external_sku,external_listing_id,listing_title,created_at')
+      .eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    const { data: mappings, error } = await query;
+    if (error) throw new Error('Marketplace SKU mappings could not be loaded.');
+    const productIds = [...new Set((mappings || []).map(row => row.product_id))];
+    const { data: products, error: productsError } = productIds.length
+      ? await auth.repositoryContext.supabase.from('products').select('id,sku,name').eq('organization_id', auth.organizationId).in('id', productIds)
+      : { data: [], error: null };
+    if (productsError) throw new Error('Mapped product details could not be loaded.');
+    const productById = new Map((products || []).map(product => [product.id, product]));
+    return json({ mappings: (mappings || []).map(row => {
+      const product = productById.get(row.product_id);
+      return {
+        id: row.id, marketplaceAccountId: row.marketplace_account_id, productId: row.product_id,
+        externalSku: row.external_sku, externalListingId: row.external_listing_id || '',
+        listingTitle: row.listing_title || '', internalSku: product?.sku || '',
+        internalName: product?.name || '', createdAt: row.created_at,
+      };
+    }) });
+  }
+
+  if (path === '/ebay/sku-mappings' && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const body = await request.json() as Record<string, unknown>;
+    const accountId = typeof body.marketplaceAccountId === 'string' ? body.marketplaceAccountId.trim() : '';
+    const productId = typeof body.productId === 'string' ? body.productId.trim() : '';
+    const externalSku = typeof body.externalSku === 'string' ? body.externalSku.trim() : '';
+    const externalListingId = typeof body.externalListingId === 'string' ? body.externalListingId.trim() : '';
+    const listingTitle = typeof body.listingTitle === 'string' ? body.listingTitle.trim() : '';
+    if (!accountId || !productId || !externalSku) return json({ error: 'Seller account, external SKU and internal product are required.' }, 400);
+    if (externalSku.length > 128 || externalListingId.length > 128 || listingTitle.length > 500) return json({ error: 'Marketplace SKU or listing details exceed the allowed length.' }, 400);
+
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase
+      .from('marketplace_accounts').select('id,environment,is_demo,auth_status')
+      .eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError) throw accountError;
+    if (!account) return json({ error: 'Marketplace seller account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'SKU mappings can only be created for connected Production seller accounts.' }, 409);
+    }
+
+    const { data: product, error: productError } = await auth.repositoryContext.supabase
+      .from('products').select('id,sku,name,data_environment')
+      .eq('id', productId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (productError) throw productError;
+    if (!product) return json({ error: 'The selected internal product was not found in this workspace.' }, 404);
+    if (product.data_environment !== 'PRODUCTION') return json({ error: 'Production eBay listings can only be mapped to Production products.' }, 409);
+
+    const { data: mapping, error: mappingError } = await auth.repositoryContext.supabase
+      .from('marketplace_sku_mappings')
+      .insert({
+        organization_id: auth.organizationId, marketplace_account_id: accountId,
+        product_id: productId, external_sku: externalSku,
+        external_listing_id: externalListingId || null, listing_title: listingTitle || null,
+      })
+      .select('id,marketplace_account_id,product_id,external_sku,external_listing_id,listing_title,created_at')
+      .single();
+    if (mappingError) {
+      if (mappingError.code === '23505') return json({ error: 'This external SKU is already mapped for the selected seller account.' }, 409);
+      if (mappingError.code === '23514') return json({ error: 'The selected product and seller account belong to different data environments.' }, 409);
+      throw mappingError;
+    }
+    return json({ mapping: {
+      id: mapping.id, marketplaceAccountId: mapping.marketplace_account_id, productId: mapping.product_id,
+      externalSku: mapping.external_sku, externalListingId: mapping.external_listing_id || '',
+      listingTitle: mapping.listing_title || '', internalSku: product.sku,
+      internalName: product.name, createdAt: mapping.created_at,
+    } }, 201);
+  }
+
   const resolveExceptionMatch = path.match(/^\/ebay\/exceptions\/([^/]+)\/resolve$/);
   if (resolveExceptionMatch && request.method === 'POST') {
     const body = await request.json() as Record<string, unknown>;
