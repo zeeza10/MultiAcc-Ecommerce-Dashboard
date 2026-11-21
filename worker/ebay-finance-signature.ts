@@ -90,6 +90,23 @@ async function loadOrCreateSigningKey(env: WorkerEnv): Promise<SigningKeyRecord>
   return data as SigningKeyRecord;
 }
 
+export function buildEbaySignatureComponents(method: 'GET', requestUrl: string, jwe: string, created: number): {
+  signatureInput: string;
+  signatureBase: string;
+} {
+  const url = new URL(requestUrl);
+  const components = '("x-ebay-signature-key" "@method" "@path" "@authority")';
+  const signatureInput = `sig1=${components};created=${created}`;
+  const signatureBase = [
+    `"x-ebay-signature-key": ${jwe}`,
+    `"@method": ${method}`,
+    `"@path": ${url.pathname}${url.search}`,
+    `"@authority": ${url.host}`,
+    `"@signature-params": ${components};created=${created}`,
+  ].join('\\n');
+  return { signatureInput, signatureBase };
+}
+
 export async function createEbayFinanceSignatureHeaders(
   method: 'GET',
   requestUrl: string,
@@ -104,17 +121,8 @@ export async function createEbayFinanceSignatureHeaders(
     false,
     ['sign'],
   );
-  const url = new URL(requestUrl);
   const created = Math.floor(Date.now() / 1000);
-  const components = '("x-ebay-signature-key" "@method" "@path" "@authority")';
-  const signatureInput = `sig1=${components};created=${created}`;
-  const signatureBase = [
-    `"x-ebay-signature-key": ${key.public_key_jwe}`,
-    `"@method": ${method}`,
-    `"@path": ${url.pathname}${url.search}`,
-    `"@authority": ${url.host}`,
-    `"@signature-params": ${components};created=${created}`,
-  ].join('\n');
+  const { signatureInput, signatureBase } = buildEbaySignatureComponents(method, requestUrl, key.public_key_jwe, created);
   const signature = await crypto.subtle.sign(
     { name: 'Ed25519' },
     cryptoKey,
