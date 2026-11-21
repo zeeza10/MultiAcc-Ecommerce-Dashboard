@@ -15,7 +15,7 @@ describe('eBay Finance RFC9421 request signatures', () => {
       '"x-ebay-signature-key": public-key-jwe',
       '"@method": GET',
       '"@path": /sell/finances/v1/transaction?limit=100&offset=0',
-      '"@authority": api.ebay.com',
+      '"@authority": apiz.ebay.com',
       '"@signature-params": ("x-ebay-signature-key" "@method" "@path" "@authority");created=1763731200',
     ].join('\n'));
   });
@@ -28,12 +28,12 @@ describe('eBay Finance RFC9421 request signatures', () => {
 
 describe('eBay signing private-key PEM parsing', () => {
   it('decodes the PKCS#8 PEM body without storing or exposing key material', () => {
-    const pem = '-----BEGIN PRIVATE KEY-----\\nAQIDBA==\\n-----END PRIVATE KEY-----';
+    const pem = '-----BEGIN PRIVATE KEY-----\nAQIDBA==\n-----END PRIVATE KEY-----';
     assert.deepEqual([...decodeEbayPrivateKeyPem(pem)], [1, 2, 3, 4]);
   });
 
   it('rejects malformed or non-PEM private key values', () => {
     assert.throws(() => decodeEbayPrivateKeyPem('not-a-pem'));
-    assert.throws(() => decodeEbayPrivateKeyPem('-----BEGIN PRIVATE KEY-----\\n***\\n-----END PRIVATE KEY-----'));
+    assert.throws(() => decodeEbayPrivateKeyPem('-----BEGIN PRIVATE KEY-----\n***\n-----END PRIVATE KEY-----'));
   });
 });
