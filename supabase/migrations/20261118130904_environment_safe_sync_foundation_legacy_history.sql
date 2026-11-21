@@ -1,0 +1,4 @@
+-- Historical migration version already recorded in the live Supabase migration ledger.
+-- Its schema changes are represented by the idempotent canonical migration:
+-- 20261118190000_environment_safe_sync_foundation.sql
+-- Keep this marker so fresh databases and the live migration ledger share the same version inventory.
