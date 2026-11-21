@@ -386,7 +386,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
       offset += orders.length;
-      hasMore = orders.length === 200 || offset < total;
+      hasMore = orders.length === 25 || offset < total;
       progress.stage = 'ORDERS_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
