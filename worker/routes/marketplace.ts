@@ -4,6 +4,8 @@ import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { normalizeEbayOrderStartDate } from '../ebay-order-date';
 import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
+import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
+import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -539,6 +541,153 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
   } while (true);
   progress.stage = 'INVENTORY_COMPLETED';
   return { fetched, offersFetched, pagesPending: hasMore, failedSkus: [...failedSkus] };
+}
+
+async function fetchEbayAccountJson(accessToken: string, path: string): Promise<Record<string, unknown>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(`https://api.ebay.com${path}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw await readEbayOrdersApiError(response);
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('eBay returned an invalid seller account response.');
+    }
+    return payload as Record<string, unknown>;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function syncSellerAccountSettings(account: any, env: WorkerEnv): Promise<{ batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  const accessToken = await getSellerAccessToken(env, account);
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const batchId = crypto.randomUUID();
+  const admin = createServiceClient(env);
+  const resources = [
+    { type: 'SELLER_PRIVILEGE', path: '/sell/account/v1/privilege' },
+    { type: 'SELLER_SUBSCRIPTION', path: '/sell/account/v1/subscription' },
+    { type: 'SELLER_PAYMENT_POLICY', path: `/sell/account/v1/payment_policy?marketplace_id=${marketplaceId}` },
+    { type: 'SELLER_FULFILLMENT_POLICY', path: `/sell/account/v1/fulfillment_policy?marketplace_id=${marketplaceId}` },
+    { type: 'SELLER_RETURN_POLICY', path: `/sell/account/v1/return_policy?marketplace_id=${marketplaceId}` },
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayAccountJson(accessToken, resource.path);
+      await saveEbayProviderSnapshot(
+        admin, account, resource.type, 'CURRENT', batchId,
+        { data: payload, marketplaceId, source: 'EBAY_ACCOUNT_API' },
+        payload,
+      );
+      synced.push(resource.type);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_ACCOUNT_API_FAILED');
+      failed.push({ resource: resource.type, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'SELLER_ACCOUNT_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.type, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'SELLER_ACCOUNT_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `Seller account sync stored ${synced.length} of ${resources.length} read-only resources.`,
+    metadata: { syncBatchId: batchId, syncedResources: synced, failedResources: failed.map(item => item.resource), environment: 'PRODUCTION' },
+  });
+  return { batchId, synced, failed };
+}
+
+async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<{ batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  const accessToken = await getSellerAccessToken(env, account);
+  const siteId = ebayTradingSiteId(account.marketplace);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const pageSize = 200;
+  const maxPages = 10;
+  let totalPages = 1;
+  let totalEntries = 0;
+  let fetched = 0;
+  let pagesFetched = 0;
+  let partial = false;
+
+  for (let pageNumber = 1; pageNumber <= Math.min(totalPages, maxPages); pageNumber++) {
+    const body = `<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ActiveList>
+    <Include>true</Include>
+    <Pagination>
+      <EntriesPerPage>${pageSize}</EntriesPerPage>
+      <PageNumber>${pageNumber}</PageNumber>
+    </Pagination>
+  </ActiveList>
+</GetMyeBaySellingRequest>`;
+    const response = await fetch('https://api.ebay.com/ws/api.dll', {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
+        'X-EBAY-API-SITEID': siteId,
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '1477',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml',
+        Accept: 'text/xml',
+      },
+      body,
+    });
+    if (!response.ok) throw new EbayOrdersApiError(response.status, null, 'eBay Trading API active listings request failed.');
+    const xml = await response.text();
+    const parsed = parseTradingActiveListings(xml);
+    if (parsed.ack === 'Failure' || parsed.ack === 'Error') {
+      throw new Error('eBay Trading API rejected the active listings request.');
+    }
+    if (parsed.ack === 'PartialFailure') partial = true;
+    totalEntries = parsed.totalEntries || totalEntries;
+    totalPages = parsed.totalPages || Math.max(1, Math.ceil(totalEntries / pageSize));
+    pagesFetched++;
+    for (const listing of parsed.listings) {
+      const itemId = typeof listing.itemId === 'string' ? listing.itemId : '';
+      if (!itemId) continue;
+      await saveEbayProviderSnapshot(
+        admin, account, 'ACTIVE_LISTING_TRADING', itemId, batchId,
+        { ...listing, source: 'EBAY_TRADING_API', siteId },
+        listing,
+        typeof listing.startTime === 'string' ? listing.startTime : null,
+      );
+      fetched++;
+    }
+    if (!parsed.listings.length && pageNumber >= totalPages) break;
+  }
+
+  const pagesPending = partial || pagesFetched < totalPages;
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'ACTIVE_LISTINGS_SYNC_COMPLETED',
+    severity: pagesPending ? 'WARNING' : 'INFO',
+    message: `Trading API active listings sync stored ${fetched} listings from ${pagesFetched} page(s).`,
+    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, endpoint: 'Trading:GetMyeBaySelling', environment: 'PRODUCTION' },
+  });
+  return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
