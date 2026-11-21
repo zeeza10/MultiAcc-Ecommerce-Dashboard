@@ -181,7 +181,7 @@ export const api = {
   syncEbayAnalytics: (id: string) =>
     request<{ success: boolean; batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-analytics`, { method: 'POST' }),
   syncEbayFinances: (id: string) =>
-    request<{ success: boolean; batchId: string; payouts: number; transactions: number; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-finances`, { method: 'POST' }),
+    request<{ success: boolean; batchId: string; payouts: number; transactions: number; pagesPending: boolean; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-finances`, { method: 'POST' }),
   getEbayFinances: (id: string) =>
     request<{ payouts: Array<Record<string, any>>; transactions: Array<Record<string, any>>; summaries: Array<Record<string, any>>; lastSyncedAt: string | null }>(`/ebay/accounts/${id}/finances`),
   getEbayAnalytics: (id: string) =>
