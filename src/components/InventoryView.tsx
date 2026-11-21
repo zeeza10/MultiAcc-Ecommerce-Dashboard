@@ -31,6 +31,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
   const [balances, setBalances] = useState<StockBalance[]>([]);
+  const [physicalBalances, setPhysicalBalances] = useState<StockBalance[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
@@ -44,15 +45,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadInventoryData = async () => {
     setLoading(true);
     setBalances([]);
+    setPhysicalBalances([]);
     setProducts([]);
     setLedger([]);
     try {
-      const [balRes, ledRes, clientRes, productRes] = await Promise.all([
-        api.getBalances(selectedStoreId, selectedEnvironment), api.getStockLedger(selectedStoreId, selectedEnvironment),
+      const physicalBalancesRequest = api.getBalances('ALL', selectedEnvironment);
+      const selectedBalancesRequest = selectedStoreId === 'ALL'
+        ? physicalBalancesRequest
+        : api.getBalances(selectedStoreId, selectedEnvironment);
+      const [balRes, physicalRes, ledRes, clientRes, productRes] = await Promise.all([
+        selectedBalancesRequest,
+        physicalBalancesRequest,
+        api.getStockLedger(selectedStoreId, selectedEnvironment),
         api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
         api.getProducts(selectedStoreId, selectedEnvironment),
       ]);
       setBalances(balRes.balances);
+      setPhysicalBalances(physicalRes.balances || []);
       setProducts(productRes.products || []);
       setLedger(ledRes.ledger);
       setClients(clientRes.clients || []);
@@ -121,7 +130,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
-      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={physicalBalances} allocationRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

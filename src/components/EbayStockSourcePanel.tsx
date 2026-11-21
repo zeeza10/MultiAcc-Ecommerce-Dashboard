@@ -33,6 +33,7 @@ interface EbayStockSourcePanelProps {
   selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   localRecords?: any[];
   stockRecords?: any[];
+  allocationRecords?: any[];
   onCreateProduct?: () => void;
   mode: 'PRODUCTS' | 'INVENTORY';
   onAllocationSaved?: () => void | Promise<void>;
@@ -47,7 +48,7 @@ const money = (value: unknown, currency = 'GBP') => {
 
 const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
 
-export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], stockRecords = [], onCreateProduct, mode, onAllocationSaved }) => {
+export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], stockRecords = [], allocationRecords = [], onCreateProduct, mode, onAllocationSaved }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,7 +212,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   const saveAllocation = async (row: ListingRow, mapping: SkuMapping) => {
     const key = rowKey(row);
-    const current = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+    const current = allocationRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
     const values = allocationInputs[key] || {
       allocated: String(current?.onHand ?? 0),
       reserved: String(current?.reserved ?? 0),
@@ -282,10 +283,10 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>
-            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Store Available' : 'Physical Available'}</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th><th className="px-4 py-3 font-semibold">Allocation Controls</th>
+            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">Physical Available</th><th className="px-4 py-3 font-semibold">Store Allocation</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th><th className="px-4 py-3 font-semibold">Allocation Controls</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
+            {loading ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
               rows.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
               rows.map((row, index) => {
                 const key = rowKey(row);
@@ -298,12 +299,17 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{row.price ? money(row.price, row.currency) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums font-semibold text-slate-800">{row.quantity ?? '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{mapping ? (() => {
-                    const internal = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
-                    if (!internal) return '0';
+                    const physical = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
+                    if (!physical) return '0';
                     const value = mode === 'INVENTORY'
-                      ? internal.available ?? Math.max(0, Number(internal.onHand || 0) - Number(internal.reserved || 0))
-                      : internal.stockAvailable ?? internal.available ?? 0;
+                      ? physical.available ?? Math.max(0, Number(physical.onHand || 0) - Number(physical.reserved || 0))
+                      : physical.stockAvailable ?? physical.available ?? 0;
                     return Number(value).toLocaleString('en-GB');
+                  })() : 'Map SKU first'}</td>
+                  <td className="min-w-[170px] px-4 py-3 text-[10px] text-slate-600">{mode !== 'INVENTORY' ? '—' : mapping ? (() => {
+                    const allocation = allocationRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+                    if (!allocation) return 'Not allocated';
+                    return `${Number(allocation.onHand || 0)} allocated · ${Number(allocation.reserved || 0)} reserved · ${Number(allocation.available || 0)} available`;
                   })() : 'Map SKU first'}</td>
                   <td className="whitespace-nowrap px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{row.status.replaceAll('_', ' ')}</span></td>
                   <td className="min-w-[230px] px-4 py-3">
