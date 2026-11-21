@@ -33,6 +33,12 @@ export function parseTradingActiveListings(xml: string): {
     const match = source.match(new RegExp('<' + escaped + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + escaped + '>', 'i'));
     return match ? decode(match[1].replace(/<[^>]+>/g, '').trim()) : null;
   };
+  const numericTag = (source: string, name: string): number | null => {
+    const raw = tag(source, name);
+    if (raw === null || raw.trim() === '') return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  };
   const nested = (source: string, parent: string, child: string): string | null => {
     const block = source.match(new RegExp('<' + parent + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + parent + '>', 'i'));
     return block ? tag(block[1], child) : null;
@@ -50,8 +56,8 @@ export function parseTradingActiveListings(xml: string): {
       itemId: tag(item, 'ItemID'),
       sku: tag(item, 'SKU'),
       title: tag(item, 'Title'),
-      quantity: tag(item, 'Quantity') === null ? null : Number(tag(item, 'Quantity')),
-      quantitySold: tag(item, 'QuantitySold') === null ? null : Number(tag(item, 'QuantitySold')),
+      quantity: numericTag(item, 'Quantity'),
+      quantitySold: numericTag(item, 'QuantitySold'),
       listingType: tag(item, 'ListingType'),
       listingStatus: nested(item, 'SellingStatus', 'ListingStatus'),
       currentPrice,
