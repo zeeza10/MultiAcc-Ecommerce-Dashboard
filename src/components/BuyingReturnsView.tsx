@@ -258,9 +258,11 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
     const key = customerEmail ? `EMAIL:${customerEmail.toLowerCase()}` : `ORDER:${o.id}`;
     const displayName = (o.customerName || '').trim() || 'Anonymous Buyer';
     const existing = customerMap.get(key);
-    const addressStr = o.shippingAddress
-      ? `${o.shippingAddress.street}, ${o.shippingAddress.city} ${o.shippingAddress.postalCode}`
-      : 'N/A';
+    const addressParts = o.shippingAddress
+      ? [o.shippingAddress.street, o.shippingAddress.city, o.shippingAddress.postalCode]
+          .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+      : [];
+    const addressStr = addressParts.join(', ') || 'N/A';
     if (!existing) {
       customerMap.set(key, {
         name: displayName,
