@@ -479,7 +479,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
     await admin.from('marketplace_sync_runs').update({ completed_at: finished, status: runStatus, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
     const accountSyncUpdate: Record<string, unknown> = {
       last_sync_status: status,
-      last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU/incomplete-data exceptions ${exceptions}.`,
+      last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; order-data exceptions ${exceptions}.`,
     };
     if (!hasMore) accountSyncUpdate.last_sync_at = finished;
     await admin.from('marketplace_accounts').update(accountSyncUpdate).eq('id', account.id);
@@ -492,7 +492,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions,
       last_error_code: failure.code, last_error_message: `${progress.stage}: ${failure.message}`,
       retryable: isRetryableEbaySyncFailure(failure), attempt_count: 1,
-      log_message: `Orders sync stopped at ${progress.stage}. Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`,
+      log_message: `Orders sync stopped at ${progress.stage}. Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; order exceptions ${exceptions}.`,
     }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({
       last_sync_status: partial ? 'PARTIAL' : 'FAILED', last_sync_message: `Orders ${partial ? 'partially completed' : 'failed'} at ${progress.stage}: ${failure.message}`,
@@ -2013,7 +2013,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
           lastErrorMessage = `Orders sync is partial: fetched ${orders.fetched}, imported ${orders.imported}, pages pending: ${orders.pagesPending}.`;
         } else if (ordersHasExceptions) {
           lastErrorCode = 'EBAY_ORDER_SKU_EXCEPTIONS';
-          lastErrorMessage = `Orders were imported, but ${orders.exceptions} line item(s) need SKU mapping review.`;
+          lastErrorMessage = `Orders were imported, but ${orders.exceptions} line item(s) need review.`;
         }
       } catch (syncError) {
         ordersSyncFailed = true;
@@ -2071,7 +2071,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       const overallStatus = resourcesComplete && !ordersHasExceptions ? 'SUCCESS' : (ordersComplete || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
-        last_sync_message: `Orders: ${ordersComplete ? 'COMPLETE' : 'INCOMPLETE'}${ordersHasExceptions ? ` (${ordersProgress.exceptions} SKU exception(s))` : ''}; Inventory: ${inventoryOk ? 'COMPLETE' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
+        last_sync_message: `Orders: ${ordersComplete ? 'COMPLETE' : 'INCOMPLETE'}${ordersHasExceptions ? ` (${ordersProgress.exceptions} order exception(s))` : ''}; Inventory: ${inventoryOk ? 'COMPLETE' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
         last_sync_attempt_at: attemptAt,
       }).eq('id', account.id).eq('organization_id', account.organization_id);
 
