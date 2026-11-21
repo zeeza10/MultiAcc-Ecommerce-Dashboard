@@ -7,6 +7,7 @@ import { ProductsView } from './components/ProductsView';
 import { InventoryView } from './components/InventoryView';
 import { AdjustmentsView } from './components/AdjustmentsView';
 import { EbayAccountsView } from './components/EbayAccountsView';
+import { EbayMarketplaceModuleView } from './components/EbayMarketplaceModuleView';
 import { BuyingReturnsView } from './components/BuyingReturnsView';
 import { WarehouseLocationsView } from './components/WarehouseLocationsView';
 import { Clients3PLView } from './components/Clients3PLView';
@@ -49,12 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   'audit-log', 'settings', 'employee-access',
 ];
 
-const EBAY_MODULE_SECTIONS: Partial<Record<NavItem, 'LISTINGS' | 'RETURNS' | 'ANALYTICS' | 'FINANCES'>> = {
-  'ebay-active-listings': 'LISTINGS',
-  'ebay-returns': 'RETURNS',
-  'ebay-analytics': 'ANALYTICS',
-  'ebay-finances': 'FINANCES',
-};
+
 
 const readWorkspacePreference = <T,>(organizationId: string, key: string, fallback: T): T => {
   try {
@@ -525,14 +521,22 @@ export default function App() {
           )}
 
 
-          {(activeTab === 'ebay-accounts' || Boolean(EBAY_MODULE_SECTIONS[activeTab])) && (
+          {activeTab === 'ebay-accounts' && (
             <EbayAccountsView
-              key={`ebay-accounts:${selectedStoreId}:${activeTab}`}
+              key={`ebay-accounts:${selectedStoreId}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
-              initialSection={EBAY_MODULE_SECTIONS[activeTab] || null}
+            />
+          )}
+
+          {(['ebay-active-listings', 'ebay-returns', 'ebay-analytics', 'ebay-finances'] as NavItem[]).includes(activeTab) && (
+            <EbayMarketplaceModuleView
+              key={`ebay-marketplace:${activeTab}:${selectedStoreId}`}
+              module={activeTab === 'ebay-active-listings' ? 'LISTINGS' : activeTab === 'ebay-returns' ? 'RETURNS' : activeTab === 'ebay-analytics' ? 'ANALYTICS' : 'FINANCES'}
+              selectedStoreId={selectedStoreId}
+              currentUser={currentUser}
             />
           )}
 
