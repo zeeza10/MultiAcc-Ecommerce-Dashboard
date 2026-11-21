@@ -47,8 +47,9 @@ export function parseTradingActiveListings(xml: string): {
   const pagination = xml.match(/<PaginationResult(?:\s[^>]*)?>([\s\S]*?)<\/PaginationResult>/i)?.[1] || '';
   const totalPages = Number(tag(pagination, 'TotalNumberOfPages') || 0);
   const totalEntries = Number(tag(pagination, 'TotalNumberOfEntries') || 0);
-  const items = [...xml.matchAll(/<Item(?:\s[^>]*)?>([\s\S]*?)<\/Item>/gi)].map(match => match[1]);
-  const listings = items.map(item => {
+  const items = [...xml.matchAll(/<Item(?:\s[^>]*)?>([\s\S]*?)<\/Item>/gi)];
+  const listings = items.map(match => {
+    const item = match[1];
     const priceBlock = item.match(/<CurrentPrice([^>]*)>([\s\S]*?)<\/CurrentPrice>/i);
     const currency = priceBlock?.[1].match(/currencyID=["']([^"']+)["']/i)?.[1] || null;
     const currentPrice = priceBlock ? decode(priceBlock[2].trim()) : null;
