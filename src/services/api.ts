@@ -174,6 +174,14 @@ export const api = {
     request<{ success: boolean; batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }>(`/ebay/accounts/${id}/sync-active-listings`, { method: 'POST' }),
   syncEbaySellerAccount: (id: string) =>
     request<{ success: boolean; batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/seller-account`, { method: 'POST' }),
+  syncEbayReturns: (id: string) =>
+    request<{ success: boolean; batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }>(`/ebay/accounts/${id}/sync-returns`, { method: 'POST' }),
+  getEbayReturns: (id: string) =>
+    request<{ returns: Array<Record<string, any>>; total: number; lastSyncedAt: string | null }>(`/ebay/accounts/${id}/returns`),
+  syncEbayAnalytics: (id: string) =>
+    request<{ success: boolean; batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-analytics`, { method: 'POST' }),
+  getEbayAnalytics: (id: string) =>
+    request<{ resources: Array<{ type: string; key: string; snapshot: Record<string, unknown>; providerUpdatedAt: string | null; syncedAt: string }> }>(`/ebay/accounts/${id}/analytics`),
   getEbaySellerAccount: (id: string) =>
     request<{ accountId: string; environment: 'PRODUCTION'; lastSyncedAt: string | null; resources: Array<{ type: string; snapshot: Record<string, unknown>; providerUpdatedAt: string | null; syncedAt: string }> }>(`/ebay/accounts/${id}/seller-account`),
   connectEbayAccount: (id: string) =>
