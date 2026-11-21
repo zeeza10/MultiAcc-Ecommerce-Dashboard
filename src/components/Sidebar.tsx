@@ -95,10 +95,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'eBay Marketplace',
       items: [
-        { id: 'ebay-active-listings', label: 'Listings', icon: Package, phase: 'P2', permission: 'marketplace.view' },
-        { id: 'ebay-returns', label: 'Returns', icon: RotateCcw, phase: 'P2', permission: 'marketplace.view' },
-        { id: 'ebay-analytics', label: 'Analytics', icon: BarChart3, phase: 'P2', permission: 'marketplace.view' },
-        { id: 'ebay-finances', label: 'Finances', icon: CreditCard, phase: 'P2', permission: 'marketplace.view' },
+        { id: 'ebay-active-listings', label: 'eBay Listings', icon: Package, phase: 'P2', permission: 'marketplace.view' },
+        { id: 'ebay-returns', label: 'eBay Returns', icon: RotateCcw, phase: 'P2', permission: 'marketplace.view' },
+        { id: 'ebay-analytics', label: 'eBay Analytics', icon: BarChart3, phase: 'P2', permission: 'marketplace.view' },
+        { id: 'ebay-finances', label: 'eBay Finance', icon: CreditCard, phase: 'P2', permission: 'marketplace.view' },
       ],
     },
     {
