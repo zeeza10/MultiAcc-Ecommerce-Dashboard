@@ -810,6 +810,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
               <p className="text-[11px] text-slate-600">
                 Payouts: {syncResult.ebayFinances?.payouts ?? 0}
                 {' · '}Transactions: {syncResult.ebayFinances?.transactions ?? 0}
+                {syncResult.ebayFinances?.pagesPending ? ' · More pages pending' : ''}
                 {' · '}Failed: {syncResult.ebayFinances?.failed?.length ?? 0}
               </p>
               {syncResult.ebayFinancesError && <p className="text-[11px] text-rose-700">{syncResult.ebayFinancesError}</p>}
