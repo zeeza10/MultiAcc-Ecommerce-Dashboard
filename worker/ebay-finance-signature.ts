@@ -19,6 +19,18 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
 
+export function decodeEbayPrivateKeyPem(pem: string): Uint8Array {
+  const match = pem.match(/^-----BEGIN PRIVATE KEY-----([\\s\\S]+)-----END PRIVATE KEY-----$/);
+  if (!match) throw new Error('The eBay signing private key is not valid PKCS#8 PEM.');
+  const encoded = match[1].replace(/\\s+/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error('The eBay signing private key PEM is malformed.');
+  try {
+    return decodeBase64(encoded);
+  } catch {
+    throw new Error('The eBay signing private key PEM is malformed.');
+  }
+}
+
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
@@ -122,7 +134,7 @@ export async function createEbayFinanceSignatureHeaders(
   const privateKey = await decryptEbayValue(key.private_key_ciphertext, env);
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
-    toArrayBuffer(decodeBase64(privateKey)),
+    toArrayBuffer(decodeEbayPrivateKeyPem(privateKey)),
     { name: 'Ed25519' },
     false,
     ['sign'],
