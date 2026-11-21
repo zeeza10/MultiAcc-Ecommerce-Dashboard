@@ -28,7 +28,7 @@ const OAUTH_SCOPES = [
 ];
 
 function isEnvironment(value: unknown): value is EbayEnvironment {
-  return value === 'SANDBOX' || value === 'PRODUCTION';
+  return value === 'PRODUCTION';
 }
 
 function isPlatformAdmin(auth: AuthContext, env: WorkerEnv): boolean {
