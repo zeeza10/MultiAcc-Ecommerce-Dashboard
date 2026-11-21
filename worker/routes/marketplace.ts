@@ -807,12 +807,12 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
   const end = new Date();
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - 30);
-  const ymd = (date: Date) => date.toISOString().slice(0, 10).replaceAll('-', '');
+  const analyticsDateRange = `[${start.toISOString().replace('Z', '+00:00')}..${end.toISOString().replace('Z', '+00:00')}]`;
   const resources = [
     {
       type: 'ANALYTICS_TRAFFIC',
       externalId: 'LAST_30_DAYS',
-      path: `/sell/analytics/v1/traffic_report?dimension=DAY&filter=${encodeURIComponent(`marketplace_ids:{${marketplaceId}},date_range:[${ymd(start)}..${ymd(end)}]`)}&metric=LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE`,
+      path: `/sell/analytics/v1/traffic_report?dimension=DAY&filter=${encodeURIComponent(`marketplace_ids:{${marketplaceId}},date_range:${analyticsDateRange}`)}&metric=LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE`,
     },
     { type: 'ANALYTICS_SELLER_STANDARDS', externalId: 'PROGRAM_CURRENT', path: `/sell/analytics/v1/seller_standards_profile/PROGRAM_${marketplaceId.replace('EBAY_', '')}/CURRENT` },
     { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_AS_DESCRIBED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_AS_DESCRIBED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
