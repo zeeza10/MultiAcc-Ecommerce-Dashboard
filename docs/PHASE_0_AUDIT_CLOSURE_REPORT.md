@@ -9,7 +9,7 @@
 
 The repository, Worker route layer, UI navigation/API client, live database metadata, RLS policies, function grants, migration inventory, and current Cloudflare preview evidence have been rechecked.
 
-**Phase 0 is not yet release-complete.** The code and static security baseline are substantially mapped, but three release gates cannot honestly be marked passed: two-organization runtime isolation, migration-history reconciliation, and full semantic review of every SECURITY DEFINER function. Production migration/deployment verification also remains outstanding.
+**Phase 0 is not yet release-complete.** The code and static security baseline are substantially mapped, but two key audit gates cannot honestly be marked passed yet: two-organization runtime isolation and migration-history reconciliation. The full SECURITY DEFINER function review is now complete; Production migration/deployment verification remains a separate release gate. Production migration/deployment verification also remains outstanding.
 
 No Production migration was applied and no business data, eBay orders, credentials, sync queues, or schedules were changed during this audit.
 
@@ -110,7 +110,7 @@ No critical privilege-escalation or cross-organization bypass was identified in 
 - The UI API client contains a stale, unused `resetDemo` helper with no Worker handler. It is not a supported API contract.
 - Customer master CRUD is not implemented; the current customer directory is derived from orders as described in section 1.
 
-The module mapping above is a code-level contract inventory. Full request/response contract tests for every method, query parameter, role, and UI action have not yet been executed.
+The module mapping above is a code-level contract inventory. This PR expands permission tests to cover the implemented Worker route/method patterns across modules, including negative method/path variants and only the implemented report IDs R-01 through R-14. Full request/response handler tests for every query parameter, role, and UI action remain a separate test layer.
 
 ## 6. Build, test, and deployment evidence
 
