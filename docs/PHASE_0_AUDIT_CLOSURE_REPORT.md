@@ -9,7 +9,7 @@
 
 The repository, Worker route layer, UI navigation/API client, live database metadata, RLS policies, function grants, migration inventory, and current Cloudflare preview evidence have been rechecked.
 
-**Phase 0 is not yet release-complete.** The code and static security baseline are substantially mapped, but two key audit gates cannot honestly be marked passed yet: two-organization runtime isolation and migration-history reconciliation. The full SECURITY DEFINER function review is now complete; Production migration/deployment verification remains a separate release gate. Production migration/deployment verification also remains outstanding.
+**Phase 0 is not yet release-complete.** The code and static security baseline are substantially mapped, but two key audit gates cannot honestly be marked passed yet: two-organization runtime isolation and migration-history reconciliation. The full SECURITY DEFINER function review is now complete; Production migration/deployment verification remains a separate release gate.
 
 No Production migration was applied and no business data, eBay orders, credentials, sync queues, or schedules were changed during this audit.
 
@@ -35,7 +35,7 @@ The existing application is not a blank rebuild. The following is the verified h
 
 - The Customers tab is currently an order-derived buyer summary, not a persistent customer-master CRUD module: no dedicated customer API methods or Worker customer CRUD route were found. It must not be described as a fully implemented customer master.
 - The customer summary previously invented `customer@marketplace.com` when an order had no email and merged buyers by display name. This PR now removes the invented email and groups only by a real email; orders without an email remain separate instead of being merged by name.
-- `api.resetDemo` exists as a stale API-client helper, but no caller was found and there is no matching Worker route. It is not part of the live user workflow.
+- The unused `api.resetDemo` helper was removed in this PR; there is no matching Worker route and no reset action is exposed to the live user workflow.
 - Raw marketplace payloads are returned only when `includeRawPayload` is enabled for `SUPER_ADMIN`; ordinary users do not receive raw payloads. There is no distinct Technical Admin role/permission in the current role catalog, so access remains Super Admin-only until a deliberate role is designed.
 
 ## 2. Tenant isolation and RLS
@@ -107,7 +107,7 @@ No critical privilege-escalation or cross-organization bypass was identified in 
 - Unknown method/path combinations fail closed with 501 before route dispatch; missing module permissions return 403.
 - `GET /orders/count` and `GET /ebay/accounts/:accountId/listings` are explicitly represented in the permission map on the PR branch.
 - Order detail repository logic includes raw payload only for Super Admin.
-- The UI API client contains a stale, unused `resetDemo` helper with no Worker handler. It is not a supported API contract.
+- The unsupported reset helper has been removed from the UI API client; no reset route is part of the supported API contract.
 - Customer master CRUD is not implemented; the current customer directory is derived from orders as described in section 1.
 
 The module mapping above is a code-level contract inventory. This PR expands permission tests to cover the implemented Worker route/method patterns across modules, including negative method/path variants and only the implemented report IDs R-01 through R-14. Full request/response handler tests for every query parameter, role, and UI action remain a separate test layer.
