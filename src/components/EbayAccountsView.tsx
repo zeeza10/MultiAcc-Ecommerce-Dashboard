@@ -224,7 +224,29 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     setSyncResult(null);
 
     try {
-      const res = await api.syncEbayAccount(accountId);
+      let res: any;
+      try {
+        res = await api.syncEbayAccount(accountId);
+      } catch (error: any) {
+        const message = error?.message || 'The orders and inventory sync request could not be completed.';
+        res = {
+          status: 'FAILED',
+          orders: {
+            status: 'FAILED',
+            fetched: 0,
+            imported: 0,
+            skipped: 0,
+            exceptions: 0,
+            error: { code: 'SYNC_REQUEST_FAILED', message, stage: 'SYNC_REQUEST', httpStatus: null },
+          },
+          inventory: {
+            status: 'FAILED',
+            fetched: 0,
+            offersFetched: 0,
+            error: { code: 'SYNC_REQUEST_FAILED', message: 'Inventory sync was not completed because the orders sync request failed.', stage: 'SYNC_REQUEST', httpStatus: null },
+          },
+        };
+      }
       let activeListings: any = null;
       let activeListingsError = '';
       let sellerAccount: any = null;
@@ -245,7 +267,25 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       catch (error: any) { ebayAnalyticsError = error?.message || 'eBay Analytics sync failed.'; }
       try { ebayFinances = await api.syncEbayFinances(accountId); }
       catch (error: any) { ebayFinancesError = error?.message || 'eBay Finances sync failed.'; }
-      setSyncResult({ ...res, activeListings, activeListingsError, sellerAccount, sellerAccountError, ebayReturns, ebayReturnsError, ebayAnalytics, ebayAnalyticsError, ebayFinances, ebayFinancesError });
+      const moduleFailureCount = [
+        activeListingsError,
+        sellerAccountError,
+        ebayReturnsError,
+        ebayAnalyticsError,
+        ebayFinancesError,
+      ].filter(Boolean).length;
+      const overallStatus = res.status === 'FAILED' && moduleFailureCount === 5
+        ? 'FAILED'
+        : (res.status !== 'SUCCESS' || moduleFailureCount > 0 ? 'PARTIAL' : 'SUCCESS');
+      setSyncResult({
+        ...res,
+        status: overallStatus,
+        activeListings, activeListingsError,
+        sellerAccount, sellerAccountError,
+        ebayReturns, ebayReturnsError,
+        ebayAnalytics, ebayAnalyticsError,
+        ebayFinances, ebayFinancesError,
+      });
 
       setListingSnapshots(current => {
         const next = { ...current };
@@ -588,7 +628,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           </h1>
 
           <p className="text-xs text-gray-500">
-            Connect each seller once, then automatically import orders, inventory items and Inventory API listing offers, prices and quantities.
+            Production-only eBay data: orders, inventory, Active Listings, seller settings, returns, analytics and finances. Each module keeps its own sync result and provider data.
           </p>
         </div>
 
@@ -1093,7 +1133,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             : acc.authStatus !== 'CONNECTED'
                               ? 'Connect first'
                               : integrationReady && productionOAuthEnabled
-                                ? 'Sync Orders + Inventory'
+                                ? 'Sync All Production Data'
                                 : 'Sync unavailable'}
                         </span>
                       </button>
@@ -1328,7 +1368,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                     {!(listingSnapshots[acc.id] || []).length && (
                                       <tr>
                                         <td colSpan={7} className="p-3 text-center text-slate-500">
-                                          No listing snapshots are available for this account yet. Last account status: {getSyncStatusLabel(acc.lastSyncStatus)}. {acc.lastSyncMessage || 'Run Sync Orders + Inventory to retrieve the seller inventory.'}
+                                          No listing snapshots are available for this account yet. Last account status: {getSyncStatusLabel(acc.lastSyncStatus)}. {acc.lastSyncMessage || 'Run Sync All Production Data to retrieve the seller inventory.'}
                                         </td>
                                       </tr>
                                     )}
