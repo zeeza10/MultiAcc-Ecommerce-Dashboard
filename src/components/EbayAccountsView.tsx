@@ -83,7 +83,7 @@ const getIntegrationGuidance = (event: any) => {
   return 'Review the API operation, stage, error code and provider message above. Preserve this event for technical investigation before retrying.';
 };
 
-type EbayModuleSection = 'LISTINGS' | 'SELLER_ACCOUNT' | 'RETURNS' | 'ANALYTICS' | 'FINANCES';
+type EbayModuleSection = 'LISTINGS' | 'RETURNS' | 'ANALYTICS' | 'FINANCES';
 
 interface EbayAccountsViewProps {
   currentUser: User;
@@ -426,7 +426,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
   useEffect(() => {
     if (!initialSection) return;
-    const account = accounts.find(item => item.authStatus === 'CONNECTED');
+    const account = (selectedStoreId !== 'ALL' ? accounts.find(item => item.id === selectedStoreId && item.authStatus === 'CONNECTED') : null)
+      || (selectedStoreId === 'ALL' ? accounts.find(item => item.authStatus === 'CONNECTED') : null);
     if (!account) return;
 
     const accountId = account.id;
@@ -442,14 +443,6 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           setListingSnapshots(current => ({ ...current, [accountId]: [...(result.listings || []), ...(result.tradingListings || [])] }));
           setListingTotals(current => ({ ...current, [accountId]: result.total || 0 }));
         }).catch(error => loadFailure('Active Listings', error)).finally(() => setListingLoadingAccountId(null));
-      }
-    } else if (initialSection === 'SELLER_ACCOUNT') {
-      setExpandedSellerAccountId(accountId);
-      if (!sellerAccountSnapshots[accountId]) {
-        setSellerAccountLoadingId(accountId);
-        void api.getEbaySellerAccount(accountId).then(result => {
-          setSellerAccountSnapshots(current => ({ ...current, [accountId]: result.resources || [] }));
-        }).catch(error => loadFailure('Seller Account', error)).finally(() => setSellerAccountLoadingId(null));
       }
     } else if (initialSection === 'RETURNS') {
       setExpandedReturnsAccountId(accountId);
@@ -476,7 +469,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         }).catch(error => loadFailure('Finances', error)).finally(() => setFinanceLoadingId(null));
       }
     }
-  }, [initialSection, accounts, listingSnapshots, sellerAccountSnapshots, returnsByAccount, analyticsByAccount, financesByAccount]);
+  }, [initialSection, accounts, selectedStoreId, listingSnapshots, sellerAccountSnapshots, returnsByAccount, analyticsByAccount, financesByAccount]);
 
   const handleReconnect = async (accountId: string) => {
     try {
@@ -618,21 +611,25 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const pendingExceptions = exceptions.filter(
     exception => exception.status === 'PENDING'
   );
+  const moduleAccountId = selectedStoreId !== 'ALL'
+    ? selectedStoreId
+    : accounts.find(account => account.authStatus === 'CONNECTED')?.id;
+
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-            {initialSection === 'LISTINGS' ? 'eBay Active Listings' : initialSection === 'SELLER_ACCOUNT' ? 'eBay Seller Account' : initialSection === 'RETURNS' ? 'eBay Returns' : initialSection === 'ANALYTICS' ? 'eBay Analytics' : initialSection === 'FINANCES' ? 'eBay Finances' : 'eBay Marketplace Integration'}
+            {initialSection === 'LISTINGS' ? 'Listings' : initialSection === 'RETURNS' ? 'Returns' : initialSection === 'ANALYTICS' ? 'Analytics' : initialSection === 'FINANCES' ? 'Finances' : 'eBay Accounts'}
           </h1>
 
           <p className="text-xs text-gray-500">
-            Production-only eBay data: orders, inventory, Active Listings, seller settings, returns, analytics and finances. Each module keeps its own sync result and provider data.
+            {initialSection ? 'Production data for the selected seller account.' : 'Manage connected eBay seller accounts and marketplace integration.'}
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        {!initialSection && <div className="flex items-center space-x-2">
           <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 font-semibold">
             {integrationReady
               ? productionOAuthEnabled
@@ -640,10 +637,10 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 : 'Production OAuth activation pending'
               : 'Integration unavailable'}
           </span>
-        </div>
+        </div>}
       </div>
 
-      {!integrationReady && (
+      {!initialSection && !integrationReady && (
         <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs">
           <div className="font-semibold mb-1">
             Live eBay integration is not enabled
@@ -655,7 +652,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         </div>
       )}
 
-      {currentUser.role === 'SUPER_ADMIN' && (
+      {!initialSection && currentUser.role === 'SUPER_ADMIN' && (
         <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
           <div className="font-semibold text-sm text-slate-900">
             eBay Developer Application Credentials
@@ -736,7 +733,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+      {!initialSection && <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
         <div className="font-semibold text-sm text-slate-900">
           Add eBay Seller Account
         </div>
@@ -772,7 +769,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         <p className="text-[11px] text-slate-500">
           Only live Production seller accounts are available in this workspace. After OAuth connects a seller, the first sync starts automatically on the next scheduled run (within about 5 minutes).
         </p>
-      </div>
+      </div>}
 
       {syncFeedback && (
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-900 text-xs flex items-center justify-between">
@@ -790,7 +787,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         </div>
       )}
 
-      {syncResult && (
+      {!initialSection && syncResult && (
         <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -943,7 +940,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 text-xs">
+      {!initialSection && <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 text-xs">
         <button
           onClick={() => setActiveTab('ACCOUNTS')}
           className={`flex items-center gap-2 px-4 py-2 font-semibold border-b-2 transition ${
@@ -979,27 +976,27 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
           <AlertTriangle className="w-4 h-4" />
           <span>eBay Order Exception Queue ({pendingExceptions.length} pending)</span>
         </button>
-      </div>
+      </div>}
 
-      {activeTab === 'ACCOUNTS' && (
+      {(initialSection || activeTab === 'ACCOUNTS') && (
         <div className="space-y-4">
           {loading ? (
             <div className="bg-white rounded-lg border p-6 text-center text-xs text-slate-500">
               Loading Production marketplace accounts…
             </div>
-          ) : accounts.length === 0 ? (
+          ) : (initialSection ? !moduleAccountId || !accounts.some(acc => acc.id === moduleAccountId) : accounts.length === 0) ? (
             <div className="bg-white rounded-lg border border-dashed p-8 text-center">
               <Store className="mx-auto mb-2 h-7 w-7 text-slate-400" />
               <p className="text-sm font-medium text-slate-700">
                 No Production seller accounts found
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Add a Production seller account to get started.
+                {initialSection ? 'Select a connected seller account from the workspace selector to view this module.' : 'Add a Production seller account to get started.'}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {accounts.map((acc, index) => {
+              {(initialSection ? accounts.filter(acc => acc.id === moduleAccountId) : accounts).map((acc, index) => {
                 const isSyncing = syncingAccountId === acc.id;
 
                 return (
@@ -1076,7 +1073,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-end flex-wrap gap-2 pt-1">
+                    {!initialSection && <div className="flex items-center justify-end flex-wrap gap-2 pt-1">
                       {currentUser.role === 'SUPER_ADMIN' && (
                         <button
                           onClick={() => handleDeleteAccount(acc)}
@@ -1137,11 +1134,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                 : 'Sync unavailable'}
                         </span>
                       </button>
-                    </div>
+                    </div>}
 
                     {acc.authStatus === 'CONNECTED' && (
                       <div className="pt-2 border-t border-gray-100">
-                        <div className="flex flex-wrap items-center gap-4">
+                        {!initialSection && <div className="flex flex-wrap items-center gap-4">
                           <button
                             onClick={() => handleToggleReturns(acc.id)}
                             className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
@@ -1174,7 +1171,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             ? 'Hide Sync Listings'
                             : `View Sync Listings (${listingTotals[acc.id] ?? 'Load'})`}
                         </button>
-                        </div>
+                        </div>}
 
                         {expandedReturnsAccountId === acc.id && (
                           <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">

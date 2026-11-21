@@ -65,7 +65,6 @@ export type NavItem =
   | 'orders'
   | 'ebay-accounts'
   | 'ebay-active-listings'
-  | 'ebay-seller-account'
   | 'ebay-returns'
   | 'ebay-analytics'
   | 'ebay-finances'
