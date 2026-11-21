@@ -1094,7 +1094,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                     <div><div className="text-[10px] text-slate-500">Status / Reason</div><div className="text-xs text-slate-800">{ret.status || ret.state || '—'} · {ret.reason || '—'}</div></div>
                                     <div><div className="text-[10px] text-slate-500">Requested</div><div className="text-xs text-slate-800">{ret.creationDate ? new Date(ret.creationDate).toLocaleString() : '—'}</div></div>
                                     <div><div className="text-[10px] text-slate-500">Seller response due</div><div className="text-xs text-slate-800">{ret.sellerResponseDue ? new Date(ret.sellerResponseDue).toLocaleString() : '—'}</div></div>
-                                    <div><div className="text-[10px] text-slate-500">Seller actions</div><div className="text-xs text-slate-800">{Array.isArray(ret.sellerActionTypes) ? ret.sellerActionTypes.join(', ') : '—'}</div></div>
+                                    <div><div className="text-[10px] text-slate-500">Seller actions / estimated refund</div><div className="text-xs text-slate-800">{Array.isArray(ret.sellerActionTypes) ? ret.sellerActionTypes.join(', ') : '—'} · {ret.estimatedRefund?.value ?? ret.actualRefund?.value ?? '—'} {ret.estimatedRefund?.currency ?? ret.actualRefund?.currency ?? ''}</div></div>
                                   </div>
                                 ))}
                               </div>
