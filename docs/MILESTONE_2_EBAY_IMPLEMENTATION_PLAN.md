@@ -33,6 +33,10 @@ These Production migrations are already present in the live Production Supabase 
 
 The queue hardening migration `20261121170000_bound_marketplace_sync_queue_and_retries.sql` is also present in Production history.
 
+## Production queue recovery
+
+The Worker now finalizes abandoned Production sync-run rows after the 15-minute lease safety window, while preserving the run belonging to any currently valid job lease. On 2026-11-21 at 14:45:48Z, the recovery pass marked 363 abandoned run records as FAILED with `SYNC_RUN_ABANDONED`. It did not delete or rewrite business orders, listings, payouts, returns or raw provider payloads. The three currently leased Production jobs remain under observation and are not force-terminated.
+
 ## Production execution and safety
 
 - Production eBay read-only synchronization and bounded, deduplicated queue recovery are approved.
