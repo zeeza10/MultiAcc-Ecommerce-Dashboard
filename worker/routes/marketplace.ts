@@ -966,14 +966,15 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
   const admin = createServiceClient(env);
   const now = Date.now();
   const { data: accounts, error } = await admin.from('marketplace_accounts')
-    .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,auto_sync_interval_minutes')
+    .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,last_sync_attempt_at,auto_sync_interval_minutes')
     .eq('is_demo', false).eq('auth_status', 'CONNECTED')
     .in('environment', ['SANDBOX', 'PRODUCTION']);
   if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
   for (const account of accounts || []) {
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
-    const lastSync = account.last_sync_at ? new Date(account.last_sync_at).getTime() : 0;
-    if (lastSync && now - lastSync < intervalMs) continue;
+    const lastAttempt = account.last_sync_attempt_at || account.last_sync_at;
+    const lastSyncAttempt = lastAttempt ? new Date(lastAttempt).getTime() : 0;
+    if (lastSyncAttempt && now - lastSyncAttempt < intervalMs) continue;
     const bucket = Math.floor(now / intervalMs);
     const idempotencyKey = `scheduled-orders:${account.id}:${bucket}`;
     const { error: enqueueError } = await admin.rpc('enqueue_marketplace_sync_job', {
@@ -995,6 +996,12 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         || !isEnvironment(account.environment)) {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
+      const attemptAt = new Date().toISOString();
+      const { error: attemptMarkError } = await admin.from('marketplace_accounts')
+        .update({ last_sync_attempt_at: attemptAt })
+        .eq('id', account.id).eq('organization_id', account.organization_id);
+      if (attemptMarkError) throw new Error('The seller sync attempt timestamp could not be recorded.');
+
       const ordersProgress = createEbaySyncProgress();
       let ordersOk = false;
       let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
@@ -1059,8 +1066,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
         last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
-        // last_sync_at is the last attempt time; this prevents repeated scheduled enqueue storms on persistent failures.
-        last_sync_at: new Date().toISOString(),
+        last_sync_attempt_at: attemptAt,
       }).eq('id', account.id).eq('organization_id', account.organization_id);
 
       if (overallStatus === 'SUCCESS') {
