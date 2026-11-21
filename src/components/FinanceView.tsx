@@ -192,6 +192,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       )}
 
+      {!loading && !loadError && invoices.length === 0 && payments.length === 0 && expenses.length === 0 && ledger.length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <p className="font-semibold">No Production finance documents have been recorded yet.</p>
+          <p className="mt-1">Invoices, payments, expenses and the internal financial ledger are isolated from Demo/Sandbox records. Create or import genuine Production business records through the existing workflows; no demo entries have been copied into Production.</p>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center space-x-2 border-b border-gray-200 text-xs overflow-x-auto">
         <button

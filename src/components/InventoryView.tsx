@@ -132,6 +132,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     <div className="space-y-4">
       <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={physicalBalances} allocationRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
 
+      {!loading && products.length === 0 && balances.length === 0 && ledger.length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <p className="font-semibold">Production inventory has no internal Product or stock records yet.</p>
+          <p className="mt-1">Create real Products/SKUs first, then use a Purchase Order and Goods Receiving or an approved Stock Adjustment to record physical stock. eBay quantities are not treated as warehouse stock.</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
