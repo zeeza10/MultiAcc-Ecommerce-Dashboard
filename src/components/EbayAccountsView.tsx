@@ -1559,7 +1559,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -1877,7 +1877,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 Save Mapping &amp; Re-link Orders
               </button>
             </div>
-          </div>}
+          </div>
         </div>
       )}
     </div>
