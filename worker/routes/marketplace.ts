@@ -1873,7 +1873,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
     if (enqueueError) throw new Error('A scheduled marketplace sync could not be queued.');
   }
 
-  const { data: jobs, error: claimError } = await admin.rpc('claim_marketplace_sync_jobs', { p_limit: 5 });
+  const { data: jobs, error: claimError } = await admin.rpc('claim_marketplace_sync_jobs', { p_limit: 1 });
   if (claimError) throw new Error('Scheduled marketplace sync jobs could not be claimed.');
   for (const job of jobs || []) {
     try {
