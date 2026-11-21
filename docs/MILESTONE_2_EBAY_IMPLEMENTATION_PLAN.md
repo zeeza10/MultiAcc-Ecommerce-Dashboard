@@ -31,6 +31,7 @@ These Production migrations are already present in the live Production Supabase 
 - `20261121180200_production_ebay_signing_keys.sql`
 - `20261121180300_production_coalesce_expired_sync_jobs.sql`
 - `20261121180400_production_extend_marketplace_sync_checkpoint_resources.sql`
+- `20261121180500_production_index_ebay_provider_tenant_keys.sql`
 
 The queue hardening migration `20261121170000_bound_marketplace_sync_queue_and_retries.sql` is also present in Production history.
 
