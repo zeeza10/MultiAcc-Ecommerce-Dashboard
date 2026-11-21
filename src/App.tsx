@@ -492,7 +492,7 @@ export default function App() {
         <main aria-busy={pendingApiRequests > 0} className="relative flex-1 min-w-0 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto overscroll-contain">
           {pendingApiRequests > 0 && (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-0.5 overflow-hidden" role="status" aria-live="polite" aria-label="Updating data">
-              <div className="h-full w-1/3 animate-[loading-progress_1.2s_ease-in-out_infinite] rounded-full bg-indigo-600" />
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-indigo-600" />
               <span className="sr-only">{pendingApiRequests} requests in progress</span>
             </div>
           )}
