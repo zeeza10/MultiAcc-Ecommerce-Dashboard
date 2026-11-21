@@ -83,11 +83,14 @@ const getIntegrationGuidance = (event: any) => {
   return 'Review the API operation, stage, error code and provider message above. Preserve this event for technical investigation before retrying.';
 };
 
+type EbayModuleSection = 'LISTINGS' | 'SELLER_ACCOUNT' | 'RETURNS' | 'ANALYTICS' | 'FINANCES';
+
 interface EbayAccountsViewProps {
   currentUser: User;
   config: SystemConfig;
   selectedStoreId: string;
   onNavigate: (tab: any) => void;
+  initialSection?: EbayModuleSection | null;
 }
 
 export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
@@ -95,6 +98,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   config,
   selectedStoreId,
   onNavigate,
+  initialSection = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'ACCOUNTS' | 'EVENTS' | 'EXCEPTIONS'>('ACCOUNTS');
 
@@ -380,6 +384,60 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     } finally { setFinanceLoadingId(null); }
   };
 
+  useEffect(() => {
+    if (!initialSection) return;
+    const account = accounts.find(item => item.authStatus === 'CONNECTED');
+    if (!account) return;
+
+    const accountId = account.id;
+    const loadFailure = (label: string, error: any) => {
+      setSyncFeedback(`Could not load eBay ${label}: ${error?.message || 'Request failed.'}`);
+    };
+
+    if (initialSection === 'LISTINGS') {
+      setExpandedListingsAccountId(accountId);
+      if (!listingSnapshots[accountId]) {
+        setListingLoadingAccountId(accountId);
+        void api.getEbayListings(accountId, 100, 0).then(result => {
+          setListingSnapshots(current => ({ ...current, [accountId]: [...(result.listings || []), ...(result.tradingListings || [])] }));
+          setListingTotals(current => ({ ...current, [accountId]: result.total || 0 }));
+        }).catch(error => loadFailure('Active Listings', error)).finally(() => setListingLoadingAccountId(null));
+      }
+    } else if (initialSection === 'SELLER_ACCOUNT') {
+      setExpandedSellerAccountId(accountId);
+      if (!sellerAccountSnapshots[accountId]) {
+        setSellerAccountLoadingId(accountId);
+        void api.getEbaySellerAccount(accountId).then(result => {
+          setSellerAccountSnapshots(current => ({ ...current, [accountId]: result.resources || [] }));
+        }).catch(error => loadFailure('Seller Account', error)).finally(() => setSellerAccountLoadingId(null));
+      }
+    } else if (initialSection === 'RETURNS') {
+      setExpandedReturnsAccountId(accountId);
+      if (!returnsByAccount[accountId]) {
+        setReturnsLoadingId(accountId);
+        void api.getEbayReturns(accountId).then(result => {
+          setReturnsByAccount(current => ({ ...current, [accountId]: result.returns || [] }));
+        }).catch(error => loadFailure('Returns', error)).finally(() => setReturnsLoadingId(null));
+      }
+    } else if (initialSection === 'ANALYTICS') {
+      setExpandedAnalyticsAccountId(accountId);
+      if (!analyticsByAccount[accountId]) {
+        setAnalyticsLoadingId(accountId);
+        void api.getEbayAnalytics(accountId).then(result => {
+          setAnalyticsByAccount(current => ({ ...current, [accountId]: result.resources || [] }));
+        }).catch(error => loadFailure('Analytics', error)).finally(() => setAnalyticsLoadingId(null));
+      }
+    } else if (initialSection === 'FINANCES') {
+      setExpandedFinanceAccountId(accountId);
+      if (!financesByAccount[accountId]) {
+        setFinanceLoadingId(accountId);
+        void api.getEbayFinances(accountId).then(result => {
+          setFinancesByAccount(current => ({ ...current, [accountId]: result }));
+        }).catch(error => loadFailure('Finances', error)).finally(() => setFinanceLoadingId(null));
+      }
+    }
+  }, [initialSection, accounts, listingSnapshots, sellerAccountSnapshots, returnsByAccount, analyticsByAccount, financesByAccount]);
+
   const handleReconnect = async (accountId: string) => {
     try {
       const res = await api.connectEbayAccount(accountId);
@@ -526,7 +584,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-            eBay Marketplace Integration
+            {initialSection === 'LISTINGS' ? 'eBay Active Listings' : initialSection === 'SELLER_ACCOUNT' ? 'eBay Seller Account' : initialSection === 'RETURNS' ? 'eBay Returns' : initialSection === 'ANALYTICS' ? 'eBay Analytics' : initialSection === 'FINANCES' ? 'eBay Finances' : 'eBay Marketplace Integration'}
           </h1>
 
           <p className="text-xs text-gray-500">
