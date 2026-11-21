@@ -769,7 +769,9 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
         creationDate: typeof creation.creationDate?.value === 'string' ? creation.creationDate.value : null,
         itemId: typeof item.itemId === 'string' ? item.itemId : null,
         transactionId: typeof item.transactionId === 'string' ? item.transactionId : null,
-        quantity: Number.isSafeInteger(Number(item.returnQuantity)) ? Number(item.returnQuantity) : null,
+        quantity: (typeof item.returnQuantity === 'number' && Number.isSafeInteger(item.returnQuantity))
+          ? item.returnQuantity
+          : (typeof item.returnQuantity === 'string' && item.returnQuantity.trim() !== '' && Number.isSafeInteger(Number(item.returnQuantity)) ? Number(item.returnQuantity) : null),
         reason: typeof creation.reason === 'string' ? creation.reason : null,
         reasonType: typeof creation.reasonType === 'string' ? creation.reasonType : null,
         sellerResponseDue: typeof member.sellerResponseDue?.respondByDate?.value === 'string' ? member.sellerResponseDue.respondByDate.value : null,
@@ -1429,9 +1431,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     ));
     const tradingListings = (tradingRows || []).filter((row: any) => !inventoryListingIds.has(row.external_id)).map((row: any) => {
       const item = row.snapshot && typeof row.snapshot === 'object' ? row.snapshot as Record<string, any> : {};
-      const quantity = Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : null;
-      const sold = Number.isFinite(Number(item.quantitySold)) ? Number(item.quantitySold) : null;
-      const availableQuantity = quantity !== null && sold !== null ? Math.max(0, quantity - sold) : null;
+      const quantity = typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : null;
+      const sold = typeof item.quantitySold === 'number' && Number.isFinite(item.quantitySold) ? item.quantitySold : null;
+      const availableQuantity = quantity !== null && sold !== null ? quantity - sold : null;
       const hasPrice = item.currentPrice !== null && item.currentPrice !== undefined && item.currency;
       return {
         offerId: row.external_id,
@@ -1449,7 +1451,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           pricingSummary: { price: { value: String(item.currentPrice), currency: String(item.currency) } },
         }] : [],
         source: 'TRADING_API',
-        sourceUpdatedAt: item.startTime || null,
+        listingStartTime: item.startTime || null,
         syncedAt: row.synced_at,
         syncStatus: 'SYNCED',
         syncError: null,
