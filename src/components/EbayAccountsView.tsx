@@ -137,6 +137,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [financeLoadingId, setFinanceLoadingId] = useState<string | null>(null);
   const [financeSyncingId, setFinanceSyncingId] = useState<string | null>(null);
   const [financeSyncResult, setFinanceSyncResult] = useState<Record<string, any>>({});
+  const [moduleSearch, setModuleSearch] = useState('');
 
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
@@ -446,8 +447,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
   useEffect(() => {
     if (!initialSection) return;
-    const account = (selectedStoreId !== 'ALL' ? accounts.find(item => item.id === selectedStoreId && item.authStatus === 'CONNECTED') : null)
-      || (selectedStoreId === 'ALL' ? accounts.find(item => item.authStatus === 'CONNECTED') : null);
+    const account = selectedStoreId !== 'ALL'
+      ? accounts.find(item => item.id === selectedStoreId && item.authStatus === 'CONNECTED')
+      : null;
     if (!account) return;
 
     const accountId = account.id;
@@ -631,9 +633,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const pendingExceptions = exceptions.filter(
     exception => exception.status === 'PENDING'
   );
-  const moduleAccountId = selectedStoreId !== 'ALL'
-    ? selectedStoreId
-    : accounts.find(account => account.authStatus === 'CONNECTED')?.id;
+  const moduleAccountId = selectedStoreId !== 'ALL' ? selectedStoreId : null;
 
 
   return (
@@ -641,11 +641,11 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-            {initialSection === 'LISTINGS' ? 'Listings' : initialSection === 'RETURNS' ? 'Returns' : initialSection === 'ANALYTICS' ? 'Analytics' : initialSection === 'FINANCES' ? 'Finances' : 'eBay Accounts'}
+            {initialSection === 'LISTINGS' ? 'eBay Listings' : initialSection === 'RETURNS' ? 'eBay Returns' : initialSection === 'ANALYTICS' ? 'eBay Analytics' : initialSection === 'FINANCES' ? 'eBay Finance' : 'eBay Accounts'}
           </h1>
 
           <p className="text-xs text-gray-500">
-            {initialSection ? 'Production data for the selected seller account.' : 'Manage connected eBay seller accounts and marketplace integration.'}
+            {initialSection ? 'Production marketplace data from the account selected in the workspace header.' : 'Manage connected eBay seller accounts and marketplace integration.'}
           </p>
         </div>
 
@@ -1000,6 +1000,22 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
       {(initialSection || activeTab === 'ACCOUNTS') && (
         <div className="space-y-4">
+          {initialSection && (
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between rounded-lg border border-slate-200 bg-white p-3">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={moduleSearch}
+                  onChange={event => setModuleSearch(event.target.value)}
+                  placeholder={initialSection === 'LISTINGS' ? 'Search SKU, item ID, product or listing status…' : initialSection === 'RETURNS' ? 'Search return ID, order, item, status or reason…' : initialSection === 'FINANCES' ? 'Search payout ID, transaction, type or amount…' : 'Search analytics resources…'}
+                  className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  aria-label="Search marketplace module records"
+                />
+              </div>
+              <div className="text-xs text-slate-500 whitespace-nowrap">{accounts.find(account => account.id === moduleAccountId)?.name || 'Selected account'}</div>
+            </div>
+          )}
           {loading ? (
             <div className="bg-white rounded-lg border p-6 text-center text-xs text-slate-500">
               Loading Production marketplace accounts…
@@ -1011,7 +1027,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 No Production seller accounts found
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                {initialSection ? 'Select a connected seller account from the workspace selector to view this module.' : 'Add a Production seller account to get started.'}
+                {initialSection ? (selectedStoreId === 'ALL' ? 'Select one seller account from the workspace selector at the top of the page. This module will load that account automatically.' : 'The selected account is not connected. Connect it once in eBay Accounts, then return to this module.') : 'Add a Production seller account to get started.'}
               </p>
             </div>
           ) : (
@@ -1022,8 +1038,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 return (
                   <div
                     key={acc.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3"
+                    className={initialSection ? "w-full min-w-0 space-y-3" : "bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3"}
                   >
+                    {!initialSection && <>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[10px] font-mono text-gray-400">
                         #{index + 1}
@@ -1092,6 +1109,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                         </div>
                       )}
                     </div>
+
+                    </>}
 
                     {!initialSection && <div className="flex items-center justify-end flex-wrap gap-2 pt-1">
                       {currentUser.role === 'SUPER_ADMIN' && (
@@ -1202,7 +1221,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                               <p className="text-xs text-slate-500">No synchronized return records are available. Run Sync Production Data to import returns.</p>
                             ) : (
                               <div className="space-y-2">
-                                {(returnsByAccount[acc.id] || []).map((ret: any) => (
+                                {(returnsByAccount[acc.id] || []).filter((ret: any) => !moduleSearch || JSON.stringify(ret).toLowerCase().includes(moduleSearch.toLowerCase())).map((ret: any) => (
                                   <div key={ret.returnId} className="rounded border border-slate-200 bg-white p-2 grid grid-cols-1 md:grid-cols-3 gap-2">
                                     <div><div className="text-[10px] text-slate-500">Return ID</div><div className="text-xs font-mono text-slate-800">{ret.returnId}</div></div>
                                     <div><div className="text-[10px] text-slate-500">Order / Item</div><div className="text-xs text-slate-800">{ret.orderId || '—'} / {ret.itemId || '—'}</div></div>
@@ -1264,7 +1283,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                 </div>
                                 <div className="text-xs font-semibold text-slate-800">Payouts ({financesByAccount[acc.id].payouts?.length || 0})</div>
                                 <div className="space-y-1">
-                                  {(financesByAccount[acc.id].payouts || []).map((payout: any) => (
+                                  {(financesByAccount[acc.id].payouts || []).filter((payout: any) => !moduleSearch || JSON.stringify(payout).toLowerCase().includes(moduleSearch.toLowerCase())).map((payout: any) => (
                                     <div key={payout.payoutId || payout.id} className="rounded border border-slate-200 bg-white p-2 flex flex-wrap justify-between gap-2 text-xs">
                                       <span className="font-mono">{payout.payoutId || payout.id}</span>
                                       <span>{payout.payoutStatus || '—'}</span>
@@ -1275,7 +1294,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                 </div>
                                 <div className="text-xs font-semibold text-slate-800">Transactions ({financesByAccount[acc.id].transactions?.length || 0})</div>
                                 <div className="space-y-1 max-h-64 overflow-auto">
-                                  {(financesByAccount[acc.id].transactions || []).map((transaction: any) => (
+                                  {(financesByAccount[acc.id].transactions || []).filter((transaction: any) => !moduleSearch || JSON.stringify(transaction).toLowerCase().includes(moduleSearch.toLowerCase())).map((transaction: any) => (
                                     <div key={transaction.transactionId || transaction.id} className="rounded border border-slate-200 bg-white p-2 grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
                                       <span className="font-mono">{transaction.transactionId || transaction.id}</span>
                                       <span>{transaction.transactionType || '—'}</span>
@@ -1298,7 +1317,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                               <p className="text-xs text-slate-500">No synchronized analytics are available. Reconnect the seller account to grant the Analytics read-only permission, then run Sync Production Data.</p>
                             ) : (
                               <div className="space-y-2">
-                                {(analyticsByAccount[acc.id] || []).map((resource: any) => {
+                                {(analyticsByAccount[acc.id] || []).filter((resource: any) => !moduleSearch || JSON.stringify(resource).toLowerCase().includes(moduleSearch.toLowerCase())).map((resource: any) => {
                                   const snapshot = resource.snapshot || {};
                                   const metrics = Array.isArray(snapshot.metrics) ? snapshot.metrics : [];
                                   const records = Array.isArray(snapshot.records) ? snapshot.records : [];
@@ -1410,7 +1429,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                   </thead>
 
                                   <tbody className="divide-y divide-slate-100">
-                                    {(listingSnapshots[acc.id] || []).map((listing: any, listingIndex: number) => (
+                                    {(listingSnapshots[acc.id] || []).filter((listing: any) => !moduleSearch || JSON.stringify(listing).toLowerCase().includes(moduleSearch.toLowerCase())).map((listing: any, listingIndex: number) => (
                                       <tr key={listing.offerId || listing.sku || listingIndex}>
                                         <td className="p-2">{listingIndex + 1}</td>
                                         <td className="p-2 font-mono">{listing.sku || listing.itemId || "—"}</td>
@@ -1470,7 +1489,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
             </div>
           )}
 
-          <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
+          {!initialSection && <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
             <div className="p-3 border-b border-gray-200 bg-slate-50 font-semibold text-xs text-gray-800 flex justify-between gap-2">
               <span>Recent Marketplace Synchronization Audit Runs</span>
               <span className="text-slate-500">Total: {recentSyncs.length}</span>
@@ -1857,7 +1876,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                 Save Mapping &amp; Re-link Orders
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       )}
     </div>
