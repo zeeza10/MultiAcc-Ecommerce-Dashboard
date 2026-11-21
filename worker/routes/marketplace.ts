@@ -2079,19 +2079,42 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         // A completed page is a successful bounded job. The next Cron invocation
         // sees the persisted cursor and queues a new continuation job; page count
         // therefore does not consume transient-failure retry attempts.
-        await admin.from('marketplace_sync_jobs').update({
+        const { data: finalizedJob, error: finalizeError } = await admin.from('marketplace_sync_jobs').update({
           status: 'SUCCEEDED', completed_at: new Date().toISOString(),
           locked_until: null, last_error_code: null, last_error_message: null,
           updated_at: new Date().toISOString(),
-        }).eq('id', job.id);
+        }).eq('id', job.id).select('id,status').maybeSingle();
+        if (finalizeError || !finalizedJob) {
+          console.error('[Marketplace Sync] Job success finalization failed', {
+            jobId: job.id ?? null, accountId: account.id,
+            pageContinuation, ordersPagesPending, inventoryPagesPending,
+            error: finalizeError?.message || 'No matching job row was updated',
+          });
+          throw new Error('The Production sync job could not be finalized after its page completed.');
+        }
+        console.info('[Marketplace Sync] Production page job completed', {
+          jobId: finalizedJob.id, accountId: account.id,
+          pageContinuation, ordersPagesPending, inventoryPagesPending,
+        });
       } else {
-        await admin.from('marketplace_sync_jobs').update({
-          status: !jobRetryable || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
-          completed_at: !jobRetryable || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? new Date().toISOString() : null,
+        const nextStatus = !jobRetryable || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED';
+        const { data: failedJob, error: finalizeError } = await admin.from('marketplace_sync_jobs').update({
+          status: nextStatus,
+          completed_at: nextStatus === 'DEAD_LETTER' ? new Date().toISOString() : null,
           scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
           locked_until: null, last_error_code: lastErrorCode, last_error_message: lastErrorMessage,
           updated_at: new Date().toISOString(),
-        }).eq('id', job.id);
+        }).eq('id', job.id).select('id,status').maybeSingle();
+        if (finalizeError || !failedJob) {
+          console.error('[Marketplace Sync] Job failure finalization failed', {
+            jobId: job.id ?? null, accountId: account.id, nextStatus,
+            error: finalizeError?.message || 'No matching job row was updated',
+          });
+          throw new Error('The Production sync job could not be finalized after its failure.');
+        }
+        console.warn('[Marketplace Sync] Production page job scheduled for retry', {
+          jobId: failedJob.id, accountId: account.id, status: failedJob.status, code: lastErrorCode,
+        });
       }
       continue;
     } catch (jobError) {
