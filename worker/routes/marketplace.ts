@@ -1067,6 +1067,86 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     return json({ success: result.failed.length === 0, ...result });
   }
 
+  const returnsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-returns$/);
+  if (returnsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,environment,marketplace,is_demo,auth_status')
+      .eq('id', returnsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerReturns(account, env);
+    return json({ success: !result.pagesPending, ...result });
+  }
+
+  const returnsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/returns$/);
+  if (returnsReadMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = returnsReadMatch[1];
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production return data is available.' }, 409);
+    const admin = createServiceClient(env);
+    const { data: latest, error: latestError } = await admin.from('marketplace_provider_snapshots')
+      .select('sync_batch_id,synced_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
+      .order('synced_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestError) throw new Error('eBay return snapshots could not be loaded.');
+    if (!latest?.sync_batch_id) return json({ returns: [], total: 0, lastSyncedAt: null });
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
+      .eq('sync_batch_id', latest.sync_batch_id).order('synced_at', { ascending: false }).limit(500);
+    if (error) throw new Error('eBay return snapshots could not be loaded.');
+    return json({ returns: (data || []).map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })), total: data?.length || 0, lastSyncedAt: latest.synced_at });
+  }
+
+  const analyticsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-analytics$/);
+  if (analyticsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', analyticsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerAnalytics(account, env);
+    return json({ success: result.failed.length === 0, ...result });
+  }
+
+  const analyticsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/analytics$/);
+  if (analyticsReadMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const accountId = analyticsReadMatch[1];
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo').eq('id', accountId).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production analytics data is available.' }, 409);
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,resource_type,external_id,snapshot,provider_updated_at,synced_at')
+      .eq('organization_id', auth.organizationId).eq('marketplace_account_id', accountId)
+      .in('resource_type', ['ANALYTICS_TRAFFIC','ANALYTICS_SELLER_STANDARDS','ANALYTICS_CUSTOMER_SERVICE'])
+      .order('synced_at', { ascending: false }).limit(50);
+    if (error) throw new Error('eBay Analytics snapshots could not be loaded.');
+    const latest = new Map<string, any>();
+    for (const row of data || []) {
+      const key = `${row.resource_type}:${row.external_id}`;
+      if (!latest.has(key)) latest.set(key, row);
+    }
+    return json({ resources: [...latest.values()].map((row: any) => ({
+      type: row.resource_type, key: row.external_id, snapshot: row.snapshot,
+      providerUpdatedAt: row.provider_updated_at, syncedAt: row.synced_at,
+    })) });
+  }
+
   const activeListingsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-active-listings$/);
   if (activeListingsSyncMatch && request.method === 'POST') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
