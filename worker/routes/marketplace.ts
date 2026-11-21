@@ -709,7 +709,6 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
   if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
     throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
   }
-  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.return.read', env);
   const accessToken = await getSellerAccessToken(env, account);
   const admin = createServiceClient(env);
   const batchId = crypto.randomUUID();
@@ -880,6 +879,7 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
   transactions: number;
   synced: string[];
   failed: Array<{ resource: string; message: string }>;
+  pagesPending: boolean;
 }> {
   if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
     throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
@@ -925,24 +925,70 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
     }
   }
 
-  const payoutPath = '/sell/finances/v1/payout?limit=100&offset=0';
-  try {
-    const payload = await fetchEbayFinanceJson(accessToken, payoutPath, marketplaceId, env);
-    const rows = Array.isArray(payload.payouts) ? payload.payouts : [];
-    for (const payout of rows) {
-      const payoutId = typeof payout.payoutId === 'string' ? payout.payoutId : '';
-      if (!payoutId) continue;
-      const normalized = {
-        payoutId,
-        payoutStatus: payout.payoutStatus ?? null,
-        payoutDate: payout.payoutDate ?? null,
-        amount: payout.amount ?? null,
-        transactionCount: payout.transactionCount ?? null,
-        source: 'EBAY_FINANCES_API',
-      };
-      await saveEbayProviderSnapshot(admin, account, 'FINANCE_PAYOUT', payoutId, batchId, normalized, payout);
-      payoutCount++;
+  const limit = 100;
+  const maxPages = 20;
+  let payoutPagesPending = false;
+  let transactionPagesPending = false;
+
+  const importPagedRecords = async (
+    basePath: string,
+    collectionKey: 'payouts' | 'transactions',
+    resourceType: 'FINANCE_PAYOUT' | 'FINANCE_TRANSACTION',
+  ): Promise<{ count: number; pagesPending: boolean }> => {
+    let offset = 0;
+    let totalEntries = 0;
+    let pages = 0;
+    let count = 0;
+    let more = true;
+    while (more && pages < maxPages) {
+      const separator = basePath.includes('?') ? '&' : '?';
+      const path = `${basePath}${separator}limit=${limit}&offset=${offset}`;
+      const payload = await fetchEbayFinanceJson(accessToken, path, marketplaceId, env);
+      const rows = Array.isArray(payload[collectionKey]) ? payload[collectionKey] : [];
+      const paginationTotal = payload.total ?? payload.totalEntries ?? payload.paginationOutput?.totalEntries;
+      if (Number.isFinite(Number(paginationTotal)) && Number(paginationTotal) >= 0) totalEntries = Number(paginationTotal);
+      pages++;
+      for (const record of rows) {
+        const externalId = resourceType === 'FINANCE_PAYOUT'
+          ? (typeof record.payoutId === 'string' ? record.payoutId : '')
+          : (typeof record.transactionId === 'string' ? record.transactionId : '');
+        if (!externalId) continue;
+        const normalized = resourceType === 'FINANCE_PAYOUT'
+          ? {
+              payoutId: externalId,
+              payoutStatus: record.payoutStatus ?? null,
+              payoutDate: record.payoutDate ?? null,
+              amount: record.amount ?? null,
+              transactionCount: record.transactionCount ?? null,
+              source: 'EBAY_FINANCES_API',
+            }
+          : {
+              transactionId: externalId,
+              transactionType: record.transactionType ?? null,
+              transactionDate: record.transactionDate ?? null,
+              amount: record.amount ?? null,
+              totalFeeAmount: record.totalFeeAmount ?? null,
+              orderId: record.orderId ?? null,
+              payoutId: record.payoutId ?? null,
+              references: Array.isArray(record.references)
+                ? record.references.map((reference: any) => ({ referenceType: reference?.referenceType ?? null, referenceId: reference?.referenceId ?? null }))
+                : [],
+              source: 'EBAY_FINANCES_API',
+            };
+        await saveEbayProviderSnapshot(admin, account, resourceType, externalId, batchId, normalized, record);
+        count++;
+      }
+      offset += rows.length;
+      more = rows.length === limit && (totalEntries === 0 || offset < totalEntries);
+      if (!rows.length) more = false;
     }
+    return { count, pagesPending: more || (totalEntries > offset) };
+  };
+
+  try {
+    const result = await importPagedRecords('/sell/finances/v1/payout', 'payouts', 'FINANCE_PAYOUT');
+    payoutCount = result.count;
+    payoutPagesPending = result.pagesPending;
     synced.push('PAYOUTS');
   } catch (error) {
     const failure = getEbaySyncFailure(error, 'EBAY_PAYOUTS_SYNC_FAILED');
@@ -954,29 +1000,14 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
     });
   }
 
-  const transactionPath = `/sell/finances/v1/transaction?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}&limit=100&offset=0`;
   try {
-    const payload = await fetchEbayFinanceJson(accessToken, transactionPath, marketplaceId, env);
-    const rows = Array.isArray(payload.transactions) ? payload.transactions : [];
-    for (const transaction of rows) {
-      const transactionId = typeof transaction.transactionId === 'string' ? transaction.transactionId : '';
-      if (!transactionId) continue;
-      const normalized = {
-        transactionId,
-        transactionType: transaction.transactionType ?? null,
-        transactionDate: transaction.transactionDate ?? null,
-        amount: transaction.amount ?? null,
-        totalFeeAmount: transaction.totalFeeAmount ?? null,
-        orderId: transaction.orderId ?? null,
-        payoutId: transaction.payoutId ?? null,
-        references: Array.isArray(transaction.references)
-          ? transaction.references.map((reference: any) => ({ referenceType: reference?.referenceType ?? null, referenceId: reference?.referenceId ?? null }))
-          : [],
-        source: 'EBAY_FINANCES_API',
-      };
-      await saveEbayProviderSnapshot(admin, account, 'FINANCE_TRANSACTION', transactionId, batchId, normalized, transaction);
-      transactionCount++;
-    }
+    const result = await importPagedRecords(
+      `/sell/finances/v1/transaction?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}`,
+      'transactions',
+      'FINANCE_TRANSACTION',
+    );
+    transactionCount = result.count;
+    transactionPagesPending = result.pagesPending;
     synced.push('TRANSACTIONS_90_DAYS');
   } catch (error) {
     const failure = getEbaySyncFailure(error, 'EBAY_TRANSACTIONS_SYNC_FAILED');
@@ -994,9 +1025,9 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
     event_type: 'EBAY_FINANCES_SYNC_COMPLETED',
     severity: failed.length ? 'WARNING' : 'INFO',
     message: `eBay Finances sync stored ${payoutCount} payouts and ${transactionCount} transactions.`,
-    metadata: { syncBatchId: batchId, payoutCount, transactionCount, syncedResources: synced, failedResources: failed.map(item => item.resource), dateRange, environment: 'PRODUCTION' },
+    metadata: { syncBatchId: batchId, payoutCount, transactionCount, payoutPagesPending, transactionPagesPending, syncedResources: synced, failedResources: failed.map(item => item.resource), dateRange, environment: 'PRODUCTION' },
   });
-  return { batchId, payouts: payoutCount, transactions: transactionCount, synced, failed };
+  return { batchId, payouts: payoutCount, transactions: transactionCount, synced, failed, pagesPending: payoutPagesPending || transactionPagesPending };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
