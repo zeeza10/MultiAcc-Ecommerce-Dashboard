@@ -32,6 +32,8 @@ interface EbayStockSourcePanelProps {
   selectedStoreId: string;
   selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   localRecords?: any[];
+  stockRecords?: any[];
+  onCreateProduct?: () => void;
   mode: 'PRODUCTS' | 'INVENTORY';
   onAllocationSaved?: () => void | Promise<void>;
 }
@@ -45,10 +47,11 @@ const money = (value: unknown, currency = 'GBP') => {
 
 const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
 
-export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], mode, onAllocationSaved }) => {
+export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], stockRecords = [], onCreateProduct, mode, onAllocationSaved }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -133,6 +136,37 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   useEffect(() => { void load(); }, [load]);
 
+  const syncListings = async () => {
+    if (selectedEnvironment !== 'PRODUCTION') {
+      setError('Live eBay listing sync is available only in the Production workspace.');
+      return;
+    }
+    setSyncing(true);
+    setError('');
+    setNotice('');
+    try {
+      const accountResult = await api.getEbayAccounts(selectedStoreId);
+      const accounts = (accountResult.accounts || []).filter((account: any) =>
+        account.environment === 'PRODUCTION' && !account.isDemo &&
+        account.authStatus === 'CONNECTED' &&
+        (selectedStoreId === 'ALL' || account.id === selectedStoreId)
+      );
+      if (!accounts.length) throw new Error('No connected Production seller accounts were found in the selected scope.');
+      const results = await Promise.allSettled(accounts.map((account: any) => api.syncEbayActiveListings(account.id)));
+      const successful = results.filter(result => result.status === 'fulfilled');
+      const failed = results.filter(result => result.status === 'rejected');
+      const fetched = successful.reduce((sum, result: any) => sum + Number(result.value?.fetched || 0), 0);
+      const pending = successful.some((result: any) => result.value?.pagesPending);
+      await load();
+      setNotice(`eBay Listings sync completed for ${successful.length}/${accounts.length} connected seller(s); ${fetched} listing record(s) fetched.${pending ? ' More pages remain; run Sync again to continue.' : ''}`);
+      if (failed.length) setError(`${failed.length} seller sync(s) failed. Check seller permissions and eBay connection status.`);
+    } catch (err: any) {
+      setError(err?.message || 'eBay Listings could not be synchronized.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const mappingByKey = useMemo(() => {
     const result = new Map<string, SkuMapping>();
     mappings.forEach(mapping => result.set(`${mapping.marketplaceAccountId}:${mapping.externalSku}`, mapping));
@@ -177,7 +211,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   const saveAllocation = async (row: ListingRow, mapping: SkuMapping) => {
     const key = rowKey(row);
-    const current = localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+    const current = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
     const values = allocationInputs[key] || {
       allocated: String(current?.onHand ?? 0),
       reserved: String(current?.reserved ?? 0),
@@ -222,9 +256,14 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
             <p className="mt-1 text-xs text-slate-500">Production marketplace data · warehouse physical stock remains separate</p>
           </div>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh listings
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void load()} disabled={loading || syncing} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <button type="button" onClick={() => void syncListings()} disabled={loading || syncing || selectedEnvironment !== 'PRODUCTION'} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync from eBay'}
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">eBay SKUs</p><p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{rows.length}</p></div>
@@ -232,6 +271,12 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Mapping required</p><p className="mt-1 text-xl font-semibold tabular-nums text-amber-700">{unmatchedCount}</p></div>
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Connected scope</p><p className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedStoreId === 'ALL' ? 'All connected sellers' : 'Selected seller'}</p></div>
       </div>
+      {mode === 'PRODUCTS' && products.length === 0 && rows.length > 0 && (
+        <div className="mx-4 mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+          <span>No Production internal Products/SKUs exist yet. Create a real catalog product before mapping these eBay SKUs.</span>
+          {onCreateProduct && <button type="button" onClick={onCreateProduct} className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Create internal Product</button>}
+        </div>
+      )}
       {error && <div role="alert" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
       {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
       <div className="overflow-x-auto">
@@ -253,9 +298,9 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{row.price ? money(row.price, row.currency) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums font-semibold text-slate-800">{row.quantity ?? '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{mapping ? (() => {
-                    const internal = localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
+                    const internal = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
                     if (!internal) return '0';
-                    const value = mode === 'INVENTORY' && selectedStoreId !== 'ALL'
+                    const value = mode === 'INVENTORY'
                       ? internal.available ?? Math.max(0, Number(internal.onHand || 0) - Number(internal.reserved || 0))
                       : internal.stockAvailable ?? internal.available ?? 0;
                     return Number(value).toLocaleString('en-GB');

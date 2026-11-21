@@ -11,7 +11,7 @@ import {
   Package,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL } from '../types';
+import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL, Product } from '../types';
 import { EbayStockSourcePanel } from './EbayStockSourcePanel';
 
 interface InventoryViewProps {
@@ -31,6 +31,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
   const [balances, setBalances] = useState<StockBalance[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,13 +44,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadInventoryData = async () => {
     setLoading(true);
     setBalances([]);
+    setProducts([]);
     setLedger([]);
     try {
-      const [balRes, ledRes, clientRes] = await Promise.all([
+      const [balRes, ledRes, clientRes, productRes] = await Promise.all([
         api.getBalances(selectedStoreId, selectedEnvironment), api.getStockLedger(selectedStoreId, selectedEnvironment),
         api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
+        api.getProducts(selectedStoreId, selectedEnvironment),
       ]);
       setBalances(balRes.balances);
+      setProducts(productRes.products || []);
       setLedger(ledRes.ledger);
       setClients(clientRes.clients || []);
     } catch (err) {
@@ -117,7 +121,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
-      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
