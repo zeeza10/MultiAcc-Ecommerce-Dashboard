@@ -61,8 +61,9 @@ export function normalizeEbayOrderHeader(orderValue: unknown): {
   missingFields: string[];
 } {
   const order = record(orderValue);
-  const totalMinor = parseEbayMoneyMinor(record(order.pricingSummary).total && record(record(order.pricingSummary).total).value);
-  const rawCurrency = record(record(order.pricingSummary).total).currency;
+  const total = record(record(order.pricingSummary).total);
+  const totalMinor = parseEbayMoneyMinor(total.value);
+  const rawCurrency = total.currency;
   const currency = typeof rawCurrency === 'string' && /^[A-Z]{3}$/i.test(rawCurrency.trim())
     ? rawCurrency.trim().toUpperCase() : null;
   const parsedDate = typeof order.creationDate === 'string' ? Date.parse(order.creationDate) : NaN;
