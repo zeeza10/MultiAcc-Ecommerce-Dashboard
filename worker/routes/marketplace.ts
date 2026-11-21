@@ -968,8 +968,8 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
   const { data: accounts, error } = await admin.from('marketplace_accounts')
     .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,last_sync_attempt_at,auto_sync_interval_minutes')
     .eq('is_demo', false).eq('auth_status', 'CONNECTED')
-    .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE'])
-    .in('environment', ['SANDBOX', 'PRODUCTION']);
+    .eq('environment', 'PRODUCTION')
+    .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']);
   if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
   for (const account of accounts || []) {
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
@@ -993,6 +993,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       const { data: account, error: accountError } = await admin.from('marketplace_accounts')
         .select('id,organization_id,environment,is_demo,auth_status,marketplace')
         .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id)
+        .eq('environment', 'PRODUCTION').eq('is_demo', false)
         .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']).maybeSingle();
       if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
         || !isEnvironment(account.environment)) {
