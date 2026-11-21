@@ -322,9 +322,8 @@ export const BuyingReturnsView: React.FC<BuyingReturnsViewProps> = ({
   }).format(minor / 100);
 
   return (
-    <>
-      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>
     <div className="space-y-4">
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"><span>{loadError}</span><button type="button" onClick={() => void loadData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
