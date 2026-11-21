@@ -676,7 +676,7 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
         admin, account, 'ACTIVE_LISTING_TRADING', itemId, batchId,
         { ...listing, source: 'EBAY_TRADING_API', siteId },
         listing,
-        typeof listing.startTime === 'string' ? listing.startTime : null,
+        null,
       );
       fetched++;
     }
