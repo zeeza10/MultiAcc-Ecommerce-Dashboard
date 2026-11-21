@@ -33,8 +33,9 @@ Implemented directly on main in commit `e464f549daebd3fc09bc756aedc4ca52d4b85635
 - `20261121180200_production_ebay_signing_keys.sql`
 - `20261121180300_production_coalesce_expired_sync_jobs.sql`
 - `20261121180400_production_extend_marketplace_sync_checkpoint_resources.sql`
+- `20261121180500_production_index_ebay_provider_tenant_keys.sql`
 
-All five versions are present in the live Production migration history. The main branch tracks each SQL file, including the checkpoint-resource extension.
+All six versions are present in the live Production migration history. The main branch tracks each SQL file, including the checkpoint-resource extension and tenant-key indexes for foreign-key performance.
 
 ## OAuth consent requirements
 
