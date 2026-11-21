@@ -20,9 +20,9 @@ function decodeBase64(value: string): Uint8Array {
 }
 
 export function decodeEbayPrivateKeyPem(pem: string): Uint8Array {
-  const match = pem.match(/^-----BEGIN PRIVATE KEY-----([\\s\\S]+)-----END PRIVATE KEY-----$/);
+  const match = pem.match(/^-----BEGIN PRIVATE KEY-----([\s\S]+)-----END PRIVATE KEY-----$/);
   if (!match) throw new Error('The eBay signing private key is not valid PKCS#8 PEM.');
-  const encoded = match[1].replace(/\\s+/g, '');
+  const encoded = match[1].replace(/\s+/g, '');
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error('The eBay signing private key PEM is malformed.');
   try {
     return decodeBase64(encoded);
