@@ -435,6 +435,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     ? checkpoint.cursor_state as Record<string, unknown> : {};
   let offset = Number.isSafeInteger(Number(savedCursor.offset)) && Number(savedCursor.offset) >= 0 ? Number(savedCursor.offset) : 0;
   let pages = 0, fetched = 0, offersFetched = 0, hasMore = false;
+  const failedSkus = new Set<string>();
   do {
     progress.stage = 'EBAY_INVENTORY_API';
     const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/inventory_item`);
@@ -476,6 +477,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     }
     const offersBySku = new Map(offerResults.map((entry) => [entry.sku, entry.offers]));
     const failedOffers = offerResults.filter((entry) => Boolean(entry.error));
+    for (const entry of failedOffers) failedSkus.add(entry.sku);
     offersFetched += offerResults.reduce((sum, entry) => sum + entry.offers.length, 0); progress.offersFetched = offersFetched;
     const syncedAt = new Date().toISOString();
     const rows = items.filter((item: any) => String(item.sku || '').trim()).map((item: any) => {
@@ -535,7 +537,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     if (!items.length || !hasMore || pages >= 5) break;
   } while (true);
   progress.stage = 'INVENTORY_COMPLETED';
-  return { fetched, offersFetched, pagesPending: hasMore, failedSkus: offerResults.filter((entry) => entry.error).map((entry) => entry.sku) };
+  return { fetched, offersFetched, pagesPending: hasMore, failedSkus: [...failedSkus] };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
