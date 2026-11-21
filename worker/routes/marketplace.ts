@@ -9,6 +9,7 @@ import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-l
 import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
 import { buildEbayPostOrderHeaders, subtractUtcMonthsClamped } from '../ebay-post-order';
 import { ebayAnalyticsMarketplaceId, ebaySellerStandardsProgram } from '../ebay-analytics';
+import { ebayOrderShippingMinor, ebayOrderTaxMinor, normalizeEbayOrderHeader, normalizeEbayOrderLines } from '../ebay-order-normalizer';
 import { getAbandonedProductionSyncRunIds } from '../marketplace-sync-recovery';
 import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
@@ -198,10 +199,6 @@ async function readEbayOrdersApiError(response: Response): Promise<EbayOrdersApi
   return new EbayOrdersApiError(response.status, providerCode, providerMessage);
 }
 
-function moneyMinor(value: unknown): number {
-  const parsed = typeof value === 'string' || typeof value === 'number' ? Number(value) : 0;
-  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
-}
 function orderStatus(orderStatusValue: unknown, paymentStatus: unknown): string {
   const fulfillment = String(orderStatusValue || '').toUpperCase();
   const payment = String(paymentStatus || '').toUpperCase();
@@ -211,6 +208,34 @@ function orderStatus(orderStatusValue: unknown, paymentStatus: unknown): string 
   if (payment === 'PAID' || fulfillment === 'IN_PROGRESS' || fulfillment === 'COMPLETED') return 'Confirmed';
   return 'New';
 }
+async function recordEbayOrderException(
+  admin: any,
+  account: any,
+  exceptionType: string,
+  referenceId: string,
+  details: string,
+  rawPayload: Record<string, unknown>,
+): Promise<boolean> {
+  const { data: existing, error: lookupError } = await admin.from('marketplace_exceptions')
+    .select('id').eq('marketplace_account_id', account.id).eq('source', 'EBAY')
+    .eq('exception_type', exceptionType).eq('reference_id', referenceId)
+    .eq('status', 'PENDING').limit(1).maybeSingle();
+  if (lookupError) throw new Error('An existing eBay order exception could not be checked safely.');
+  if (existing) return false;
+  const { error: insertError } = await admin.from('marketplace_exceptions').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    exception_type: exceptionType,
+    source: 'EBAY',
+    reference_id: referenceId,
+    details,
+    raw_payload_snippet: JSON.stringify(rawPayload).slice(0, 4000),
+    status: 'PENDING',
+  });
+  if (insertError) throw new Error('An incomplete eBay order record could not be placed in the exception queue.');
+  return true;
+}
+
 async function getSellerAccessToken(env: WorkerEnv, account: any): Promise<string> {
   const admin = createServiceClient(env);
   const { data: credential, error } = await admin.from('marketplace_credentials').select('access_token_ciphertext,refresh_token_ciphertext,expires_at,refresh_token_expires_at,scopes,revoked_at').eq('marketplace_account_id', account.id).eq('organization_id', account.organization_id).maybeSingle();
@@ -344,6 +369,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       progress.stage = 'EBAY_ORDERS_API';
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
       endpoint.searchParams.set('limit', '25'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
+      endpoint.searchParams.set('fieldGroups', 'TAX_BREAKDOWN');
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw await readEbayOrdersApiError(response);
       const page = await response.json() as { orders?: any[]; total?: number };
@@ -352,26 +378,68 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       for (const order of orders) {
         const externalId = typeof order.orderId === 'string' ? order.orderId : '';
         if (!externalId) continue;
+        const orderHeader = normalizeEbayOrderHeader(order);
+        if (orderHeader.missingFields.length) {
+          const created = await recordEbayOrderException(
+            admin, account, 'INCOMPLETE_ORDER', externalId,
+            `The eBay order is missing required provider fields: ${orderHeader.missingFields.join(', ')}. The order was not imported with substitute values.`,
+            {
+              orderId: externalId,
+              creationDate: order.creationDate ?? null,
+              pricingSummary: order.pricingSummary ?? null,
+              orderPaymentStatus: order.orderPaymentStatus ?? null,
+              orderFulfillmentStatus: order.orderFulfillmentStatus ?? null,
+            },
+          );
+          if (created) exceptions++;
+          progress.exceptions = exceptions;
+          continue;
+        }
         const shipping = order.fulfillmentStartInstructions?.find((item: any) => item?.shippingStep?.shipTo)?.shippingStep?.shipTo;
         const address = shipping?.contactAddress || {};
-        const items = (Array.isArray(order.lineItems) ? order.lineItems : []).map((line: any) => {
-          const sku = String(line.sku || line.legacyItemId || line.lineItemId || 'UNKNOWN').slice(0, 128);
-          const productId = mappingBySku.get(sku), product = (productId ? productById.get(productId) : null) || productBySku.get(sku) || null;
-          const quantity = Math.max(1, Math.trunc(Number(line.quantity || 1))), unit = moneyMinor(line.lineItemCost?.value);
-          return { product_id: product?.id || null, sku: product?.sku || sku, product_name: product?.name || String(line.title || 'eBay item').slice(0, 250), quantity, unit_price_minor: unit, tax_amount_minor: 0, total_price_minor: unit * quantity, raw_item: { lineItemId: line.lineItemId || null, sku, title: line.title || null, quantity, unitPrice: line.lineItemCost?.value || null } };
-        });
-        const totalMinor = moneyMinor(order.pricingSummary?.total?.value) || items.reduce((sum: number, item: any) => sum + item.total_price_minor, 0);
+        const lineResult = normalizeEbayOrderLines(
+          externalId,
+          order.lineItems,
+          orderHeader.currency as string,
+          (sku) => {
+            const mappedProductId = mappingBySku.get(sku);
+            const product = (mappedProductId ? productById.get(mappedProductId) : null) || productBySku.get(sku) || null;
+            return product?.id || null;
+          },
+        );
+        for (const lineException of lineResult.exceptions) {
+          const created = await recordEbayOrderException(
+            admin, account, 'INCOMPLETE_ORDER_LINE', lineException.referenceId,
+            lineException.details, lineException.rawPayload,
+          );
+          if (created) exceptions++;
+        }
+        const items = lineResult.items;
         const payload = {
           external_order_id: externalId, order_number: `EB-${account.id.slice(0, 6)}-${externalId}`,
           customer_name: String(shipping?.fullName || order.buyer?.username || 'eBay buyer').slice(0, 160), customer_email: null,
           shipping_address: { name: shipping?.fullName || null, addressLine1: address.addressLine1 || null, addressLine2: address.addressLine2 || null, city: address.city || null, stateOrProvince: address.stateOrProvince || null, postalCode: address.postalCode || null, countryCode: address.countryCode || null },
           status: orderStatus(order.orderFulfillmentStatus, order.orderPaymentStatus),
           payment_state: String(order.orderPaymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : 'PENDING',
-          total_minor: totalMinor, tax_minor: moneyMinor(order.pricingSummary?.tax?.value), shipping_charge_minor: moneyMinor(order.pricingSummary?.deliveryCost?.value),
-          currency: order.pricingSummary?.total?.currency || 'GBP', created_at: order.creationDate || new Date().toISOString(),
+          total_minor: orderHeader.totalMinor,
+          tax_minor: ebayOrderTaxMinor(order),
+          shipping_charge_minor: ebayOrderShippingMinor(order),
+          currency: orderHeader.currency,
+          created_at: orderHeader.createdAt,
           marketplace_status: typeof order.orderFulfillmentStatus === 'string' ? order.orderFulfillmentStatus : null,
           marketplace_status_updated_at: typeof order.lastModifiedDate === 'string' && Number.isFinite(Date.parse(order.lastModifiedDate)) ? new Date(order.lastModifiedDate).toISOString() : null,
-          safe_payload: { orderId: externalId, creationDate: order.creationDate || null, lastModifiedDate: order.lastModifiedDate || null, orderPaymentStatus: order.orderPaymentStatus || null, orderFulfillmentStatus: order.orderFulfillmentStatus || null, lineItems: items.map((item: any) => item.raw_item) }, items,
+          safe_payload: {
+            orderId: externalId,
+            creationDate: orderHeader.createdAt,
+            lastModifiedDate: order.lastModifiedDate || null,
+            orderPaymentStatus: order.orderPaymentStatus || null,
+            orderFulfillmentStatus: order.orderFulfillmentStatus || null,
+            lineItems: items.map((item: any) => item.raw_item),
+            incompleteLineItems: lineResult.exceptions.map((exception) => ({
+              referenceId: exception.referenceId, details: exception.details, rawItem: exception.rawPayload,
+            })),
+          },
+          items,
         };
         progress.stage = 'ORDER_IMPORT';
         const { data: result, error: importError } = await admin.rpc('import_marketplace_order', { p_organization_id: account.organization_id, p_marketplace_account_id: account.id, p_order: payload });
@@ -404,7 +472,12 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
     const status = exceptions || hasMore ? 'PARTIAL' : 'SUCCESS';
     const runStatus = status === 'SUCCESS' ? 'COMPLETED' : 'PARTIAL';
     await admin.from('marketplace_sync_runs').update({ completed_at: finished, status: runStatus, orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions, log_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}; more pages pending: ${hasMore}.`, attempt_count: 1, retryable: false, data_environment: dataEnvironment }).eq('id', run.id);
-    await admin.from('marketplace_accounts').update({ last_sync_at: finished, last_sync_status: status, last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.` }).eq('id', account.id);
+    const accountSyncUpdate: Record<string, unknown> = {
+      last_sync_status: status,
+      last_sync_message: `Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU/incomplete-data exceptions ${exceptions}.`,
+    };
+    if (!hasMore) accountSyncUpdate.last_sync_at = finished;
+    await admin.from('marketplace_accounts').update(accountSyncUpdate).eq('id', account.id);
     return { imported, skipped, exceptions, fetched, status, pagesPending: hasMore };
   } catch (error) {
     const failure = getEbaySyncFailure(error, 'EBAY_ORDER_SYNC_FAILED');
@@ -1825,7 +1898,23 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
   // before it could finalize. Never touch business orders or a run protected by
   // a currently valid Production job lease.
   const productionAccountIds = (accounts || []).map((account: any) => account.id);
+  const continuationOffsets = new Map<string, { orders: number; inventory: number }>();
   if (productionAccountIds.length) {
+    const { data: checkpoints, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+      .select('marketplace_account_id,resource_type,cursor_state')
+      .in('marketplace_account_id', productionAccountIds)
+      .in('resource_type', ['ORDERS', 'INVENTORY']);
+    if (checkpointError) throw new Error('Production sync continuation checkpoints could not be loaded.');
+    for (const checkpoint of checkpoints || []) {
+      const cursor = checkpoint.cursor_state && typeof checkpoint.cursor_state === 'object'
+        ? checkpoint.cursor_state as Record<string, unknown> : {};
+      const parsedOffset = Number(cursor.offset);
+      const offset = Number.isSafeInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0;
+      const current = continuationOffsets.get(checkpoint.marketplace_account_id) || { orders: 0, inventory: 0 };
+      if (checkpoint.resource_type === 'ORDERS') current.orders = offset;
+      if (checkpoint.resource_type === 'INVENTORY') current.inventory = offset;
+      continuationOffsets.set(checkpoint.marketplace_account_id, current);
+    }
     const recoveryNow = new Date();
     const recoveryNowIso = recoveryNow.toISOString();
     const recoveryCutoffIso = new Date(recoveryNow.getTime() - 15 * 60_000).toISOString();
@@ -1862,9 +1951,13 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
     const lastAttempt = account.last_sync_attempt_at || account.last_sync_at;
     const lastSyncAttempt = lastAttempt ? new Date(lastAttempt).getTime() : 0;
-    if (lastSyncAttempt && now - lastSyncAttempt < intervalMs) continue;
+    const continuation = continuationOffsets.get(account.id) || { orders: 0, inventory: 0 };
+    const hasContinuation = continuation.orders > 0 || continuation.inventory > 0;
+    if (!hasContinuation && lastSyncAttempt && now - lastSyncAttempt < intervalMs) continue;
     const bucket = Math.floor(now / intervalMs);
-    const idempotencyKey = `scheduled-orders:${account.id}:${bucket}`;
+    const idempotencyKey = hasContinuation
+      ? `scheduled-orders:${account.id}:continuation:${continuation.orders}:${continuation.inventory}`
+      : `scheduled-orders:${account.id}:${bucket}`;
     const { error: enqueueError } = await admin.rpc('enqueue_marketplace_sync_job', {
       p_organization_id: account.organization_id,
       p_marketplace_account_id: account.id,
@@ -1895,11 +1988,16 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       const ordersProgress = createEbaySyncProgress();
       let ordersComplete = false;
       let ordersHasExceptions = false;
+      let ordersPagesPending = false;
+      let ordersSyncFailed = false;
+      let inventoryPagesPending = false;
+      let inventorySyncFailed = false;
       let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
       let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
       let jobRetryable = true;
       try {
         const orders = await syncSellerOrders(account, env, ordersProgress);
+        ordersPagesPending = orders.pagesPending;
         ordersComplete = !orders.pagesPending;
         ordersHasExceptions = orders.exceptions > 0;
         if (!ordersComplete) {
@@ -1910,6 +2008,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
           lastErrorMessage = `Orders were imported, but ${orders.exceptions} line item(s) need SKU mapping review.`;
         }
       } catch (syncError) {
+        ordersSyncFailed = true;
         const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
         lastErrorCode = failure.code;
         lastErrorMessage = `Orders failed at ${ordersProgress.stage}: ${failure.message}`;
@@ -1928,6 +2027,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       let inventoryOk = false;
       try {
         const inventory = await syncSellerInventory(account, env, inventoryProgress);
+        inventoryPagesPending = inventory.pagesPending;
         inventoryOk = !inventory.pagesPending;
         await admin.from('marketplace_integration_events').insert({
           organization_id: account.organization_id, marketplace_account_id: account.id,
@@ -1940,6 +2040,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
           lastErrorMessage = 'Inventory sync has additional pages pending.';
         }
       } catch (syncError) {
+        inventorySyncFailed = true;
         const failure = getEbaySyncFailure(syncError, 'EBAY_INVENTORY_SYNC_FAILED');
         lastErrorCode = failure.code;
         lastErrorMessage = `Inventory failed at ${inventoryProgress.stage}: ${failure.message}`;
@@ -1958,6 +2059,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       const ordersPartial = ordersProgress.fetched > 0 || ordersProgress.imported > 0 || ordersProgress.skipped > 0;
       const inventoryPartial = inventoryProgress.fetched > 0 || inventoryProgress.offersFetched > 0;
       const resourcesComplete = ordersComplete && inventoryOk;
+      const pageContinuation = !ordersSyncFailed && !inventorySyncFailed && (ordersPagesPending || inventoryPagesPending);
       const overallStatus = resourcesComplete && !ordersHasExceptions ? 'SUCCESS' : (ordersComplete || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
@@ -1965,7 +2067,10 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         last_sync_attempt_at: attemptAt,
       }).eq('id', account.id).eq('organization_id', account.organization_id);
 
-      if (resourcesComplete) {
+      if (resourcesComplete || pageContinuation) {
+        // A completed page is a successful bounded job. The next Cron invocation
+        // sees the persisted cursor and queues a new continuation job; page count
+        // therefore does not consume transient-failure retry attempts.
         await admin.from('marketplace_sync_jobs').update({
           status: 'SUCCEEDED', completed_at: new Date().toISOString(),
           locked_until: null, last_error_code: null, last_error_message: null,
