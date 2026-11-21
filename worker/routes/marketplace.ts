@@ -56,7 +56,7 @@ async function handleIntegrationConfig(path: string, request: Request, auth: Aut
     if (error) throw new Error('eBay integration configuration could not be loaded.');
     const byEnvironment = new Map((data || []).map((row: any) => [row.environment, row]));
     return json({
-      environments: ['SANDBOX', 'PRODUCTION'].map((environment) => {
+      environments: ['PRODUCTION'].map((environment) => {
         const row: any = byEnvironment.get(environment);
         return { environment, configured: Boolean(row), credentialsVerified: Boolean(row?.credentials_verified_at), credentialsVerifiedAt: row?.credentials_verified_at || null, clientIdMasked: row?.client_id_masked || '', credentialVersion: row?.credential_version || 0, updatedAt: row?.updated_at || null };
       }),
@@ -750,10 +750,10 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const marketplace = body?.marketplace;
     const environment = body?.environment;
-    if (!name || name.length > 120 || !['EBAY_UK', 'EBAY_US', 'EBAY_DE'].includes(String(marketplace)) || !isEnvironment(environment)) {
+    if (!name || name.length > 120 || !['EBAY_UK', 'EBAY_US', 'EBAY_DE'].includes(String(marketplace)) || environment !== 'PRODUCTION') {
       return json({ error: 'Provide an account name, supported eBay marketplace and environment.' }, 400);
     }
-    if (environment === 'PRODUCTION' && env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') {
+    if (env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') {
       return json({ error: 'Production eBay authorization is locked until the eBay production keyset is activated and deletion-notification compliance is verified.' }, 403);
     }
     const { data, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').insert({
@@ -1034,8 +1034,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
     const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts').select('id,organization_id,environment,is_demo,auth_status,marketplace').eq('id', syncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
-    if (account.is_demo || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected eBay seller account can be synchronized.' }, 409);
-    if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
+    if (account.is_demo || account.environment !== 'PRODUCTION' || account.auth_status !== 'CONNECTED') return json({ error: 'Only a real, connected Production eBay seller account can be synchronized.' }, 409);
     const ordersProgress = createEbaySyncProgress();
     let ordersResult: Record<string, unknown>;
     try {
@@ -1120,8 +1119,8 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .select('id,name,environment,is_demo,marketplace').eq('id', connectMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
     if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.is_demo) return json({ error: 'Demo accounts cannot be connected. Create a real seller account entry first.' }, 400);
-    if (!isEnvironment(account.environment)) return json({ error: 'The account environment is invalid.' }, 400);
-    if (account.environment === 'PRODUCTION' && env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') return json({ error: 'Production eBay authorization is disabled until eBay activates the production keyset and compliance is complete.' }, 403);
+    if (account.environment !== 'PRODUCTION') return json({ error: 'Only Production eBay seller accounts can be connected.' }, 409);
+    if (env.EBAY_PRODUCTION_OAUTH_ENABLED !== 'true') return json({ error: 'Production eBay authorization is disabled until eBay activates the production keyset and compliance is complete.' }, 403);
     const credentials = await getPlatformCredentials(env, account.environment);
     if (!credentials) return json({ error: `eBay ${account.environment} application credentials have not been configured.` }, 409);
     const state = randomState();
@@ -1218,7 +1217,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
     .select('id,organization_id,environment,is_demo,auth_status,last_sync_at,last_sync_attempt_at,auto_sync_interval_minutes')
     .eq('is_demo', false).eq('auth_status', 'CONNECTED')
     .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE'])
-    .in('environment', ['SANDBOX', 'PRODUCTION']);
+    .eq('environment', 'PRODUCTION');
   if (error) throw new Error('Scheduled marketplace accounts could not be loaded.');
   for (const account of accounts || []) {
     const intervalMs = Math.max(5, Math.min(1440, Number(account.auto_sync_interval_minutes || 15))) * 60_000;
@@ -1244,7 +1243,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id)
         .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']).maybeSingle();
       if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
-        || !isEnvironment(account.environment)) {
+        || account.environment !== 'PRODUCTION') {
         throw new Error('The scheduled seller account is not eligible for live synchronization.');
       }
       const attemptAt = new Date().toISOString();
