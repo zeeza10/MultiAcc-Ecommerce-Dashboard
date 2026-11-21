@@ -14,15 +14,22 @@ describe('eBay Finance RFC9421 request signatures', () => {
     assert.equal(result.signatureBase, [
       '"x-ebay-signature-key": public-key-jwe',
       '"@method": GET',
-      '"@path": /sell/finances/v1/transaction?limit=100&offset=0',
+      '"@path": /sell/finances/v1/transaction',
       '"@authority": apiz.ebay.com',
       '"@signature-params": ("x-ebay-signature-key" "@method" "@path" "@authority");created=1763731200',
     ].join('\n'));
   });
 
-  it('preserves the exact path and query in the signature base', () => {
-    const result = buildEbaySignatureComponents('GET', 'https://apiz.ebay.com/sell/finances/v1/payout?limit=25', 'jwe', 1);
-    assert.ok(result.signatureBase.includes('"@path": /sell/finances/v1/payout?limit=25'));
+  it('excludes query parameters from the RFC 9421 @path component', () => {
+    const result = buildEbaySignatureComponents('GET', 'https://apiz.ebay.com/sell/finances/v1/payout?limit=25&offset=0', 'jwe', 1);
+    assert.ok(result.signatureBase.includes('"@path": /sell/finances/v1/payout'));
+    assert.ok(!result.signatureBase.includes('"@path": /sell/finances/v1/payout?'));
+    assert.ok(result.signatureInput.includes('"@path"'));
+  });
+
+  it('normalizes an empty URL path to a slash', () => {
+    const result = buildEbaySignatureComponents('GET', 'https://apiz.ebay.com', 'jwe', 1);
+    assert.ok(result.signatureBase.includes('"@path": /'));
   });
 });
 
