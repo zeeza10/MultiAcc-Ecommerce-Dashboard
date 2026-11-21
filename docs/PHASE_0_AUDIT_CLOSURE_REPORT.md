@@ -132,7 +132,7 @@ The module mapping above is a code-level contract inventory. This PR expands per
 | P0 | Obtain a disposable second organization/test environment and run cross-tenant read/write isolation tests for each active role | Automated test results proving tenant A cannot read/write tenant B |
 | P0 | Reconcile the three live-only and four GitHub-only migration versions | Reviewed migration parity report; no destructive history rewrite |
 | P0 | Preserve the completed SECURITY DEFINER review as a regression baseline | Re-run grant/search_path/tenant-scope checks whenever SECURITY DEFINER functions change |
-| P0 | Fresh Cloudflare Preview build for the latest PR #159 head | Successful build and deployment for the latest commit |
+| P1 | Preserve the Cloudflare lint/test/build/Preview gate for future code changes | Build command runs typecheck, the 82-test suite, Vite build, and Preview deployment |
 | P0 | Obtain approval, then apply the reviewed pending Production migrations | Migration history and post-migration schema checks |
 | P1 | Enable Supabase Leaked Password Protection | Supabase Auth security advisor warning cleared |
 | P1 | Add a real customer-master API/UI backed by `customers` and `customer_addresses` if customer CRUD is in scope | Customer CRUD contract tests and role coverage |
