@@ -197,10 +197,10 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>
-            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th>
+            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Store Allocation' : 'Physical Available'}</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
+            {loading ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
               rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
               rows.map((row, index) => {
                 const key = rowKey(row);
@@ -212,6 +212,14 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.accountName}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{row.price ? money(row.price, row.currency) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums font-semibold text-slate-800">{row.quantity ?? '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{mapping ? (() => {
+                    const internal = localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
+                    if (!internal) return '0';
+                    const value = mode === 'INVENTORY' && selectedStoreId !== 'ALL'
+                      ? internal.available ?? Math.max(0, Number(internal.onHand || 0) - Number(internal.reserved || 0))
+                      : internal.stockAvailable ?? internal.available ?? 0;
+                    return Number(value).toLocaleString('en-GB');
+                  })() : 'Map SKU first'}</td>
                   <td className="whitespace-nowrap px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{row.status.replaceAll('_', ' ')}</span></td>
                   <td className="min-w-[230px] px-4 py-3">
                     {mapping ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{mapping.internalSku || 'Mapped'} · {mapping.internalName || 'Product'}</span> :
