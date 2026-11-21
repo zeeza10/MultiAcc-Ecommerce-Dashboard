@@ -114,12 +114,24 @@ export function normalizeEbayAnalyticsResource(resourceType: string, payloadValu
       source: 'EBAY_ANALYTICS_API',
       marketplaceId,
       dimensionKeys: Array.isArray(payload.dimensionKeys) ? payload.dimensionKeys.filter((v: unknown) => typeof v === 'string') : [],
-      metrics: Array.isArray(payload.metrics) ? payload.metrics.filter((v: unknown) => typeof v === 'string') : [],
+      metrics: Array.isArray(payload.metrics) ? payload.metrics.map((value: unknown) => {
+        if (typeof value === 'string') return value;
+        const metric = record(value);
+        return { metricType: textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name), value: metric.value ?? metric.metricValue ?? null };
+      }) : [],
       records: Array.isArray(payload.records) ? payload.records.map((entry: unknown) => {
         const item = record(entry);
         return {
-          dimensionValues: Array.isArray(item.dimensionValues) ? item.dimensionValues : [],
-          metricValues: Array.isArray(item.metricValues) ? item.metricValues : [],
+          dimensionValues: Array.isArray(item.dimensionValues) ? item.dimensionValues.map((value: unknown) => {
+            if (typeof value === 'string') return value;
+            const dimension = record(value);
+            return { dimension: textValue(dimension.dimension) || textValue(dimension.name), value: dimension.value ?? null };
+          }) : [],
+          metricValues: Array.isArray(item.metricValues) ? item.metricValues.map((value: unknown) => {
+            if (typeof value === 'number' || typeof value === 'string') return value;
+            const metric = record(value);
+            return { metricType: textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name), value: metric.value ?? metric.metricValue ?? null };
+          }) : [],
         };
       }) : [],
     };
@@ -134,7 +146,11 @@ export function normalizeEbayAnalyticsResource(resourceType: string, payloadValu
     rating: textValue(payload.rating),
     metric: record(payload.metric),
     benchmark: record(payload.benchmark),
-    standardsProfile: Array.isArray(payload.standardsProfile) ? payload.standardsProfile : [],
+    sellerLevel: textValue(payload.sellerLevel),
+    standardsProfile: Array.isArray(payload.standardsProfile) ? payload.standardsProfile : Array.isArray(payload.sellerStandardsProfiles) ? payload.sellerStandardsProfiles.map((entry: unknown) => {
+      const item = record(entry);
+      return { metric: textValue(item.metric), rating: textValue(item.rating), evaluationDate: textValue(item.evaluationDate) };
+    }) : [],
   };
 }
 
@@ -143,6 +159,7 @@ const FINANCE_SAFE_KEYS = new Set([
   'transactionCount','totalAmount','totalFeeAmount','amount','currency','value','count',
   'status','payoutStatus','totalPayoutAmount','totalPayoutCount','totalTransactionCount',
   'totalFees','feeAmount','totalRefundAmount','totalSalesAmount','totalCreditsAmount',
+  'payoutSummary','transactionSummary','sellerFundsSummary',
 ]);
 
 function safeFinanceValue(value: unknown): unknown {
