@@ -1177,8 +1177,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             ) : (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {(sellerAccountSnapshots[acc.id] || []).map((resource: any) => {
-                                  const data = resource.snapshot?.data || {};
-                                  const collection = data.paymentPolicies || data.fulfillmentPolicies || data.returnPolicies || [];
+                                  const data = resource.snapshot || {};
+                                  const collection = Array.isArray(data.policies) ? data.policies : [];
                                   const policyNames = Array.isArray(collection) ? collection.map((policy: any) => policy.name).filter((name: any) => typeof name === 'string') : [];
                                   const label = String(resource.type || '').replaceAll('_', ' ').toLowerCase();
                                   const summary = Array.isArray(collection)
