@@ -343,7 +343,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
     do {
       progress.stage = 'EBAY_ORDERS_API';
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
-      endpoint.searchParams.set('limit', '200'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
+      endpoint.searchParams.set('limit', '25'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw await readEbayOrdersApiError(response);
       const page = await response.json() as { orders?: any[]; total?: number };
@@ -397,7 +397,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         consecutive_failures: 0, last_error_code: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'marketplace_account_id,resource_type' });
       if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay order sync checkpoint could not be saved.');
-      if (!orders.length || !hasMore || pages >= 10) break;
+      if (!orders.length || !hasMore || pages >= 1) break;
     } while (true);
     progress.stage = 'ORDERS_FINALIZE';
     const finished = new Date().toISOString();
@@ -450,7 +450,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
   do {
     progress.stage = 'EBAY_INVENTORY_API';
     const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/inventory/v1/inventory_item`);
-    endpoint.searchParams.set('limit', '25');
+    endpoint.searchParams.set('limit', '10');
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
     if (!response.ok) throw await readEbayOrdersApiError(response);
@@ -529,7 +529,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
     }
     offset += items.length;
     const total = Number(page.total ?? offset);
-    hasMore = items.length === 25 || offset < total;
+    hasMore = items.length === 10 || offset < total;
     progress.stage = 'INVENTORY_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
       organization_id: account.organization_id,
@@ -545,7 +545,7 @@ async function syncSellerInventory(account: any, env: WorkerEnv, progress: EbayS
       updated_at: new Date().toISOString(),
     }, { onConflict: 'marketplace_account_id,resource_type' });
     if (checkpointSaveError) throw new Error(checkpointSaveError.message || 'The eBay inventory checkpoint could not be saved.');
-    if (!items.length || !hasMore || pages >= 5) break;
+    if (!items.length || !hasMore || pages >= 1) break;
   } while (true);
   progress.stage = 'INVENTORY_COMPLETED';
   return { fetched, offersFetched, pagesPending: hasMore, failedSkus: [...failedSkus] };
