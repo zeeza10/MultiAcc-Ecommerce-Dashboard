@@ -8,6 +8,7 @@ import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
 import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
 import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
 import { buildEbayPostOrderHeaders, subtractUtcMonthsClamped } from '../ebay-post-order';
+import { ebayAnalyticsMarketplaceId, ebaySellerStandardsProgram } from '../ebay-analytics';
 import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
@@ -856,8 +857,8 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
   const accessToken = await getSellerAccessToken(env, account);
   const admin = createServiceClient(env);
   const batchId = crypto.randomUUID();
-  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
-    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const marketplaceId = ebayAnalyticsMarketplaceId(account.marketplace);
+  const standardsProgram = ebaySellerStandardsProgram(account.marketplace);
   const end = new Date();
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - 30);
@@ -868,7 +869,7 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
       externalId: 'LAST_30_DAYS',
       path: `/sell/analytics/v1/traffic_report?dimension=DAY&filter=${encodeURIComponent(`marketplace_ids:{${marketplaceId}},date_range:${analyticsDateRange}`)}&metric=LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE`,
     },
-    { type: 'ANALYTICS_SELLER_STANDARDS', externalId: 'PROGRAM_CURRENT', path: `/sell/analytics/v1/seller_standards_profile/PROGRAM_${marketplaceId.replace('EBAY_', '')}/CURRENT` },
+    { type: 'ANALYTICS_SELLER_STANDARDS', externalId: 'PROGRAM_CURRENT', path: `/sell/analytics/v1/seller_standards_profile/${standardsProgram}/CURRENT` },
     { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_AS_DESCRIBED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_AS_DESCRIBED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
     { type: 'ANALYTICS_CUSTOMER_SERVICE', externalId: 'ITEM_NOT_RECEIVED_CURRENT', path: `/sell/analytics/v1/customer_service_metric/ITEM_NOT_RECEIVED/CURRENT?evaluation_marketplace_id=${marketplaceId}` },
   ];
