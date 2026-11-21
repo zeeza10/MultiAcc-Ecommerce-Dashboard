@@ -106,24 +106,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
       {/* Main Navigation Bar */}
-      <div className="mx-auto flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-5 xl:flex-nowrap xl:gap-x-3 xl:px-4">
+      <div className="mx-auto flex min-h-14 w-full max-w-none flex-nowrap items-center justify-between gap-x-1 px-2 py-1.5 sm:gap-x-3 sm:px-5 sm:py-2 xl:gap-x-3 xl:px-4">
         {/* Brand / Logo */}
-        <div className="flex min-w-0 shrink-0 items-center space-x-2 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+        <div className="flex min-w-0 shrink-0 items-center space-x-1 sm:space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onOpenNavigation(); }} aria-label={isMobileNavigationOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={isMobileNavigationOpen} aria-controls="oria-mobile-navigation" className="lg:hidden inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:mr-1 sm:h-9 sm:w-9">{isMobileNavigationOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-base font-bold text-white shadow-sm sm:h-9 sm:w-9 sm:text-lg">
             O
           </div>
           <div>
             <div className="flex min-w-0 items-center space-x-2">
-              <span className="whitespace-nowrap font-bold text-gray-900 text-lg tracking-tight">Oria Future</span>
+              <span className="whitespace-nowrap text-xs font-bold tracking-tight text-gray-900 sm:text-lg">Oria</span>
             </div>
           </div>
         </div>
 
         {/* Global Search Bar (FR-SRCH-01) & Global Store Filter */}
-        <div className="relative z-20 order-3 flex w-full min-w-0 flex-wrap items-center justify-end gap-2 xl:order-none xl:w-[420px] xl:flex-none xl:flex-nowrap">
-          <div className="relative z-20 min-w-0 w-full flex-1 max-w-md xl:w-[150px] xl:flex-none xl:max-w-[150px]">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="relative z-20 flex min-w-0 shrink items-center justify-end gap-1 sm:gap-2 xl:w-[420px] xl:flex-none xl:flex-nowrap">
+          <div className="relative z-20 min-w-0 w-auto sm:w-full sm:max-w-md sm:flex-1 xl:w-[150px] xl:flex-none xl:max-w-[150px]">
+            <button type="button" onClick={onSearchOpen} aria-label="Open global search" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 sm:hidden"><Search className="h-4 w-4" /></button>
+            <Search className="absolute left-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-gray-400 sm:block" />
             <input
               type="text"
               value={globalSearch}
@@ -131,12 +132,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               onFocus={onSearchOpen}
               onClick={onSearchOpen}
               placeholder="Global Search (Orders, SKUs, Tracking #, Buyers)..."
-              className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="hidden h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] text-slate-700 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:block"
             />
             {searchDropdown}
           </div>
 
-          <div className="w-48 shrink-0 xl:w-[190px]">
+          <div className="w-[92px] min-w-0 shrink-0 sm:w-48 xl:w-[190px]">
             <select
               value={selectedStoreId}
               onChange={(e) => {
@@ -153,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               aria-label="All Accounts or an individual seller account"
               title="View all seller accounts together or select one seller account"
-              className="w-full bg-slate-50 border border-slate-300 text-slate-700 font-medium text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              className="h-8 w-full truncate rounded-lg border border-slate-300 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer sm:h-auto sm:px-2.5 sm:py-2 sm:text-xs"
             >
               <option value="ALL">All Accounts</option>
               {marketplaceAccounts.filter((account) => !account.isDemo && account.environment === 'PRODUCTION').map((account) => (
@@ -166,14 +167,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
         {/* Action Controls & Role Switcher */}
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2 xl:flex-nowrap xl:gap-2">
+        <div className="flex min-w-0 shrink-0 flex-nowrap items-center justify-end gap-0.5 sm:gap-2 xl:gap-2">
           <button
             type="button"
             onClick={onToggleTheme}
             aria-label={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
             aria-pressed={isDarkTheme}
             title={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-slate-600 transition hover:bg-slate-100 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-slate-600 transition hover:bg-slate-100 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:h-9 sm:w-9"
           >
             {isDarkTheme ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
           </button>
@@ -209,10 +210,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Notifications Center Bell */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               onClick={() => setShowNotifMenu(!showNotifMenu)}
-              className="relative p-2 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none"
+              className="relative inline-flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none sm:h-9 sm:w-9"
               title="Live eBay Order Notifications"
             >
               <Bell className="w-5 h-5" />
@@ -276,14 +277,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          <div className="flex max-w-full shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 sm:gap-2 sm:px-3">
-            <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-xs">{currentUser.name.charAt(0).toUpperCase()}</div>
+          <div className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-1 py-1 sm:gap-2 sm:px-3">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white sm:h-7 sm:w-7">{currentUser.name.charAt(0).toUpperCase()}</div>
             <div className="hidden sm:block text-left">
               <div className="text-xs font-semibold text-gray-900">{currentUser.name}</div>
               <div className="text-[10px] text-gray-500">{currentUser.email}</div>
             </div>
             <span className="hidden sm:inline-flex">{getRoleBadge(currentUser.role)}</span>
-            <button onClick={onSignOut} className="ml-0.5 rounded-md px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs font-semibold text-slate-600 hover:bg-slate-200">Sign out</button>
+            <button onClick={onSignOut} className="ml-0.5 whitespace-nowrap rounded-md px-1 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-200 sm:px-2 sm:text-xs">Exit</button>
           </div>
         </div>
       </div>
