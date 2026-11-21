@@ -1003,16 +1003,21 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       if (attemptMarkError) throw new Error('The seller sync attempt timestamp could not be recorded.');
 
       const ordersProgress = createEbaySyncProgress();
-      let ordersOk = false;
+      let ordersComplete = false;
+      let ordersHasExceptions = false;
       let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
       let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
       let jobRetryable = true;
       try {
         const orders = await syncSellerOrders(account, env, ordersProgress);
-        ordersOk = orders.status === 'SUCCESS';
-        if (!ordersOk) {
+        ordersComplete = !orders.pagesPending;
+        ordersHasExceptions = orders.exceptions > 0;
+        if (!ordersComplete) {
           lastErrorCode = 'EBAY_ORDER_SYNC_PARTIAL';
           lastErrorMessage = `Orders sync is partial: fetched ${orders.fetched}, imported ${orders.imported}, pages pending: ${orders.pagesPending}.`;
+        } else if (ordersHasExceptions) {
+          lastErrorCode = 'EBAY_ORDER_SKU_EXCEPTIONS';
+          lastErrorMessage = `Orders were imported, but ${orders.exceptions} line item(s) need SKU mapping review.`;
         }
       } catch (syncError) {
         const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
@@ -1062,14 +1067,15 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
 
       const ordersPartial = ordersProgress.fetched > 0 || ordersProgress.imported > 0 || ordersProgress.skipped > 0;
       const inventoryPartial = inventoryProgress.fetched > 0 || inventoryProgress.offersFetched > 0;
-      const overallStatus = ordersOk && inventoryOk ? 'SUCCESS' : (ordersOk || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
+      const resourcesComplete = ordersComplete && inventoryOk;
+      const overallStatus = resourcesComplete && !ordersHasExceptions ? 'SUCCESS' : (ordersComplete || inventoryOk || ordersPartial || inventoryPartial ? 'PARTIAL' : 'FAILED');
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
-        last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
+        last_sync_message: `Orders: ${ordersComplete ? 'COMPLETE' : 'INCOMPLETE'}${ordersHasExceptions ? ` (${ordersProgress.exceptions} SKU exception(s))` : ''}; Inventory: ${inventoryOk ? 'COMPLETE' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
         last_sync_attempt_at: attemptAt,
       }).eq('id', account.id).eq('organization_id', account.organization_id);
 
-      if (overallStatus === 'SUCCESS') {
+      if (resourcesComplete) {
         await admin.from('marketplace_sync_jobs').update({
           status: 'SUCCEEDED', completed_at: new Date().toISOString(),
           locked_until: null, last_error_code: null, last_error_message: null,
