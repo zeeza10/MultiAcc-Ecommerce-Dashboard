@@ -12,6 +12,7 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('GET', '/products'), 'products.view');
     assert.equal(permissionByRoute('POST', '/products'), 'products.create');
     assert.equal(permissionByRoute('GET', '/orders'), 'orders.view');
+    assert.equal(permissionByRoute('GET', '/orders/count'), 'orders.view');
     assert.equal(permissionByRoute('POST', '/orders'), 'orders.create');
     assert.equal(permissionByRoute('PUT', '/orders/order-id'), 'orders.edit');
     assert.equal(permissionByRoute('PATCH', '/orders/order-id'), undefined);
@@ -25,6 +26,9 @@ describe('Worker route permission policy', () => {
   it('requires separate permissions for finance, marketplace, audit and fulfilment data', () => {
     assert.equal(permissionByRoute('GET', '/finance/invoices'), 'finance.view');
     assert.equal(permissionByRoute('GET', '/ebay/accounts'), 'marketplace.view');
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/listings'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/listings'), undefined);
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/unlisted-resource'), undefined);
     assert.equal(permissionByRoute('GET', '/ebay/integration/events'), 'marketplace.view');
     assert.equal(permissionByRoute('POST', '/ebay/exceptions/exception-id/resolve'), 'marketplace.manage');
     assert.equal(permissionByRoute('GET', '/audit-logs'), 'audit.view');
