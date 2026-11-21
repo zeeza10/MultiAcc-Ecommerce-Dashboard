@@ -2,6 +2,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && /^\/(auth\/me|me)\/?$/.test(path)) return null;
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
+  if (method === 'GET' && /^\\/ebay\\/accounts\\/[^/]+\\/listings$/.test(path)) return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/integration/events') return 'marketplace.view';
   if (method === 'POST' && path === '/ebay/accounts') return 'marketplace.manage';
   if (method === 'DELETE' && /^\/ebay\/accounts\/[^/]+$/.test(path)) return null;
@@ -30,6 +31,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'POST' && path === '/stock/adjustments') return 'inventory.adjust';
   if (method === 'POST' && /^\/stock\/adjustments\/[^/]+\/decision$/.test(path)) return 'inventory.adjust';
   if (method === 'GET' && path === '/orders') return 'orders.view';
+  if (method === 'GET' && path === '/orders/count') return 'orders.view';
   if (method === 'GET' && /^\/orders\/[^/]+$/.test(path)) return 'orders.view';
   if (method === 'POST' && path === '/orders') return 'orders.create';
   if (method === 'PUT' && /^\/orders\/[^/]+$/.test(path)) return 'orders.edit';
