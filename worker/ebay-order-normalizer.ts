@@ -27,6 +27,27 @@ function record(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
+function safeAmount(value: unknown): Record<string, unknown> | null {
+  const amount = record(value);
+  if (amount.value === undefined && amount.currency === undefined) return null;
+  return {
+    ...(typeof amount.value === 'number' || typeof amount.value === 'string' ? { value: amount.value } : {}),
+    ...(typeof amount.currency === 'string' ? { currency: amount.currency } : {}),
+  };
+}
+
+function safeTaxRows(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry: unknown) => {
+    const tax = record(entry);
+    return {
+      ...(typeof tax.taxType === 'string' ? { taxType: tax.taxType } : {}),
+      ...(typeof tax.collectionMethod === 'string' ? { collectionMethod: tax.collectionMethod } : {}),
+      amount: safeAmount(tax.amount),
+    };
+  });
+}
+
 function safeLinePayload(lineValue: unknown): Record<string, unknown> {
   const line = record(lineValue);
   return {
@@ -35,11 +56,11 @@ function safeLinePayload(lineValue: unknown): Record<string, unknown> {
     sku: typeof line.sku === 'string' ? line.sku : null,
     title: typeof line.title === 'string' ? line.title : null,
     quantity: line.quantity ?? null,
-    lineItemCost: line.lineItemCost ?? null,
-    discountedLineItemCost: line.discountedLineItemCost ?? null,
-    total: line.total ?? null,
-    taxes: Array.isArray(line.taxes) ? line.taxes : [],
-    ebayCollectAndRemitTaxes: Array.isArray(line.ebayCollectAndRemitTaxes) ? line.ebayCollectAndRemitTaxes : [],
+    lineItemCost: safeAmount(line.lineItemCost),
+    discountedLineItemCost: safeAmount(line.discountedLineItemCost),
+    total: safeAmount(line.total),
+    taxes: safeTaxRows(line.taxes),
+    ebayCollectAndRemitTaxes: safeTaxRows(line.ebayCollectAndRemitTaxes),
   };
 }
 
