@@ -66,9 +66,10 @@ function safeLinePayload(lineValue: unknown): Record<string, unknown> {
 
 function lineTaxMinor(lineValue: unknown): number {
   const line = record(lineValue);
-  const taxes = Array.isArray(line.taxes) && line.taxes.length
-    ? line.taxes
-    : Array.isArray(line.ebayCollectAndRemitTaxes) ? line.ebayCollectAndRemitTaxes : [];
+  const taxes = [
+    ...(Array.isArray(line.taxes) ? line.taxes : []),
+    ...(Array.isArray(line.ebayCollectAndRemitTaxes) ? line.ebayCollectAndRemitTaxes : []),
+  ];
   return taxes.reduce((sum: number, taxValue: unknown) => {
     const tax = record(taxValue);
     return sum + (parseEbayMoneyMinor(record(tax.amount).value) ?? 0);
