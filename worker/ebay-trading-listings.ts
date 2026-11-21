@@ -66,6 +66,7 @@ export function parseTradingActiveListings(xml: string): {
       endTime: tag(item, 'EndTime'),
       viewItemUrl: tag(item, 'ViewItemURL'),
       galleryUrl: nested(item, 'PictureDetails', 'GalleryURL'),
+      rawXml: match[0],
     };
   }).filter(row => typeof row.itemId === 'string' && row.itemId.length > 0);
   return {
