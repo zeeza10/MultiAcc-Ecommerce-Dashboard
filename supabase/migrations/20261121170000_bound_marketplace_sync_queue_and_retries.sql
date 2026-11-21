@@ -184,6 +184,13 @@ BEGIN
       AND j.attempt_count < j.max_attempts
       AND j.last_error_code IS DISTINCT FROM 'EBAY_API_30830'
       AND (j.locked_until IS NULL OR j.locked_until < now())
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.marketplace_sync_jobs AS active
+        WHERE active.marketplace_account_id = j.marketplace_account_id
+          AND active.status = 'RUNNING'
+          AND active.locked_until >= now()
+      )
   ),
   candidates AS (
     SELECT j.id
