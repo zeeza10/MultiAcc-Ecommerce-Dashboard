@@ -3,6 +3,7 @@ import type { AuthContext, WorkerEnv } from '../types';
 import { fetchEbaySellerIdentity } from '../ebay-identity';
 import { json } from '../http';
 import { normalizeEbayOrderStartDate } from '../ebay-order-date';
+import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -402,7 +403,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
       completed_at: new Date().toISOString(), status: partial ? 'PARTIAL' : 'FAILED',
       orders_fetched: fetched, orders_imported: imported, orders_skipped_duplicate: skipped, exceptions_raised: exceptions,
       last_error_code: failure.code, last_error_message: `${progress.stage}: ${failure.message}`,
-      retryable: true, attempt_count: 1,
+      retryable: isRetryableEbaySyncFailure(failure), attempt_count: 1,
       log_message: `Orders sync stopped at ${progress.stage}. Fetched ${fetched}; imported ${imported}; duplicates ${skipped}; SKU exceptions ${exceptions}.`,
     }).eq('id', run.id);
     await admin.from('marketplace_accounts').update({
@@ -975,15 +976,11 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
     if (lastSync && now - lastSync < intervalMs) continue;
     const bucket = Math.floor(now / intervalMs);
     const idempotencyKey = `scheduled-orders:${account.id}:${bucket}`;
-    const { error: enqueueError } = await admin.from('marketplace_sync_jobs').upsert({
-      organization_id: account.organization_id,
-      marketplace_account_id: account.id,
-      idempotency_key: idempotencyKey,
-      trigger_reason: 'SCHEDULED',
-      status: 'QUEUED',
-      scheduled_at: new Date(now).toISOString(),
-      updated_at: new Date(now).toISOString(),
-    }, { onConflict: 'marketplace_account_id,idempotency_key', ignoreDuplicates: true });
+    const { error: enqueueError } = await admin.rpc('enqueue_marketplace_sync_job', {
+      p_organization_id: account.organization_id,
+      p_marketplace_account_id: account.id,
+      p_idempotency_key: idempotencyKey,
+    });
     if (enqueueError) throw new Error('A scheduled marketplace sync could not be queued.');
   }
 
@@ -1002,6 +999,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       let ordersOk = false;
       let lastErrorCode = 'SCHEDULED_SYNC_FAILED';
       let lastErrorMessage = 'Scheduled eBay synchronization failed. Retry is queued when eligible.';
+      let jobRetryable = true;
       try {
         const orders = await syncSellerOrders(account, env, ordersProgress);
         ordersOk = orders.status === 'SUCCESS';
@@ -1013,6 +1011,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         const failure = getEbaySyncFailure(syncError, 'EBAY_ORDER_SYNC_FAILED');
         lastErrorCode = failure.code;
         lastErrorMessage = `Orders failed at ${ordersProgress.stage}: ${failure.message}`;
+        jobRetryable = isRetryableEbaySyncFailure(failure);
         if (!ordersProgress.runCreated) {
           await admin.from('marketplace_integration_events').insert({
             organization_id: account.organization_id, marketplace_account_id: account.id,
@@ -1042,6 +1041,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         const failure = getEbaySyncFailure(syncError, 'EBAY_INVENTORY_SYNC_FAILED');
         lastErrorCode = failure.code;
         lastErrorMessage = `Inventory failed at ${inventoryProgress.stage}: ${failure.message}`;
+        jobRetryable = jobRetryable && isRetryableEbaySyncFailure(failure);
         await admin.from('marketplace_integration_events').insert({
           organization_id: account.organization_id, marketplace_account_id: account.id,
           event_type: 'INVENTORY_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
@@ -1059,7 +1059,8 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       await admin.from('marketplace_accounts').update({
         last_sync_status: overallStatus,
         last_sync_message: `Orders: ${ordersOk ? 'SUCCESS' : 'FAILED'}; Inventory: ${inventoryOk ? 'SUCCESS' : inventoryProgress.fetched || inventoryProgress.offersFetched ? 'PARTIAL' : 'FAILED'}.`,
-        ...(ordersOk || inventoryOk ? { last_sync_at: new Date().toISOString() } : {}),
+        // last_sync_at is the last attempt time; this prevents repeated scheduled enqueue storms on persistent failures.
+        last_sync_at: new Date().toISOString(),
       }).eq('id', account.id).eq('organization_id', account.organization_id);
 
       if (overallStatus === 'SUCCESS') {
@@ -1070,7 +1071,8 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         }).eq('id', job.id);
       } else {
         await admin.from('marketplace_sync_jobs').update({
-          status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+          status: !jobRetryable || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+          completed_at: !jobRetryable || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? new Date().toISOString() : null,
           scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
           locked_until: null, last_error_code: lastErrorCode, last_error_message: lastErrorMessage,
           updated_at: new Date().toISOString(),
@@ -1087,8 +1089,8 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         metadata: { stage: 'SCHEDULED_JOB_FINALIZE', httpStatus: failure.httpStatus, providerCode: failure.providerCode, attempt: job.attempt_count, environment: job.data_environment || null },
       });
       await admin.from('marketplace_sync_jobs').update({
-        status: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
-        completed_at: Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? failedAt : null,
+        status: !isRetryableEbaySyncFailure(failure) || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED',
+        completed_at: !isRetryableEbaySyncFailure(failure) || Number(job.attempt_count || 0) >= Number(job.max_attempts || 5) ? failedAt : null,
         scheduled_at: new Date(Date.now() + Math.min(60, 2 ** Number(job.attempt_count || 1)) * 60_000).toISOString(),
         locked_until: null, last_error_code: failure.code,
         last_error_message: `${failure.httpStatus ? `HTTP ${failure.httpStatus}: ` : ''}${failure.message}`,
