@@ -264,7 +264,7 @@ export class SupabaseOrderRepository implements OrderRepository {
 
     // PR #151's provider metadata migration may not yet be applied in every
     // environment. Keep order details readable against the existing schema.
-    let historyResult = await this.context.supabase
+    const providerHistoryResult = await this.context.supabase
       .from('order_status_history')
       .select(historyColumnsWithProvider)
       .eq('organization_id', this.context.organizationId)
@@ -272,26 +272,30 @@ export class SupabaseOrderRepository implements OrderRepository {
       .order('changed_at', { ascending: true });
 
     const missingProviderColumns = Boolean(
-      historyResult.error &&
-      (historyResult.error.code === '42703' ||
-        historyResult.error.code === 'PGRST204' ||
-        /column .*source.* does not exist|source_timestamp.*schema cache/i.test(historyResult.error.message || '')),
+      providerHistoryResult.error &&
+      (providerHistoryResult.error.code === '42703' ||
+        providerHistoryResult.error.code === 'PGRST204' ||
+        /column .*source.* does not exist|source_timestamp.*schema cache/i.test(providerHistoryResult.error.message || '')),
     );
 
+    let historyRows: OrderHistoryRow[] = (providerHistoryResult.data || []) as unknown as OrderHistoryRow[];
+    let historyError = providerHistoryResult.error;
     if (missingProviderColumns) {
-      historyResult = await this.context.supabase
+      const legacyHistoryResult = await this.context.supabase
         .from('order_status_history')
         .select(historyColumnsLegacy)
         .eq('organization_id', this.context.organizationId)
         .eq('order_id', row.id)
         .order('changed_at', { ascending: true });
+      historyRows = (legacyHistoryResult.data || []) as unknown as OrderHistoryRow[];
+      historyError = legacyHistoryResult.error;
     }
 
     const [itemsResult] = await Promise.all([itemsPromise]);
-    if (historyResult.error) throw historyResult.error;
+    if (historyError) throw historyError;
 
     const lines = itemsResult.map(mapOrderItem);
-    const histories = ((historyResult.data || []) as unknown as OrderHistoryRow[]).map(history => ({
+    const histories = historyRows.map(history => ({
       id: history.id,
       orderId: history.order_id,
       fromStatus: history.from_status || undefined,
