@@ -119,6 +119,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [listingSnapshots, setListingSnapshots] = useState<Record<string, any[]>>({});
   const [listingTotals, setListingTotals] = useState<Record<string, number>>({});
   const [listingLoadingAccountId, setListingLoadingAccountId] = useState<string | null>(null);
+  const [expandedSellerAccountId, setExpandedSellerAccountId] = useState<string | null>(null);
+  const [sellerAccountSnapshots, setSellerAccountSnapshots] = useState<Record<string, any[]>>({});
+  const [sellerAccountLoadingId, setSellerAccountLoadingId] = useState<string | null>(null);
 
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
@@ -209,8 +212,15 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
     try {
       const res = await api.syncEbayAccount(accountId);
-
-      setSyncResult(res);
+      let activeListings: any = null;
+      let activeListingsError = '';
+      let sellerAccount: any = null;
+      let sellerAccountError = '';
+      try { activeListings = await api.syncEbayActiveListings(accountId); }
+      catch (error: any) { activeListingsError = error?.message || 'Trading API active listings sync failed.'; }
+      try { sellerAccount = await api.syncEbaySellerAccount(accountId); }
+      catch (error: any) { sellerAccountError = error?.message || 'Seller account settings sync failed.'; }
+      setSyncResult({ ...res, activeListings, activeListingsError, sellerAccount, sellerAccountError });
 
       setListingSnapshots(current => {
         const next = { ...current };
@@ -278,7 +288,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
       setListingSnapshots(current => ({
         ...current,
-        [accountId]: result.listings || [],
+        [accountId]: [...(result.listings || []), ...(result.tradingListings || [])],
       }));
 
       setListingTotals(current => ({
@@ -291,6 +301,20 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
     } finally {
       setListingLoadingAccountId(null);
     }
+  };
+
+  const handleToggleSellerAccount = async (accountId: string) => {
+    if (expandedSellerAccountId === accountId) { setExpandedSellerAccountId(null); return; }
+    setExpandedSellerAccountId(accountId);
+    if (sellerAccountSnapshots[accountId]) return;
+    setSellerAccountLoadingId(accountId);
+    try {
+      const result = await api.getEbaySellerAccount(accountId);
+      setSellerAccountSnapshots(current => ({ ...current, [accountId]: result.resources || [] }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load seller account settings: ${err.message}`);
+      setExpandedSellerAccountId(null);
+    } finally { setSellerAccountLoadingId(null); }
   };
 
   const handleReconnect = async (accountId: string) => {
@@ -670,6 +694,30 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
             <div className="rounded-md border border-slate-200 p-3 space-y-1">
               <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Active Listings (Trading API)</span>
+                <span className="text-[10px] font-bold">{syncResult.activeListingsError ? 'FAILED' : syncResult.activeListings ? (syncResult.activeListings.pagesPending ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Retrieved: {syncResult.activeListings?.fetched ?? 0}
+                {' · '}Provider total: {syncResult.activeListings?.totalEntries ?? '—'}
+                {' · '}Pages: {syncResult.activeListings?.pagesFetched ?? 0}
+                {syncResult.activeListings?.pagesPending ? ' · More pages pending' : ''}
+              </p>
+              {syncResult.activeListingsError && <p className="text-[11px] text-rose-700">{syncResult.activeListingsError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">Seller Account & Policies</span>
+                <span className="text-[10px] font-bold">{syncResult.sellerAccountError ? 'FAILED' : syncResult.sellerAccount ? (syncResult.sellerAccount.failed?.length ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Read-only resources stored: {syncResult.sellerAccount?.synced?.length ?? 0}
+                {' · '}Failed: {syncResult.sellerAccount?.failed?.length ?? 0}
+              </p>
+              {syncResult.sellerAccountError && <p className="text-[11px] text-rose-700">{syncResult.sellerAccountError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-900">
                   Inventory & Listings
                 </span>
@@ -896,32 +944,75 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
 
                     {acc.authStatus === 'CONNECTED' && (
                       <div className="pt-2 border-t border-gray-100">
-                        <button
-                          onClick={() => handleToggleListings(acc.id)}
-                          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
-                        >
+                        <div className="flex flex-wrap items-center gap-4">
+                          <button
+                            onClick={() => handleToggleSellerAccount(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedSellerAccountId === acc.id ? 'Hide Seller Account Settings' : 'View Seller Account Settings'}
+                          </button>
+                          <button
+                            onClick={() => handleToggleListings(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
                           {expandedListingsAccountId === acc.id
                             ? 'Hide Sync Listings'
                             : `View Sync Listings (${listingTotals[acc.id] ?? 'Load'})`}
                         </button>
+                        </div>
+
+                        {expandedSellerAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                            <div className="text-xs font-semibold text-slate-800">Production Seller Account Data</div>
+                            {sellerAccountLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading seller account settings…</p>
+                            ) : (sellerAccountSnapshots[acc.id] || []).length === 0 ? (
+                              <p className="text-xs text-slate-500">No synchronized seller settings are available yet. Run Sync Production Data to retrieve them.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {(sellerAccountSnapshots[acc.id] || []).map((resource: any) => {
+                                  const data = resource.snapshot?.data || {};
+                                  const collection = data.paymentPolicies || data.fulfillmentPolicies || data.returnPolicies || [];
+                                  const policyNames = Array.isArray(collection) ? collection.map((policy: any) => policy.name).filter((name: any) => typeof name === 'string') : [];
+                                  const label = String(resource.type || '').replaceAll('_', ' ').toLowerCase();
+                                  const summary = Array.isArray(collection)
+                                    ? `${collection.length} policy record(s)`
+                                    : resource.type === 'SELLER_PRIVILEGE'
+                                      ? (data.sellerRegistrationCompleted === true ? 'Seller registration completed' : 'Registration status returned by eBay')
+                                      : resource.type === 'SELLER_SUBSCRIPTION'
+                                        ? `${Array.isArray(data.subscriptions) ? data.subscriptions.length : 0} subscription record(s)`
+                                        : 'Latest provider settings retrieved';
+                                  return (
+                                    <div key={resource.type} className="rounded border border-slate-200 bg-white p-2">
+                                      <div className="text-[11px] font-semibold text-slate-800 capitalize">{label}</div>
+                                      <div className="text-[11px] text-slate-600">{summary}</div>
+                                      {policyNames.length > 0 && <div className="mt-1 text-[10px] text-slate-500">{policyNames.slice(0, 6).join(' · ')}</div>}
+                                      <div className="mt-1 text-[10px] text-slate-400">Synced: {resource.syncedAt ? new Date(resource.syncedAt).toLocaleString() : '—'}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {expandedListingsAccountId === acc.id && (
                           <div className="mt-3 overflow-x-auto">
                             {listingLoadingAccountId === acc.id ? (
                               <p className="text-xs text-slate-500 py-3">
-                                Loading seller inventory and listings…
+                                Loading Production inventory and listings…
                               </p>
                             ) : (
                               <>
                                 <div className="text-[11px] text-slate-500 mb-2">
-                                  Total synced inventory records: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
+                                  Total synced Production listings: {listingTotals[acc.id] ?? (listingSnapshots[acc.id] || []).length}
                                 </div>
 
                                 <table className="w-full text-left text-[11px]">
                                   <thead className="bg-slate-50 text-slate-600">
                                     <tr>
                                       <th className="p-2">#</th>
-                                      <th className="p-2">SKU</th>
+                                      <th className="p-2">SKU / Item ID</th>
                                       <th className="p-2">Product</th>
                                       <th className="p-2">Sync Status</th>
                                       <th className="p-2">eBay Listing Status</th>
@@ -934,7 +1025,7 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                     {(listingSnapshots[acc.id] || []).map((listing: any, listingIndex: number) => (
                                       <tr key={listing.offerId || listing.sku || listingIndex}>
                                         <td className="p-2">{listingIndex + 1}</td>
-                                        <td className="p-2 font-mono">{listing.sku}</td>
+                                        <td className="p-2 font-mono">{listing.sku || listing.itemId || "—"}</td>
                                         <td className="p-2 min-w-40">{listing.title || '—'}</td>
                                         <td className="p-2">
                                           <span title={listing.syncError || undefined} className={`rounded px-1.5 py-0.5 font-semibold ${listing.syncStatus === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
