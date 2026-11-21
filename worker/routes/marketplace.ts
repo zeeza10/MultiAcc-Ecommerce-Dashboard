@@ -865,6 +865,60 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
   }
 
 
+  const sellerAccountMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/seller-account$/);
+  if (sellerAccountMatch && request.method === 'GET') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
+      return json({ error: 'Marketplace view permission is required.' }, 403);
+    }
+    const { data: account, error: accountError } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,environment,is_demo,auth_status').eq('id', sellerAccountMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production seller account data is available in this workspace.' }, 409);
+    const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
+      .select('id,resource_type,external_id,sync_batch_id,snapshot,provider_updated_at,synced_at')
+      .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
+      .in('resource_type', ['SELLER_PRIVILEGE','SELLER_SUBSCRIPTION','SELLER_PAYMENT_POLICY','SELLER_FULFILLMENT_POLICY','SELLER_RETURN_POLICY'])
+      .order('synced_at', { ascending: false });
+    if (error) throw new Error('eBay seller account snapshots could not be loaded.');
+    const latest = new Map<string, any>();
+    for (const row of data || []) if (!latest.has(row.resource_type)) latest.set(row.resource_type, row);
+    return json({
+      accountId: account.id,
+      environment: 'PRODUCTION',
+      lastSyncedAt: [...latest.values()].map((row: any) => row.synced_at).sort().at(-1) || null,
+      resources: [...latest.values()].map((row: any) => ({
+        type: row.resource_type, snapshot: row.snapshot, providerUpdatedAt: row.provider_updated_at, syncedAt: row.synced_at,
+      })),
+    });
+  }
+
+  if (sellerAccountMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', sellerAccountMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncSellerAccountSettings(account, env);
+    return json({ success: result.failed.length === 0, ...result });
+  }
+
+  const activeListingsSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-active-listings$/);
+  if (activeListingsSyncMatch && request.method === 'POST') {
+    if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.manage')) return json({ error: 'Marketplace management permission is required.' }, 403);
+    const { data: account, error } = await auth.repositoryContext.supabase.from('marketplace_accounts')
+      .select('id,organization_id,marketplace,environment,is_demo,auth_status')
+      .eq('id', activeListingsSyncMatch[1]).eq('organization_id', auth.organizationId).maybeSingle();
+    if (error || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
+    if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+      return json({ error: 'Only connected Production eBay seller accounts can be synchronized.' }, 409);
+    }
+    const result = await syncTradingActiveListings(account, env);
+    return json({ success: !result.pagesPending, ...result });
+  }
+
   const listingsMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/listings$/);
   if (listingsMatch && request.method === 'GET') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
