@@ -34,7 +34,7 @@ interface EbayStockSourcePanelProps {
   localRecords?: any[];
   stockRecords?: any[];
   allocationRecords?: any[];
-  onCreateProduct?: () => void;
+  onCreateProduct?: (listing: { sku: string; title: string }) => void;
   mode: 'PRODUCTS' | 'INVENTORY';
   onAllocationSaved?: () => void | Promise<void>;
 }
@@ -275,7 +275,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
       {mode === 'PRODUCTS' && products.length === 0 && rows.length > 0 && (
         <div className="mx-4 mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between">
           <span>No Production internal Products/SKUs exist yet. Create a real catalog product before mapping these eBay SKUs.</span>
-          {onCreateProduct && <button type="button" onClick={onCreateProduct} className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Create internal Product</button>}
+          {onCreateProduct && <button type="button" onClick={() => onCreateProduct({ sku: rows[0].sku, title: rows[0].title })} className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Create internal Product</button>}
         </div>
       )}
       {error && <div role="alert" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
@@ -314,7 +314,9 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                   <td className="whitespace-nowrap px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{row.status.replaceAll('_', ' ')}</span></td>
                   <td className="min-w-[230px] px-4 py-3">
                     {mapping ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{mapping.internalSku || 'Mapped'} · {mapping.internalName || 'Product'}</span> :
-                      <div className="flex min-w-[220px] items-center gap-2">
+                      products.length === 0 && onCreateProduct ? (
+                        <button type="button" onClick={() => onCreateProduct({ sku: row.sku, title: row.title })} className="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100">Create Product from Listing</button>
+                      ) : <div className="flex min-w-[220px] items-center gap-2">
                         <select value={suggestedProductId} onChange={event => setSelectedProducts(current => ({ ...current, [key]: event.target.value }))} className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-700 focus:border-indigo-500 focus:outline-none">
                           <option value="">Select internal SKU</option>
                           {products.map(product => <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>)}
