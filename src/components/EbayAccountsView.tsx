@@ -128,6 +128,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
   const [expandedAnalyticsAccountId, setExpandedAnalyticsAccountId] = useState<string | null>(null);
   const [analyticsByAccount, setAnalyticsByAccount] = useState<Record<string, any[]>>({});
   const [analyticsLoadingId, setAnalyticsLoadingId] = useState<string | null>(null);
+  const [expandedFinanceAccountId, setExpandedFinanceAccountId] = useState<string | null>(null);
+  const [financesByAccount, setFinancesByAccount] = useState<Record<string, any>>({});
+  const [financeLoadingId, setFinanceLoadingId] = useState<string | null>(null);
 
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
   const [targetProductId, setTargetProductId] = useState('');
@@ -226,6 +229,8 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       let ebayReturnsError = '';
       let ebayAnalytics: any = null;
       let ebayAnalyticsError = '';
+      let ebayFinances: any = null;
+      let ebayFinancesError = '';
       try { activeListings = await api.syncEbayActiveListings(accountId); }
       catch (error: any) { activeListingsError = error?.message || 'Trading API active listings sync failed.'; }
       try { sellerAccount = await api.syncEbaySellerAccount(accountId); }
@@ -234,7 +239,9 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       catch (error: any) { ebayReturnsError = error?.message || 'eBay Returns sync failed.'; }
       try { ebayAnalytics = await api.syncEbayAnalytics(accountId); }
       catch (error: any) { ebayAnalyticsError = error?.message || 'eBay Analytics sync failed.'; }
-      setSyncResult({ ...res, activeListings, activeListingsError, sellerAccount, sellerAccountError, ebayReturns, ebayReturnsError, ebayAnalytics, ebayAnalyticsError });
+      try { ebayFinances = await api.syncEbayFinances(accountId); }
+      catch (error: any) { ebayFinancesError = error?.message || 'eBay Finances sync failed.'; }
+      setSyncResult({ ...res, activeListings, activeListingsError, sellerAccount, sellerAccountError, ebayReturns, ebayReturnsError, ebayAnalytics, ebayAnalyticsError, ebayFinances, ebayFinancesError });
 
       setListingSnapshots(current => {
         const next = { ...current };
@@ -357,6 +364,20 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
       setSyncFeedback(`Could not load eBay Analytics: ${err.message}`);
       setExpandedAnalyticsAccountId(null);
     } finally { setAnalyticsLoadingId(null); }
+  };
+
+  const handleToggleFinance = async (accountId: string) => {
+    if (expandedFinanceAccountId === accountId) { setExpandedFinanceAccountId(null); return; }
+    setExpandedFinanceAccountId(accountId);
+    if (financesByAccount[accountId]) return;
+    setFinanceLoadingId(accountId);
+    try {
+      const result = await api.getEbayFinances(accountId);
+      setFinancesByAccount(current => ({ ...current, [accountId]: result }));
+    } catch (err: any) {
+      setSyncFeedback(`Could not load eBay Finances: ${err.message}`);
+      setExpandedFinanceAccountId(null);
+    } finally { setFinanceLoadingId(null); }
   };
 
   const handleReconnect = async (accountId: string) => {
@@ -783,6 +804,18 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
             </div>
             <div className="rounded-md border border-slate-200 p-3 space-y-1">
               <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">eBay Finances (Signed API)</span>
+                <span className="text-[10px] font-bold">{syncResult.ebayFinancesError ? 'RECONNECT / FAILED' : syncResult.ebayFinances ? (syncResult.ebayFinances.failed?.length ? 'PARTIAL' : 'SUCCESS') : 'NOT RUN'}</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Payouts: {syncResult.ebayFinances?.payouts ?? 0}
+                {' · '}Transactions: {syncResult.ebayFinances?.transactions ?? 0}
+                {' · '}Failed: {syncResult.ebayFinances?.failed?.length ?? 0}
+              </p>
+              {syncResult.ebayFinancesError && <p className="text-[11px] text-rose-700">{syncResult.ebayFinancesError}</p>}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-900">
                   Inventory & Listings
                 </span>
@@ -1017,6 +1050,12 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                             {expandedReturnsAccountId === acc.id ? 'Hide eBay Returns' : 'View eBay Returns'}
                           </button>
                           <button
+                            onClick={() => handleToggleFinance(acc.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                          >
+                            {expandedFinanceAccountId === acc.id ? 'Hide Finances' : 'View Finances'}
+                          </button>
+                          <button
                             onClick={() => handleToggleAnalytics(acc.id)}
                             className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
                           >
@@ -1058,6 +1097,50 @@ export const EbayAccountsView: React.FC<EbayAccountsViewProps> = ({
                                   </div>
                                 ))}
                               </div>
+                            )}
+                          </div>
+                        )}
+
+                        {expandedFinanceAccountId === acc.id && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                            <div className="text-xs font-semibold text-slate-800">Production eBay Financial Data</div>
+                            {financeLoadingId === acc.id ? (
+                              <p className="text-xs text-slate-500">Loading finance records…</p>
+                            ) : !financesByAccount[acc.id] ? (
+                              <p className="text-xs text-slate-500">No synchronized finance data is available. Reconnect the seller account to grant the Finance permission, then run Sync Production Data.</p>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {(financesByAccount[acc.id].summaries || []).map((summary: any) => (
+                                    <div key={summary.key} className="rounded border border-slate-200 bg-white p-2">
+                                      <div className="text-[11px] font-semibold text-slate-800">{String(summary.key).replaceAll('_', ' ')}</div>
+                                      <div className="text-[10px] text-slate-500">Provider summary received · {summary.syncedAt ? new Date(summary.syncedAt).toLocaleString() : '—'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-xs font-semibold text-slate-800">Payouts ({financesByAccount[acc.id].payouts?.length || 0})</div>
+                                <div className="space-y-1">
+                                  {(financesByAccount[acc.id].payouts || []).map((payout: any) => (
+                                    <div key={payout.payoutId || payout.id} className="rounded border border-slate-200 bg-white p-2 flex flex-wrap justify-between gap-2 text-xs">
+                                      <span className="font-mono">{payout.payoutId || payout.id}</span>
+                                      <span>{payout.payoutStatus || '—'}</span>
+                                      <span>{payout.amount?.value ?? '—'} {payout.amount?.currency ?? ''}</span>
+                                      <span>{payout.payoutDate ? new Date(payout.payoutDate).toLocaleDateString() : '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-xs font-semibold text-slate-800">Transactions ({financesByAccount[acc.id].transactions?.length || 0})</div>
+                                <div className="space-y-1 max-h-64 overflow-auto">
+                                  {(financesByAccount[acc.id].transactions || []).map((transaction: any) => (
+                                    <div key={transaction.transactionId || transaction.id} className="rounded border border-slate-200 bg-white p-2 grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                                      <span className="font-mono">{transaction.transactionId || transaction.id}</span>
+                                      <span>{transaction.transactionType || '—'}</span>
+                                      <span>{transaction.amount?.value ?? '—'} {transaction.amount?.currency ?? ''}</span>
+                                      <span>{transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleString() : '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
                             )}
                           </div>
                         )}
