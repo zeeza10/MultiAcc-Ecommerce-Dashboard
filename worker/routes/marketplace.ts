@@ -6,6 +6,7 @@ import { normalizeEbayOrderStartDate } from '../ebay-order-date';
 import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
 import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
 import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
+import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -22,6 +23,7 @@ const OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.return.read',
   'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.finances',
 ];
 
 function isEnvironment(value: unknown): value is EbayEnvironment {
@@ -850,6 +852,151 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
     metadata: { syncBatchId: batchId, syncedResources: synced, failedResources: failed.map(item => item.resource), environment: 'PRODUCTION' },
   });
   return { batchId, synced, failed };
+}
+
+async function fetchEbayFinanceJson(accessToken: string, path: string, marketplaceId: string, env: WorkerEnv): Promise<Record<string, any>> {
+  const url = `https://api.ebay.com${path}`;
+  const signatureHeaders = await createEbayFinanceSignatureHeaders('GET', url, env);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
+      Accept: 'application/json',
+      ...signatureHeaders,
+    },
+  });
+  if (!response.ok) throw await readEbayOrdersApiError(response);
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('eBay returned an invalid Finances API response.');
+  }
+  return payload as Record<string, any>;
+}
+
+async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
+  batchId: string;
+  payouts: number;
+  transactions: number;
+  synced: string[];
+  failed: Array<{ resource: string; message: string }>;
+}> {
+  if (account.environment !== 'PRODUCTION' || account.is_demo || account.auth_status !== 'CONNECTED') {
+    throw new EbayOrdersApiError(403, null, 'Only connected Production eBay seller accounts can be synchronized.');
+  }
+  await assertEbaySellerScope(account, 'https://api.ebay.com/oauth/api_scope/sell.finances', env);
+  const accessToken = await getSellerAccessToken(env, account);
+  const admin = createServiceClient(env);
+  const batchId = crypto.randomUUID();
+  const marketplaceId = account.marketplace === 'EBAY_UK' ? 'EBAY_GB'
+    : account.marketplace === 'EBAY_DE' ? 'EBAY_DE' : 'EBAY_US';
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 90);
+  const dateRange = `[${start.toISOString()}..${end.toISOString()}]`;
+  const resources: Array<{ type: string; key: string; path: string }> = [
+    { type: 'FINANCE_SUMMARY', key: 'SELLER_FUNDS_CURRENT', path: '/sell/finances/v1/seller_funds_summary' },
+    { type: 'FINANCE_SUMMARY', key: 'PAYOUT_SUMMARY_CURRENT', path: '/sell/finances/v1/payout_summary' },
+    { type: 'FINANCE_SUMMARY', key: 'TRANSACTION_SUMMARY_90_DAYS', path: `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}` },
+  ];
+  const synced: string[] = [];
+  const failed: Array<{ resource: string; message: string }> = [];
+  let payoutCount = 0;
+  let transactionCount = 0;
+
+  for (const resource of resources) {
+    try {
+      const payload = await fetchEbayFinanceJson(accessToken, resource.path, marketplaceId, env);
+      await saveEbayProviderSnapshot(admin, account, resource.type, resource.key, batchId,
+        { data: payload, marketplaceId, source: 'EBAY_FINANCES_API' }, payload);
+      synced.push(resource.key);
+    } catch (error) {
+      const failure = getEbaySyncFailure(error, 'EBAY_FINANCES_API_FAILED');
+      failed.push({ resource: resource.key, message: failure.message });
+      await admin.from('marketplace_integration_events').insert({
+        organization_id: account.organization_id,
+        marketplace_account_id: account.id,
+        event_type: 'EBAY_FINANCES_SYNC_FAILED',
+        severity: 'ERROR',
+        error_code: failure.code,
+        message: failure.message,
+        metadata: { resource: resource.key, endpoint: resource.path.split('?')[0], httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+      });
+    }
+  }
+
+  const payoutPath = '/sell/finances/v1/payout?limit=100&offset=0';
+  try {
+    const payload = await fetchEbayFinanceJson(accessToken, payoutPath, marketplaceId, env);
+    const rows = Array.isArray(payload.payouts) ? payload.payouts : [];
+    for (const payout of rows) {
+      const payoutId = typeof payout.payoutId === 'string' ? payout.payoutId : '';
+      if (!payoutId) continue;
+      const normalized = {
+        payoutId,
+        payoutStatus: payout.payoutStatus ?? null,
+        payoutDate: payout.payoutDate ?? null,
+        amount: payout.amount ?? null,
+        transactionCount: payout.transactionCount ?? null,
+        source: 'EBAY_FINANCES_API',
+      };
+      await saveEbayProviderSnapshot(admin, account, 'FINANCE_PAYOUT', payoutId, batchId, normalized, payout);
+      payoutCount++;
+    }
+    synced.push('PAYOUTS');
+  } catch (error) {
+    const failure = getEbaySyncFailure(error, 'EBAY_PAYOUTS_SYNC_FAILED');
+    failed.push({ resource: 'PAYOUTS', message: failure.message });
+    await admin.from('marketplace_integration_events').insert({
+      organization_id: account.organization_id, marketplace_account_id: account.id,
+      event_type: 'EBAY_FINANCES_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+      message: failure.message, metadata: { resource: 'PAYOUTS', endpoint: '/sell/finances/v1/payout', httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+    });
+  }
+
+  const transactionPath = `/sell/finances/v1/transaction?filter=${encodeURIComponent(`transactionDate:${dateRange}`)}&limit=100&offset=0`;
+  try {
+    const payload = await fetchEbayFinanceJson(accessToken, transactionPath, marketplaceId, env);
+    const rows = Array.isArray(payload.transactions) ? payload.transactions : [];
+    for (const transaction of rows) {
+      const transactionId = typeof transaction.transactionId === 'string' ? transaction.transactionId : '';
+      if (!transactionId) continue;
+      const normalized = {
+        transactionId,
+        transactionType: transaction.transactionType ?? null,
+        transactionDate: transaction.transactionDate ?? null,
+        amount: transaction.amount ?? null,
+        totalFeeAmount: transaction.totalFeeAmount ?? null,
+        orderId: transaction.orderId ?? null,
+        payoutId: transaction.payoutId ?? null,
+        references: Array.isArray(transaction.references)
+          ? transaction.references.map((reference: any) => ({ referenceType: reference?.referenceType ?? null, referenceId: reference?.referenceId ?? null }))
+          : [],
+        source: 'EBAY_FINANCES_API',
+      };
+      await saveEbayProviderSnapshot(admin, account, 'FINANCE_TRANSACTION', transactionId, batchId, normalized, transaction);
+      transactionCount++;
+    }
+    synced.push('TRANSACTIONS_90_DAYS');
+  } catch (error) {
+    const failure = getEbaySyncFailure(error, 'EBAY_TRANSACTIONS_SYNC_FAILED');
+    failed.push({ resource: 'TRANSACTIONS_90_DAYS', message: failure.message });
+    await admin.from('marketplace_integration_events').insert({
+      organization_id: account.organization_id, marketplace_account_id: account.id,
+      event_type: 'EBAY_FINANCES_SYNC_FAILED', severity: 'ERROR', error_code: failure.code,
+      message: failure.message, metadata: { resource: 'TRANSACTIONS_90_DAYS', endpoint: '/sell/finances/v1/transaction', httpStatus: failure.httpStatus, providerCode: failure.providerCode, environment: 'PRODUCTION' },
+    });
+  }
+
+  await admin.from('marketplace_integration_events').insert({
+    organization_id: account.organization_id,
+    marketplace_account_id: account.id,
+    event_type: 'EBAY_FINANCES_SYNC_COMPLETED',
+    severity: failed.length ? 'WARNING' : 'INFO',
+    message: `eBay Finances sync stored ${payoutCount} payouts and ${transactionCount} transactions.`,
+    metadata: { syncBatchId: batchId, payoutCount, transactionCount, syncedResources: synced, failedResources: failed.map(item => item.resource), dateRange, environment: 'PRODUCTION' },
+  });
+  return { batchId, payouts: payoutCount, transactions: transactionCount, synced, failed };
 }
 
 export async function handleMarketplaceRoute(path: string, request: Request, auth: AuthContext, env: WorkerEnv): Promise<Response | null> {
