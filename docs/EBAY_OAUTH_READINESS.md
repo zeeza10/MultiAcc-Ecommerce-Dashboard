@@ -1,65 +1,64 @@
 # eBay Integration — Production Readiness
 
-**Reviewed:** 2026-11-21  
-**Runtime:** Cloudflare Worker multiacc-ecommerce-dashboard  
+**Runtime:** Cloudflare Worker `multiacc-ecommerce-dashboard`  
 **Target:** Existing Production Supabase project and connected eBay Production seller accounts only.
 
 ## Implemented core
 
 - OAuth authorization-code flow, one-time state, encrypted credentials/tokens, token refresh lease and immutable seller identity mapping.
 - Sell Fulfillment order import with two-year date clamp, pagination, cursor/checkpoint, idempotent transactional imports and SKU exception handling.
-- Inventory API inventory item/offer sync with listing snapshots and sanitized per-SKU failures.
-- Scheduled sync queue with bounded attempts and Production-only new-order in-app/push notifications.
-- Raw provider payloads are stored separately from normalized snapshots and remain restricted to Super Admin diagnostics.
+- Inventory API item/offer sync with listing snapshots and sanitized per-SKU failures.
+- Production-only scheduled sync and new-order in-app/push notifications.
+- Bounded queue with retry classification, expired lease handling and duplicate-job coalescing.
+- Restricted raw provider payload storage, separate from normalized snapshots.
 
 ## Production-only operating policy
 
-No Supabase Development Branch or non-Production seller workflow is used for this milestone. New Production database migrations are explicitly named with production and identified as Production migrations in their PR. They are applied to the existing Production project and tracked in GitHub. Historical non-Production records are retained and excluded from future sync and queue claims.
+All new syncs and queue claims are limited to connected Production seller accounts. New database migrations are explicitly named as Production migrations and tracked on main. Historical records remain preserved.
 
-## M2.1 — Orders and queue stabilization
+## Production eBay modules — main commit
 
-PR #160 merged the retry classification, 30830 permanent-failure handling, separate last-attempt timestamp, one active scheduled job per seller, bounded job claims and duplicate queue coalescing.
+Implemented directly on main in commit `e464f549daebd3fc09bc756aedc4ca52d4b85635`:
 
-Production migration 20261121170000_bound_marketplace_sync_queue_and_retries is present in the live migration history.
-
-Latest read-only Production queue snapshot: 1,419 DEAD_LETTER, 6 RUNNING and 287 SUCCEEDED. The 6 RUNNING jobs must be checked against their lease expiry and Production account eligibility before recovery. The user has approved a bounded, deduplicated Production recovery run; do not bulk-drain the queue or delete historical job rows.
-
-## Production eBay modules — main commit e464f549daebd3fc09bc756aedc4ca52d4b85635
-
-PR #161 implements:
-
-- **Active Listings:** Inventory API plus Trading API GetMyeBaySelling to include Seller Hub/legacy listings. Pagination resumes from a saved checkpoint in batches of 10 pages. A completed batch remains visible until the next complete batch is ready. Original listing item XML is preserved in the restricted raw-payload store.
-- **Returns:** Production Post-Order Search Returns import for the last 18 months, bounded to 20 pages. Request uses the required IAF OAuth scheme, JSON content type and Post-Order marketplace IDs (EBAY_UK, EBAY_DE, EBAY_US). No seller-side mutation is called.
+- **Active Listings:** Inventory API plus Trading API `GetMyeBaySelling` to include Seller Hub/legacy listings. Pagination resumes from a saved checkpoint in batches of 10 pages. Completed batches remain visible until the next complete batch is ready. Original listing item XML is preserved in restricted raw storage.
+- **Returns:** Production Post-Order Search Returns import for the previous 18 months, bounded to 20 pages. Uses IAF authorization, correct Post-Order marketplace IDs and read-only GET requests. No seller-side mutation is called.
 - **Seller Account:** Read-only seller privilege, subscription and payment/fulfillment/return business policies.
-- **Analytics:** Traffic reports, seller standards profile and supported customer-service metrics. Marketplace support and date-range limits are respected.
-- **Finances:** Seller funds summary, payout summary, status-specific transaction summaries, payouts and 90-day transactions. Requests use apiz.ebay.com, Ed25519 digital signatures and explicit 204 empty-result handling.
+- **Analytics:** Traffic reports, seller standards profile and supported customer-service metrics.
+- **Finances:** Seller funds summary, payout summary, transaction summaries, payouts and transactions. Requests use `apiz.ebay.com`, Ed25519 digital signatures and explicit 204 empty-result handling.
 
-### Production migrations tracked in main commit e464f549daebd3fc09bc756aedc4ca52d4b85635
+## Production migrations tracked on main
 
-- 20261121180000_production_ebay_provider_snapshots.sql
-- 20261121180100_production_only_marketplace_sync.sql
-- 20261121180200_production_ebay_signing_keys.sql
-- 20261121180300_production_coalesce_expired_sync_jobs.sql
+- `20261121180000_production_ebay_provider_snapshots.sql`
+- `20261121180100_production_only_marketplace_sync.sql`
+- `20261121180200_production_ebay_signing_keys.sql`
+- `20261121180300_production_coalesce_expired_sync_jobs.sql`
 
-All four versions are already present in the live Production migration history. The main commit e464f549daebd3fc09bc756aedc4ca52d4b85635 reconciles the migration SQL into GitHub source control.
+All four versions are already present in the live Production migration history. The main commit above reconciles their SQL into GitHub source control.
 
 ## OAuth consent requirements
 
-The existing connected Production tokens have Account, Fulfillment and Inventory read-only scopes. Analytics requires sell.analytics.readonly; Finances requires sell.finances. The Worker checks the saved scopes and reports when a seller must reconnect. Existing sellers are not forcibly disconnected. The Returns read import uses the authorized seller token and the Post-Order API's documented IAF authorization header.
+- Existing connected Production tokens contain Account, Fulfillment and Inventory read-only scopes.
+- Analytics requires `sell.analytics.readonly`.
+- Returns requires `sell.return.read`.
+- Finances requires `sell.finances`.
+- The Worker checks saved scopes and reports when a seller must reconnect. Existing sellers are not forcibly disconnected and existing grants are not silently widened.
+- Returns read import uses the seller user token with the Post-Order API's documented IAF authorization header.
+
+## Build and deployment evidence
+
+Main commit `e464f549daebd3fc09bc756aedc4ca52d4b85635` passed TypeScript validation, 103 tests and the Vite production build. Cloudflare Production deployment completed at `2026-11-21T14:32:46Z`, Worker version `ae1144a3-c5f1-4580-b587-91b819573fcb`. Subsequent signing-key PEM hardening is being verified by the latest main build.
 
 ## Remaining release gates
 
-1. Verified on main commit e464f549daebd3fc09bc756aedc4ca52d4b85635: TypeScript check passed, 103 tests passed, Vite production build passed, and Cloudflare Production deployment completed.
-2. Production deployment completed at 2026-11-21T14:32:46Z (Worker version ae1144a3-c5f1-4580-b587-91b819573fcb).
-3. Verify Worker health and current Production account permissions.
-4. Run the user-approved bounded queue recovery and confirm idempotent order imports.
-5. Run approved read-only Production syncs for each eligible module/account.
-6. Record exact provider counts, pagination continuation, missing scopes and errors. Do not infer absent values or rewrite existing finance/order data.
+1. Verify the latest main build and Production deployment after signing-key PEM hardening.
+2. Complete the approved bounded Production queue recovery; reconcile stalled sync runs and job outcomes.
+3. Run read-only Production syncs for each eligible module/account.
+4. Record exact provider counts, pagination continuation, missing scopes and errors. Do not infer absent values or rewrite existing order/finance data.
 
 ## Explicitly excluded
 
-- No eBay listing creation, revision, publication or deletion.
+- No listing creation, revision, publication or deletion.
 - No return approval/decline, refund, label purchase, buyer message or received-item mutation.
 - No finance transfer or payout mutation.
 - No deletion of existing business records or raw provider payloads.
-- No forced OAuth re-consent. Seller consent is requested only when the relevant module is used and its required scope is missing.
+- No forced OAuth re-consent.
