@@ -873,7 +873,8 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
     }
 
     offset += members.length;
-    if (!members.length || offset >= totalEntries) {
+    const morePages = totalEntries > 0 ? offset < totalEntries : pagesFetched < totalPages;
+    if (!members.length || !morePages) {
       noMoreData = true;
       break;
     }
