@@ -24,7 +24,7 @@ Production migration 20261121170000_bound_marketplace_sync_queue_and_retries is 
 
 Latest read-only Production queue snapshot: 1,419 DEAD_LETTER, 6 RUNNING and 287 SUCCEEDED. The 6 RUNNING jobs must be checked against their lease expiry and Production account eligibility before recovery. The user has approved a bounded, deduplicated Production recovery run; do not bulk-drain the queue or delete historical job rows.
 
-## PR #161 — Production eBay modules
+## Production eBay modules — main commit e464f549daebd3fc09bc756aedc4ca52d4b85635
 
 PR #161 implements:
 
@@ -34,14 +34,14 @@ PR #161 implements:
 - **Analytics:** Traffic reports, seller standards profile and supported customer-service metrics. Marketplace support and date-range limits are respected.
 - **Finances:** Seller funds summary, payout summary, status-specific transaction summaries, payouts and 90-day transactions. Requests use apiz.ebay.com, Ed25519 digital signatures and explicit 204 empty-result handling.
 
-### Production migrations tracked by PR #161
+### Production migrations tracked in main commit e464f549daebd3fc09bc756aedc4ca52d4b85635
 
 - 20261121180000_production_ebay_provider_snapshots.sql
 - 20261121180100_production_only_marketplace_sync.sql
 - 20261121180200_production_ebay_signing_keys.sql
 - 20261121180300_production_coalesce_expired_sync_jobs.sql
 
-All four versions are already present in the live Production migration history. PR #161 reconciles the migration SQL into GitHub source control.
+All four versions are already present in the live Production migration history. The main commit e464f549daebd3fc09bc756aedc4ca52d4b85635 reconciles the migration SQL into GitHub source control.
 
 ## OAuth consent requirements
 
@@ -49,8 +49,8 @@ The existing connected Production tokens have Account, Fulfillment and Inventory
 
 ## Remaining release gates
 
-1. Finish fresh typecheck, test and Cloudflare build verification for the latest PR #161 head.
-2. Review and merge PR #161, then deploy the Worker to Production.
+1. Verified on main commit e464f549daebd3fc09bc756aedc4ca52d4b85635: TypeScript check passed, 103 tests passed, Vite production build passed, and Cloudflare Production deployment completed.
+2. Production deployment completed at 2026-11-21T14:32:46Z (Worker version ae1144a3-c5f1-4580-b587-91b819573fcb).
 3. Verify Worker health and current Production account permissions.
 4. Run the user-approved bounded queue recovery and confirm idempotent order imports.
 5. Run approved read-only Production syncs for each eligible module/account.
