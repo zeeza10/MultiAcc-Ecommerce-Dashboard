@@ -32,6 +32,9 @@ interface EbayStockSourcePanelProps {
   selectedStoreId: string;
   selectedEnvironment: 'DEMO' | 'SANDBOX' | 'PRODUCTION';
   localRecords?: any[];
+  stockRecords?: any[];
+  allocationRecords?: any[];
+  onCreateProduct?: (listing: { sku: string; title: string }) => void;
   mode: 'PRODUCTS' | 'INVENTORY';
   onAllocationSaved?: () => void | Promise<void>;
 }
@@ -45,10 +48,11 @@ const money = (value: unknown, currency = 'GBP') => {
 
 const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
 
-export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], mode, onAllocationSaved }) => {
+export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, selectedEnvironment, localRecords = [], stockRecords = [], allocationRecords = [], onCreateProduct, mode, onAllocationSaved }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -133,6 +137,37 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   useEffect(() => { void load(); }, [load]);
 
+  const syncListings = async () => {
+    if (selectedEnvironment !== 'PRODUCTION') {
+      setError('Live eBay listing sync is available only in the Production workspace.');
+      return;
+    }
+    setSyncing(true);
+    setError('');
+    setNotice('');
+    try {
+      const accountResult = await api.getEbayAccounts(selectedStoreId);
+      const accounts = (accountResult.accounts || []).filter((account: any) =>
+        account.environment === 'PRODUCTION' && !account.isDemo &&
+        account.authStatus === 'CONNECTED' &&
+        (selectedStoreId === 'ALL' || account.id === selectedStoreId)
+      );
+      if (!accounts.length) throw new Error('No connected Production seller accounts were found in the selected scope.');
+      const results = await Promise.allSettled(accounts.map((account: any) => api.syncEbayActiveListings(account.id)));
+      const successful = results.filter(result => result.status === 'fulfilled');
+      const failed = results.filter(result => result.status === 'rejected');
+      const fetched = successful.reduce((sum, result: any) => sum + Number(result.value?.fetched || 0), 0);
+      const pending = successful.some((result: any) => result.value?.pagesPending);
+      await load();
+      setNotice(`eBay Listings sync completed for ${successful.length}/${accounts.length} connected seller(s); ${fetched} listing record(s) fetched.${pending ? ' More pages remain; run Sync again to continue.' : ''}`);
+      if (failed.length) setError(`${failed.length} seller sync(s) failed. Check seller permissions and eBay connection status.`);
+    } catch (err: any) {
+      setError(err?.message || 'eBay Listings could not be synchronized.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const mappingByKey = useMemo(() => {
     const result = new Map<string, SkuMapping>();
     mappings.forEach(mapping => result.set(`${mapping.marketplaceAccountId}:${mapping.externalSku}`, mapping));
@@ -177,7 +212,7 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   const saveAllocation = async (row: ListingRow, mapping: SkuMapping) => {
     const key = rowKey(row);
-    const current = localRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+    const current = allocationRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
     const values = allocationInputs[key] || {
       allocated: String(current?.onHand ?? 0),
       reserved: String(current?.reserved ?? 0),
@@ -222,9 +257,14 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
             <p className="mt-1 text-xs text-slate-500">Production marketplace data · warehouse physical stock remains separate</p>
           </div>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh listings
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void load()} disabled={loading || syncing} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <button type="button" onClick={() => void syncListings()} disabled={loading || syncing || selectedEnvironment !== 'PRODUCTION'} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Syncing…' : 'Sync from eBay'}
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">eBay SKUs</p><p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{rows.length}</p></div>
@@ -232,16 +272,22 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Mapping required</p><p className="mt-1 text-xl font-semibold tabular-nums text-amber-700">{unmatchedCount}</p></div>
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Connected scope</p><p className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedStoreId === 'ALL' ? 'All connected sellers' : 'Selected seller'}</p></div>
       </div>
+      {mode === 'PRODUCTS' && products.length === 0 && rows.length > 0 && (
+        <div className="mx-4 mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+          <span>No Production internal Products/SKUs exist yet. Create a real catalog product before mapping these eBay SKUs.</span>
+          {onCreateProduct && <button type="button" onClick={() => onCreateProduct({ sku: rows[0].sku, title: rows[0].title })} className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700">Create internal Product</button>}
+        </div>
+      )}
       {error && <div role="alert" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
       {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>
-            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">{mode === 'INVENTORY' && selectedStoreId !== 'ALL' ? 'Store Available' : 'Physical Available'}</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th><th className="px-4 py-3 font-semibold">Allocation Controls</th>
+            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">Physical Available</th><th className="px-4 py-3 font-semibold">Store Allocation</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th><th className="px-4 py-3 font-semibold">Allocation Controls</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
-              rows.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
+            {loading ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
+              rows.length === 0 ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope. Use Sync from eBay to fetch the latest active listings.</td></tr> :
               rows.map((row, index) => {
                 const key = rowKey(row);
                 const mapping = mappingByKey.get(key);
@@ -253,17 +299,24 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{row.price ? money(row.price, row.currency) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums font-semibold text-slate-800">{row.quantity ?? '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{mapping ? (() => {
-                    const internal = localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
-                    if (!internal) return '0';
-                    const value = mode === 'INVENTORY' && selectedStoreId !== 'ALL'
-                      ? internal.available ?? Math.max(0, Number(internal.onHand || 0) - Number(internal.reserved || 0))
-                      : internal.stockAvailable ?? internal.available ?? 0;
+                    const physical = stockRecords.find(record => String(record.productId || record.id || '') === mapping.productId) || localRecords.find(record => String(record.id || record.productId || '') === mapping.productId);
+                    if (!physical) return '0';
+                    const value = mode === 'INVENTORY'
+                      ? physical.available ?? Math.max(0, Number(physical.onHand || 0) - Number(physical.reserved || 0))
+                      : physical.stockAvailable ?? physical.available ?? 0;
                     return Number(value).toLocaleString('en-GB');
+                  })() : 'Map SKU first'}</td>
+                  <td className="min-w-[170px] px-4 py-3 text-[10px] text-slate-600">{mode !== 'INVENTORY' ? '—' : mapping ? (() => {
+                    const allocation = allocationRecords.find(record => String(record.productId || record.id || '') === mapping.productId);
+                    if (!allocation) return 'Not allocated';
+                    return `${Number(allocation.onHand || 0)} allocated · ${Number(allocation.reserved || 0)} reserved · ${Number(allocation.available || 0)} available`;
                   })() : 'Map SKU first'}</td>
                   <td className="whitespace-nowrap px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{row.status.replaceAll('_', ' ')}</span></td>
                   <td className="min-w-[230px] px-4 py-3">
                     {mapping ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{mapping.internalSku || 'Mapped'} · {mapping.internalName || 'Product'}</span> :
-                      <div className="flex min-w-[220px] items-center gap-2">
+                      products.length === 0 && onCreateProduct ? (
+                        <button type="button" onClick={() => onCreateProduct({ sku: row.sku, title: row.title })} className="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100">Create Product from Listing</button>
+                      ) : <div className="flex min-w-[220px] items-center gap-2">
                         <select value={suggestedProductId} onChange={event => setSelectedProducts(current => ({ ...current, [key]: event.target.value }))} className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-700 focus:border-indigo-500 focus:outline-none">
                           <option value="">Select internal SKU</option>
                           {products.map(product => <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>)}

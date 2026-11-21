@@ -27,13 +27,20 @@ interface EbayPayoutsViewProps {
 }
 
 const formatMoney = (minor: number, currency = 'GBP') => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+const formatProviderAmount = (amount: any) => {
+  const value = Number(amount && typeof amount === 'object' ? amount.value : amount);
+  const unit = String(amount && typeof amount === 'object' ? amount.currency || 'GBP' : 'GBP').toUpperCase();
+  if (!Number.isFinite(value)) return '—';
+  try { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: unit }).format(value); }
+  catch { return `${unit} ${value.toFixed(2)}`; }
+};
 
 export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   currentUser,
   selectedStoreId = 'ALL',
   onStoreChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'payouts' | 'reconciliation' | 'ledger'>('payouts');
+  const [activeTab, setActiveTab] = useState<'payouts' | 'reconciliation' | 'ledger' | 'provider'>('payouts');
   const [storeFilter, setStoreFilter] = useState<string>(selectedStoreId);
   const [payouts, setPayouts] = useState<EbayPayout[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -41,6 +48,11 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
   const [currency, setCurrency] = useState('GBP');
   const [balances, setBalances] = useState<any>(null);
   const [reconciliations, setReconciliations] = useState<FinancialReconciliation[]>([]);
+  const [providerPayouts, setProviderPayouts] = useState<any[]>([]);
+  const [providerTransactions, setProviderTransactions] = useState<any[]>([]);
+  const [providerSummaries, setProviderSummaries] = useState<any[]>([]);
+  const [providerFinanceLastSyncedAt, setProviderFinanceLastSyncedAt] = useState<string | null>(null);
+  const [providerFinanceError, setProviderFinanceError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const canManageFinance = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'FINANCE_USER';
@@ -70,7 +82,26 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
       setPayouts(payoutRes.payouts || []);
       setBalances(payoutRes.balances || null);
       setReconciliations(recRes.reconciliations || []);
+      const connectedProductionAccounts = (accountRes.accounts || []).filter((account: any) =>
+        account.environment === 'PRODUCTION' && !account.isDemo &&
+        account.authStatus === 'CONNECTED' &&
+        (storeFilter === 'ALL' || account.id === storeFilter)
+      );
       setAccounts(accountRes.accounts || []);
+      const providerResults = await Promise.allSettled(connectedProductionAccounts.map(async (account: any) => ({
+        accountId: account.id,
+        accountName: account.name || account.sellerUsername || 'eBay Seller',
+        ...(await api.getEbayFinances(account.id)),
+      })));
+      const providerData = providerResults.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
+      setProviderPayouts(providerData.flatMap(item => (item.payouts || []).map((row: any) => ({ ...row, accountId: item.accountId, accountName: item.accountName }))));
+      setProviderTransactions(providerData.flatMap(item => (item.transactions || []).map((row: any) => ({ ...row, accountId: item.accountId, accountName: item.accountName }))));
+      setProviderSummaries(providerData.flatMap(item => (item.summaries || []).map((row: any) => ({ ...row, accountId: item.accountId, accountName: item.accountName }))));
+      const syncDates = providerData.map(item => item.lastSyncedAt).filter(Boolean).sort();
+      setProviderFinanceLastSyncedAt(syncDates.length ? syncDates[syncDates.length - 1] : null);
+      setProviderFinanceError(providerResults.some(result => result.status === 'rejected')
+        ? 'Some connected seller finance feeds could not be read. Check marketplace.view permission and seller sync status.'
+        : '');
       setLedger(ledgerRes.ledger || []);
       setCurrency(String(configRes.config?.baseCurrency || payoutRes.payouts?.[0]?.currency || 'GBP').toUpperCase());
     } catch (err) {
@@ -291,6 +322,17 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
             <Receipt className="w-4 h-4" />
             <span>C. Double-Entry Journal Audit</span>
           </button>
+          <button
+            onClick={() => setActiveTab('provider')}
+            className={`pb-3 font-medium flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'provider'
+                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>D. eBay API Source Feed ({providerPayouts.length}/{providerTransactions.length})</span>
+          </button>
         </nav>
       </div>
 
@@ -481,6 +523,53 @@ export const EbayPayoutsView: React.FC<EbayPayoutsViewProps> = ({
           </div>
         </div>
       )}
+      {/* Tab D: Read-only eBay provider finance snapshots */}
+      {activeTab === 'provider' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-indigo-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">eBay Finance API — Source Records</h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Read-only provider payouts, transactions and summaries. These records are not posted into invoices, expenses or the accounting ledger automatically.</p>
+                <p className="mt-1 text-[10px] text-slate-400">{providerFinanceLastSyncedAt ? `Latest source sync: ${new Date(providerFinanceLastSyncedAt).toLocaleString()}` : 'No eBay finance sync timestamp available for the selected connected sellers.'}</p>
+              </div>
+              <button type="button" onClick={() => void loadData()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh source records
+              </button>
+            </div>
+            {providerFinanceError && <div role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{providerFinanceError}</div>}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] text-slate-500">eBay payouts</p><p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{providerPayouts.length}</p></div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] text-slate-500">eBay transactions</p><p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{providerTransactions.length}</p></div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] text-slate-500">Finance summaries</p><p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{providerSummaries.length}</p></div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] text-slate-500">Connected seller feeds</p><p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{new Set([...providerPayouts, ...providerTransactions, ...providerSummaries].map(row => row.accountId)).size}</p></div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <h4 className="mb-3 text-xs font-semibold text-slate-900 dark:text-slate-100">Provider Payout Records</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800"><tr><th className="px-3 py-2">Payout ID</th><th className="px-3 py-2">Seller</th><th className="px-3 py-2">Date</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Transactions</th></tr></thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {providerPayouts.length ? providerPayouts.map((row, index) => <tr key={row.id || row.payoutId || index}><td className="px-3 py-2 font-mono">{row.payoutId || row.id || '—'}</td><td className="px-3 py-2">{row.accountName}</td><td className="px-3 py-2 whitespace-nowrap">{row.payoutDate ? new Date(row.payoutDate).toLocaleDateString() : '—'}</td><td className="px-3 py-2 text-right tabular-nums">{formatProviderAmount(row.amount)}</td><td className="px-3 py-2">{row.payoutStatus || '—'}</td><td className="px-3 py-2 text-right tabular-nums">{row.transactionCount ?? '—'}</td></tr>) : <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-500">No eBay provider payout snapshots found for the selected connected Production sellers.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <h4 className="mb-3 text-xs font-semibold text-slate-900 dark:text-slate-100">Provider Transaction Records</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800"><tr><th className="px-3 py-2">Transaction ID</th><th className="px-3 py-2">Seller</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Type</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-right">Fee</th><th className="px-3 py-2">Order / Payout</th></tr></thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {providerTransactions.length ? providerTransactions.map((row, index) => <tr key={row.id || row.transactionId || index}><td className="px-3 py-2 font-mono">{row.transactionId || row.id || '—'}</td><td className="px-3 py-2">{row.accountName}</td><td className="px-3 py-2 whitespace-nowrap">{row.transactionDate ? new Date(row.transactionDate).toLocaleDateString() : '—'}</td><td className="px-3 py-2">{String(row.transactionType || '—').replaceAll('_', ' ')}</td><td className="px-3 py-2 text-right tabular-nums">{formatProviderAmount(row.amount)}</td><td className="px-3 py-2 text-right tabular-nums">{row.totalFeeAmount ? formatProviderAmount(row.totalFeeAmount) : '—'}</td><td className="px-3 py-2">{row.orderId || row.payoutId || '—'}</td></tr>) : <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-slate-500">No eBay provider transaction snapshots found for the selected connected Production sellers.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm Deposit Modal */}
       {selectedPayoutForConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">

@@ -11,7 +11,7 @@ import {
   Package,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL } from '../types';
+import { StockBalance, StockLedgerEntry, User, SystemConfig, Client3PL, Product } from '../types';
 import { EbayStockSourcePanel } from './EbayStockSourcePanel';
 
 interface InventoryViewProps {
@@ -31,6 +31,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'BALANCES' | 'LEDGER'>('BALANCES');
   const [balances, setBalances] = useState<StockBalance[]>([]);
+  const [physicalBalances, setPhysicalBalances] = useState<StockBalance[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [ledger, setLedger] = useState<StockLedgerEntry[]>([]);
   const [clients, setClients] = useState<Client3PL[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,13 +45,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const loadInventoryData = async () => {
     setLoading(true);
     setBalances([]);
+    setPhysicalBalances([]);
+    setProducts([]);
     setLedger([]);
     try {
-      const [balRes, ledRes, clientRes] = await Promise.all([
-        api.getBalances(selectedStoreId, selectedEnvironment), api.getStockLedger(selectedStoreId, selectedEnvironment),
+      const physicalBalancesRequest = api.getBalances('ALL', selectedEnvironment);
+      const selectedBalancesRequest = selectedStoreId === 'ALL'
+        ? physicalBalancesRequest
+        : api.getBalances(selectedStoreId, selectedEnvironment);
+      const [balRes, physicalRes, ledRes, clientRes, productRes] = await Promise.all([
+        selectedBalancesRequest,
+        physicalBalancesRequest,
+        api.getStockLedger(selectedStoreId, selectedEnvironment),
         api.get3PLClients(selectedStoreId).catch(() => ({ clients: [], rateCards: [] })),
+        api.getProducts(selectedStoreId, selectedEnvironment),
       ]);
       setBalances(balRes.balances);
+      setPhysicalBalances(physicalRes.balances || []);
+      setProducts(productRes.products || []);
       setLedger(ledRes.ledger);
       setClients(clientRes.clients || []);
     } catch (err) {
@@ -117,7 +130,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="space-y-4">
-      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} selectedEnvironment={selectedEnvironment} localRecords={products} stockRecords={physicalBalances} allocationRecords={balances} mode="INVENTORY" onAllocationSaved={loadInventoryData} />
+
+      {!loading && products.length === 0 && balances.length === 0 && ledger.length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <p className="font-semibold">Production inventory has no internal Product or stock records yet.</p>
+          <p className="mt-1">Create real Products/SKUs first, then use a Purchase Order and Goods Receiving or an approved Stock Adjustment to record physical stock. eBay quantities are not treated as warehouse stock.</p>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
