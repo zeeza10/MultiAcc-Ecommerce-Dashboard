@@ -221,3 +221,49 @@ The audit baseline and concrete defects are now documented. Phase 0 is **audit-b
 5. Verify module UI → API → Worker handler → repository/table mappings and record acceptance tests.
 
 No Production business data, credentials, OAuth grants, schema, migration state, Cloudflare configuration, or deployments were changed by this supplemental audit.
+
+
+## 11. Final supplemental security/API review — 2026-11-21
+
+### 11.1 SECURITY DEFINER inventory
+
+The live catalog contains 34 SECURITY DEFINER functions across `private` and `public`:
+
+- All 34 have a function-level empty `search_path`.
+- None is executable by `anon`.
+- Five public-schema SECURITY DEFINER functions are executable only by `service_role`; authenticated users cannot execute them directly.
+- Private application RPCs executable by `authenticated` include caller/organization/permission checks or are identity-scoped helpers. Trigger-only functions have no direct execute grant to `anon` or `authenticated`.
+- Spot checks of organization bootstrap, invitations, role assignment, order creation, purchase-order operations, finance operations and marketplace allocation confirmed tenant/permission checks. The helper `private.has_org_permission` resolves active membership for the supplied organization and applies explicit DENY overrides before role/GRANT checks; Super Admin has the intended organization-wide bypass.
+
+This catalog review does not replace end-to-end tests with real authenticated users, but no anonymous execution or mutable search-path exposure was identified.
+
+### 11.2 RLS role matrix and customer PII exception
+
+The live system-role permission matrix was checked. Ops Manager has order create/edit but not delete; Super Admin has order create/edit/delete; Finance User, Warehouse Staff, Viewer and Client User have order view only.
+
+A concrete least-privilege defect was found: `customers` and `customer_addresses` write policies used `products.create/edit/delete`, so product permissions also authorized customer PII changes. The permission catalog has no separate customer permission family. In addition, the address-to-customer foreign key checked only `customer_id`, not the organization pair.
+
+Read-only data validation found **zero** existing cross-organization customer-address links. A forward-only migration was added in PR #158 to:
+- use `orders.create/edit/delete` for customer and address writes, retaining `orders.view` for reads;
+- enforce a composite `(customer_id, organization_id)` foreign key.
+
+The migration is not applied to the live database.
+
+### 11.3 API contract corrections
+
+Both previously identified frontend API calls have existing handlers but were missing from the Worker route allowlist. PR #158 adds:
+- `GET /orders/count` → `orders.view`
+- `GET /ebay/accounts/:accountId/listings` → `marketplace.view`
+
+Tests were added for these routes and fail-closed method/path variants. The Worker remains fail-closed for unknown routes. The account DELETE route intentionally has no generic module permission because its handler enforces workspace Super Admin role, same-origin request, exact-name confirmation, disconnected status and zero linked records before deletion.
+
+### 11.4 Verification limits and next gates
+
+- Supabase live migration history contains 83 entries. The repository migration checker verifies filename format and duplicate versions; it does not compare repository files against the live history. Exact 83-file GitHub/live parity still needs a repository-tree inventory.
+- The connector session cannot impersonate the six system roles safely for live RLS positive/negative tests. Role permission metadata and policy expressions were reviewed, but runtime two-organization isolation tests remain open.
+- Automated tests/build have not been executed in this session. PR #158 adds test assertions but is still Draft pending CI/local verification and review.
+- No Production migration, data write, eBay sync, OAuth scope change, queue retry, scheduler run, deployment or merge was performed.
+
+### 11.5 Current disposition
+
+The first security/API implementation slice is in Draft PR #158. PR #157 remains a separate Draft documentation-only audit record and is not required to be merged. Phase 0 is now sufficiently mapped to proceed with the next isolated implementation slices, while the runtime tenant-isolation tests and exact migration parity check remain explicit release gates.
