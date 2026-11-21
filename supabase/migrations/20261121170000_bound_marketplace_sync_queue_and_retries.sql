@@ -1,6 +1,13 @@
 -- Bound scheduled marketplace queue growth and avoid retrying permanent eBay request errors.
 -- Existing duplicate jobs are retained as DEAD_LETTER audit records; no job rows are deleted.
 
+ALTER TABLE public.marketplace_accounts
+  ADD COLUMN IF NOT EXISTS last_sync_attempt_at timestamptz;
+
+UPDATE public.marketplace_accounts
+SET last_sync_attempt_at = last_sync_at
+WHERE last_sync_attempt_at IS NULL AND last_sync_at IS NOT NULL;
+
 WITH scheduled_candidates AS (
   SELECT
     j.id,
@@ -162,16 +169,28 @@ BEGIN
     AND (locked_until IS NULL OR locked_until < now());
 
   RETURN QUERY
-  WITH candidates AS (
-    SELECT j.id
+  WITH ranked_candidates AS (
+    SELECT
+      j.id,
+      j.marketplace_account_id,
+      row_number() OVER (
+        PARTITION BY j.marketplace_account_id
+        ORDER BY j.scheduled_at, j.created_at, j.id
+      ) AS account_rank
     FROM public.marketplace_sync_jobs AS j
     WHERE j.status IN ('QUEUED','FAILED','RUNNING')
       AND j.scheduled_at <= now()
       AND j.attempt_count < j.max_attempts
       AND j.last_error_code IS DISTINCT FROM 'EBAY_API_30830'
       AND (j.locked_until IS NULL OR j.locked_until < now())
+  ),
+  candidates AS (
+    SELECT j.id
+    FROM public.marketplace_sync_jobs AS j
+    JOIN ranked_candidates AS ranked ON ranked.id = j.id
+    WHERE ranked.account_rank = 1
     ORDER BY j.scheduled_at, j.created_at
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE OF j SKIP LOCKED
     LIMIT LEAST(GREATEST(COALESCE(p_limit, 5), 1), 20)
   )
   UPDATE public.marketplace_sync_jobs AS j
@@ -188,6 +207,8 @@ $$;
 REVOKE ALL ON FUNCTION public.claim_marketplace_sync_jobs(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_marketplace_sync_jobs(integer) TO service_role;
 
+COMMENT ON COLUMN public.marketplace_accounts.last_sync_attempt_at IS
+  'Timestamp of the most recent marketplace synchronization attempt, whether successful or failed.';
 COMMENT ON FUNCTION public.enqueue_marketplace_sync_job(uuid, uuid, text) IS
   'Service-only scheduled enqueue. Serializes per account and reuses an active sync job to prevent duplicate queue growth.';
 COMMENT ON FUNCTION public.claim_marketplace_sync_jobs(integer) IS
