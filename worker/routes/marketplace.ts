@@ -358,6 +358,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
   const mappingBySku = new Map((mappingsResult.data || []).map((row: any) => [row.external_sku, row.product_id]));
   const productById = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
   const productBySku = new Map((productsResult.data || []).map((row: any) => [row.sku, row]));
+  const pageLimit = 5; // Bound DB RPCs and notification writes within the Cloudflare Worker subrequest budget.
   let imported = 0, skipped = 0, exceptions = 0, fetched = 0;
   progress.stage = 'SYNC_RUN_CREATE';
   const { data: run, error: runError } = await admin.from('marketplace_sync_runs').insert({ organization_id: account.organization_id, marketplace_account_id: account.id, started_at: new Date().toISOString(), status: 'RUNNING', data_environment: dataEnvironment }).select('id').single();
@@ -368,7 +369,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
     do {
       progress.stage = 'EBAY_ORDERS_API';
       const endpoint = new URL(`${ebayBaseUrl(account.environment)}/sell/fulfillment/v1/order`);
-      endpoint.searchParams.set('limit', '25'); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
+      endpoint.searchParams.set('limit', String(pageLimit)); endpoint.searchParams.set('offset', String(offset)); endpoint.searchParams.set('filter', `${filterField}:[${since}..]`);
       endpoint.searchParams.set('fieldGroups', 'TAX_BREAKDOWN');
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
       if (!response.ok) throw await readEbayOrdersApiError(response);
@@ -459,7 +460,7 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
       }
       offset += orders.length;
-      hasMore = orders.length === 25 || offset < total;
+      hasMore = orders.length === pageLimit || offset < total;
       progress.stage = 'ORDERS_CHECKPOINT_WRITE';
     const { error: checkpointSaveError } = await admin.from('marketplace_sync_checkpoints').upsert({
         organization_id: account.organization_id, marketplace_account_id: account.id,
