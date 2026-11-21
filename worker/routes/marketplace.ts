@@ -628,22 +628,57 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
   const accessToken = await getSellerAccessToken(env, account);
   const siteId = ebayTradingSiteId(account.marketplace);
   const admin = createServiceClient(env);
-  const batchId = crypto.randomUUID();
-  const pageSize = 200;
-  const maxPages = 10;
-  let totalPages = 1;
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,last_successful_at,consecutive_failures')
+    .eq('marketplace_account_id', account.id)
+    .eq('organization_id', account.organization_id)
+    .eq('resource_type', 'ACTIVE_LISTINGS_TRADING')
+    .maybeSingle();
+  if (checkpointError) throw new Error('The active listing sync checkpoint could not be loaded.');
+
+  const saved = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
+    ? checkpoint.cursor_state as Record<string, unknown> : {};
+  const savedActiveBatch = typeof saved.activeBatchId === 'string' ? saved.activeBatchId : '';
+  const savedNextPage = Number(saved.nextPageNumber);
+  const lastCompletedBatchId = typeof saved.lastCompletedBatchId === 'string' ? saved.lastCompletedBatchId : '';
+  const resuming = Boolean(savedActiveBatch && Number.isSafeInteger(savedNextPage) && savedNextPage >= 1);
+  const batchId = resuming ? savedActiveBatch : crypto.randomUUID();
+  let pageNumber = resuming ? savedNextPage : 1;
+  let totalPages = pageNumber;
   let totalEntries = 0;
   let fetched = 0;
   let pagesFetched = 0;
   let partial = false;
+  const maxPagesPerRun = 10;
 
-  for (let pageNumber = 1; pageNumber <= Math.min(totalPages, maxPages); pageNumber++) {
+  const saveCheckpoint = async (cursorState: Record<string, unknown>, completed: boolean, consecutiveFailures: number) => {
+    const { error } = await admin.from('marketplace_sync_checkpoints').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      resource_type: 'ACTIVE_LISTINGS_TRADING',
+      data_environment: 'PRODUCTION',
+      cursor_state: cursorState,
+      last_attempt_at: new Date().toISOString(),
+      last_successful_at: completed ? new Date().toISOString() : (checkpoint?.last_successful_at || null),
+      consecutive_failures: consecutiveFailures,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'marketplace_account_id,resource_type' });
+    if (error) throw new Error('The active listing sync checkpoint could not be saved.');
+  };
+
+  await saveCheckpoint({
+    activeBatchId: batchId,
+    nextPageNumber: pageNumber,
+    ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}),
+  }, false, Number(checkpoint?.consecutive_failures || 0));
+
+  while (pagesFetched < maxPagesPerRun && pageNumber <= totalPages) {
     const body = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <ActiveList>
     <Include>true</Include>
     <Pagination>
-      <EntriesPerPage>${pageSize}</EntriesPerPage>
+      <EntriesPerPage>200</EntriesPerPage>
       <PageNumber>${pageNumber}</PageNumber>
     </Pagination>
   </ActiveList>
@@ -668,8 +703,9 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
     }
     if (parsed.ack === 'PartialFailure') partial = true;
     totalEntries = parsed.totalEntries || totalEntries;
-    totalPages = parsed.totalPages || Math.max(1, Math.ceil(totalEntries / pageSize));
+    totalPages = parsed.totalPages || Math.max(1, Math.ceil(totalEntries / 200));
     pagesFetched++;
+
     for (const listing of parsed.listings) {
       const itemId = typeof listing.itemId === 'string' ? listing.itemId : '';
       if (!itemId) continue;
@@ -682,17 +718,30 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
       );
       fetched++;
     }
-    if (!parsed.listings.length && pageNumber >= totalPages) break;
+
+    // Re-read a partial-failure page on the next run; item upserts are idempotent.
+    const nextPageNumber = partial ? pageNumber : pageNumber + 1;
+    const pagesPending = partial || nextPageNumber <= totalPages;
+    const cursorState = pagesPending
+      ? { activeBatchId: batchId, nextPageNumber, ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}) }
+      : { lastCompletedBatchId: batchId };
+    await saveCheckpoint(
+      cursorState,
+      !pagesPending,
+      partial ? Number(checkpoint?.consecutive_failures || 0) + 1 : 0,
+    );
+    if (partial) break;
+    pageNumber = nextPageNumber;
   }
 
-  const pagesPending = partial || pagesFetched < totalPages;
+  const pagesPending = partial || pageNumber <= totalPages;
   await admin.from('marketplace_integration_events').insert({
     organization_id: account.organization_id,
     marketplace_account_id: account.id,
     event_type: 'ACTIVE_LISTINGS_SYNC_COMPLETED',
     severity: pagesPending ? 'WARNING' : 'INFO',
     message: `Trading API active listings sync stored ${fetched} listings from ${pagesFetched} page(s).`,
-    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, endpoint: 'Trading:GetMyeBaySelling', environment: 'PRODUCTION' },
+    metadata: { syncBatchId: batchId, fetched, totalEntries, pagesFetched, totalPages, pagesPending, nextPageNumber: pagesPending ? pageNumber : null, endpoint: 'Trading:GetMyeBaySelling', environment: 'PRODUCTION' },
   });
   return { batchId, fetched, totalEntries, pagesFetched, pagesPending };
 }
@@ -1418,16 +1467,26 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    const { data: tradingCheckpoint, error: tradingCheckpointError } = await admin.from('marketplace_sync_checkpoints')
+      .select('cursor_state').eq('marketplace_account_id', account.id)
+      .eq('organization_id', auth.organizationId).eq('resource_type', 'ACTIVE_LISTINGS_TRADING').maybeSingle();
+    if (tradingCheckpointError) throw new Error('The active listing checkpoint could not be loaded.');
+    const tradingCursor = tradingCheckpoint?.cursor_state && typeof tradingCheckpoint.cursor_state === 'object'
+      ? tradingCheckpoint.cursor_state as Record<string, unknown> : {};
+    const preferredTradingBatchId = typeof tradingCursor.lastCompletedBatchId === 'string'
+      ? tradingCursor.lastCompletedBatchId
+      : typeof tradingCursor.activeBatchId === 'string' ? tradingCursor.activeBatchId : null;
     const { data: latestTradingBatch, error: latestTradingBatchError } = await admin.from('marketplace_provider_snapshots')
       .select('sync_batch_id').eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
       .order('synced_at', { ascending: false }).limit(1).maybeSingle();
     if (latestTradingBatchError) throw new Error('Trading API active listing snapshots could not be loaded.');
-    const { data: tradingRows, error: tradingError } = latestTradingBatch?.sync_batch_id
+    const tradingBatchId = preferredTradingBatchId || latestTradingBatch?.sync_batch_id || null;
+    const { data: tradingRows, error: tradingError } = tradingBatchId
       ? await admin.from('marketplace_provider_snapshots')
           .select('external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
           .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
-          .eq('sync_batch_id', latestTradingBatch.sync_batch_id).order('synced_at', { ascending: false })
+          .eq('sync_batch_id', tradingBatchId).order('synced_at', { ascending: false })
       : { data: [], error: null };
     if (tradingError) throw new Error('Trading API active listing snapshots could not be loaded.');
     const inventoryListingIds = new Set((data || []).flatMap((row: any) =>
