@@ -148,7 +148,7 @@ export const api = {
 
   // eBay Accounts & Sync
   getEbayAccounts: (accountId?: string) => request<{ accounts: MarketplaceAccount[]; recentSyncs: any[]; integrationReady: boolean; integrationMessage: string; productionOAuthEnabled: boolean }>(`/ebay/accounts${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
-  createEbayAccount: (payload: { name: string; marketplace: 'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'; environment: 'SANDBOX' | 'PRODUCTION' }) => request<{ account: MarketplaceAccount }>('/ebay/accounts', { method: 'POST', body: JSON.stringify(payload) }),
+  createEbayAccount: (payload: { name: string; marketplace: 'EBAY_UK' | 'EBAY_US' | 'EBAY_DE'; environment: 'PRODUCTION' }) => request<{ account: MarketplaceAccount }>('/ebay/accounts', { method: 'POST', body: JSON.stringify(payload) }),
   deleteEbayAccount: (id: string, confirmationName: string) => request<{ success: boolean }>(`/ebay/accounts/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ confirmationName }) }),
   getEbayIntegrationConfig: () => request<{ environments: Array<{ environment: string; configured: boolean; clientIdMasked: string; credentialVersion: number; updatedAt: string | null }>; productionOAuthEnabled: boolean; encryptionReady: boolean }>('/ebay/integration/config'),
   getEbayIntegrationEvents: (accountId?: string) => request<{ events: Array<{ id: string; accountId: string | null; accountName: string; sellerUsername: string; eventType: string; severity: string; errorCode: string | null; message: string; apiName: string; httpStatus: number | null; providerCode: string | null; createdAt: string; nextSyncAt: string | null; retryable: boolean }> }>(`/ebay/integration/events${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
@@ -169,7 +169,25 @@ export const api = {
       imported: number; skipped: number; exceptions: number; fetched: number;
     }>(`/ebay/accounts/${id}/sync`, { method: 'POST' }),
   getEbayListings: (id: string, limit = 50, offset = 0) =>
-    request<{ listings: Array<{ sku: string; title: string; description: string; imageUrls: string[]; condition: string; inventoryQuantity: number | null; listingStatus: string; offers: any[]; syncedAt: string; syncStatus?: 'SYNCED' | 'PARTIAL'; syncError?: string | null }>; total: number; limit: number; offset: number }>(`/ebay/accounts/${id}/listings?limit=${limit}&offset=${offset}`),
+    request<{ listings: Array<{ sku: string; title: string; description: string; imageUrls: string[]; condition: string; inventoryQuantity: number | null; listingStatus: string; offers: any[]; syncedAt: string; syncStatus?: 'SYNCED' | 'PARTIAL'; syncError?: string | null }>; tradingListings: Array<{ offerId: string; itemId: string; sku: string; title: string; listingStatus: string; inventoryQuantity: number | null; offers: any[]; source: 'TRADING_API'; syncedAt: string; syncStatus: 'SYNCED' }>; tradingTotal: number; total: number; limit: number; offset: number }>(`/ebay/accounts/${id}/listings?limit=${limit}&offset=${offset}`),
+  syncEbayActiveListings: (id: string) =>
+    request<{ success: boolean; batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }>(`/ebay/accounts/${id}/sync-active-listings`, { method: 'POST' }),
+  syncEbaySellerAccount: (id: string) =>
+    request<{ success: boolean; batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/seller-account`, { method: 'POST' }),
+  syncEbayReturns: (id: string) =>
+    request<{ success: boolean; batchId: string; fetched: number; totalEntries: number; pagesFetched: number; pagesPending: boolean }>(`/ebay/accounts/${id}/sync-returns`, { method: 'POST' }),
+  getEbayReturns: (id: string) =>
+    request<{ returns: Array<Record<string, any>>; total: number; lastSyncedAt: string | null }>(`/ebay/accounts/${id}/returns`),
+  syncEbayAnalytics: (id: string) =>
+    request<{ success: boolean; batchId: string; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-analytics`, { method: 'POST' }),
+  syncEbayFinances: (id: string) =>
+    request<{ success: boolean; batchId: string; payouts: number; transactions: number; pagesPending: boolean; synced: string[]; failed: Array<{ resource: string; message: string }> }>(`/ebay/accounts/${id}/sync-finances`, { method: 'POST' }),
+  getEbayFinances: (id: string) =>
+    request<{ payouts: Array<Record<string, any>>; transactions: Array<Record<string, any>>; summaries: Array<Record<string, any>>; lastSyncedAt: string | null }>(`/ebay/accounts/${id}/finances`),
+  getEbayAnalytics: (id: string) =>
+    request<{ resources: Array<{ type: string; key: string; snapshot: Record<string, unknown>; providerUpdatedAt: string | null; syncedAt: string }> }>(`/ebay/accounts/${id}/analytics`),
+  getEbaySellerAccount: (id: string) =>
+    request<{ accountId: string; environment: 'PRODUCTION'; lastSyncedAt: string | null; resources: Array<{ type: string; snapshot: Record<string, unknown>; providerUpdatedAt: string | null; syncedAt: string }> }>(`/ebay/accounts/${id}/seller-account`),
   connectEbayAccount: (id: string) =>
     request<{ authorizationUrl: string }>(`/ebay/accounts/${id}/connect`, { method: 'POST' }),
   getExceptions: (accountId?: string) => request<{ exceptions: ExceptionItem[] }>(`/ebay/exceptions${accountId && accountId !== 'ALL' ? `?accountId=${encodeURIComponent(accountId)}` : ''}`),
