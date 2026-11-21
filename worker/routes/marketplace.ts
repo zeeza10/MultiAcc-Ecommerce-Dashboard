@@ -7,6 +7,7 @@ import { isRetryableEbaySyncFailure } from '../ebay-sync-retry';
 import { saveEbayProviderSnapshot } from '../ebay-provider-snapshots';
 import { ebayTradingSiteId, parseTradingActiveListings } from '../ebay-trading-listings';
 import { createEbayFinanceSignatureHeaders } from '../ebay-finance-signature';
+import { normalizeEbayAnalyticsResource, normalizeEbayFinanceSummary, normalizeEbaySellerAccountResource } from '../ebay-provider-normalizers';
 import { sendWebPushNotification } from '../web-push';
 import { isPlatformAdminUser } from '../platform-admin';
 import {
@@ -590,7 +591,7 @@ async function syncSellerAccountSettings(account: any, env: WorkerEnv): Promise<
       const payload = await fetchEbayAccountJson(accessToken, resource.path);
       await saveEbayProviderSnapshot(
         admin, account, resource.type, 'CURRENT', batchId,
-        { data: payload, marketplaceId, source: 'EBAY_ACCOUNT_API' },
+        normalizeEbaySellerAccountResource(resource.type, payload, marketplaceId),
         payload,
       );
       synced.push(resource.type);
@@ -825,7 +826,7 @@ async function syncSellerAnalytics(account: any, env: WorkerEnv): Promise<{ batc
       const payload = await fetchEbayAccountJson(accessToken, resource.path);
       await saveEbayProviderSnapshot(
         admin, account, resource.type, resource.externalId, batchId,
-        { data: payload, marketplaceId, source: 'EBAY_ANALYTICS_API' }, payload,
+        normalizeEbayAnalyticsResource(resource.type, payload, marketplaceId), payload,
       );
       synced.push(resource.externalId);
     } catch (error) {
@@ -908,7 +909,7 @@ async function syncSellerFinances(account: any, env: WorkerEnv): Promise<{
     try {
       const payload = await fetchEbayFinanceJson(accessToken, resource.path, marketplaceId, env);
       await saveEbayProviderSnapshot(admin, account, resource.type, resource.key, batchId,
-        { data: payload, marketplaceId, source: 'EBAY_FINANCES_API' }, payload);
+        normalizeEbayFinanceSummary(resource.key, payload, marketplaceId), payload);
       synced.push(resource.key);
     } catch (error) {
       const failure = getEbaySyncFailure(error, 'EBAY_FINANCES_API_FAILED');
