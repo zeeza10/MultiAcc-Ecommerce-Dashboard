@@ -1795,14 +1795,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
         .in('id', abandonedRunIds)
         .eq('status', 'RUNNING');
       if (recoverError) throw new Error('Abandoned Production sync runs could not be finalized.');
-      await admin.from('marketplace_integration_events').insert({
-        organization_id: (accounts || [])[0].organization_id,
-        marketplace_account_id: null,
-        event_type: 'SYNC_RUN_RECOVERY_COMPLETED',
-        severity: 'WARNING',
-        message: `Recovered ${abandonedRunIds.length} abandoned Production sync-run record(s); no business data was changed.`,
-        metadata: { recoveredRunCount: abandonedRunIds.length, environment: 'PRODUCTION', recoveredRunIds: abandonedRunIds },
-      });
+      console.info('[eBay sync recovery] finalized abandoned Production sync runs', { recoveredRunCount: abandonedRunIds.length });
     }
   }
 
