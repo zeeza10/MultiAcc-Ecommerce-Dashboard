@@ -1,12 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ebaySiteMarketplaceId, parseTradingActiveListings } from './ebay-trading-listings';
+import { ebayTradingSiteId, parseTradingActiveListings } from './ebay-trading-listings';
 
 describe('eBay Trading active listing parser', () => {
   it('maps the product marketplace code to the Trading API site marketplace', () => {
-    assert.equal(ebaySiteMarketplaceId('EBAY_UK'), 'EBAY_GB');
-    assert.equal(ebaySiteMarketplaceId('EBAY_US'), 'EBAY_US');
-    assert.equal(ebaySiteMarketplaceId('EBAY_DE'), 'EBAY_DE');
+    assert.equal(ebayTradingSiteId('EBAY_UK'), '3');
+    assert.equal(ebayTradingSiteId('EBAY_US'), '0');
+    assert.equal(ebayTradingSiteId('EBAY_DE'), '77');
   });
 
   it('extracts provider listing values without inventing missing fields', () => {
