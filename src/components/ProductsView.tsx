@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Product, User, SystemConfig, Client3PL } from '../types';
+import { EbayStockSourcePanel } from './EbayStockSourcePanel';
 
 interface ProductsViewProps {
   currentUser: User;
@@ -156,6 +157,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   return (
     <div className="space-y-4">
+      <EbayStockSourcePanel selectedStoreId={selectedStoreId} localRecords={products} mode="PRODUCTS" />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
