@@ -44,9 +44,13 @@ All four versions are already present in the live Production migration history. 
 - The Worker checks saved scopes and reports when a seller must reconnect. Existing sellers are not forcibly disconnected and existing grants are not silently widened.
 - Returns read import uses the seller user token with the Post-Order API's documented IAF authorization header.
 
+## Production queue recovery
+
+The Worker now finalizes abandoned Production sync-run rows after the 15-minute lease safety window, while preserving any run protected by a current valid job lease. The 2026-11-21 14:45:48Z recovery pass marked 363 abandoned run records as FAILED with `SYNC_RUN_ABANDONED`. No business records or raw provider payloads were deleted or rewritten. Three currently leased Production jobs remain under observation.
+
 ## Build and deployment evidence
 
-Main commit `e464f549daebd3fc09bc756aedc4ca52d4b85635` passed TypeScript validation, 103 tests and the Vite production build. Cloudflare Production deployment completed at `2026-11-21T14:32:46Z`, Worker version `ae1144a3-c5f1-4580-b587-91b819573fcb`. Subsequent signing-key PEM hardening is being verified by the latest main build.
+Main commit `e464f549daebd3fc09bc756aedc4ca52d4b85635` passed TypeScript validation, 107 tests and the Vite production build. The latest Cloudflare Production deployment completed at `2026-11-21T14:45:51Z`, Worker version `76e8e8e9-c40e-4121-9bbb-633b943e800e`. It includes signing-key PEM newline handling, Production-only scheduling, bounded order/inventory pages and abandoned-run recovery.
 
 ## Remaining release gates
 
