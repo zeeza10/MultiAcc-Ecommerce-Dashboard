@@ -726,12 +726,8 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
     const cursorState = pagesPending
       ? { activeBatchId: batchId, nextPageNumber, ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}) }
       : { lastCompletedBatchId: batchId };
-    await saveCheckpoint(
-      cursorState,
-      !pagesPending,
-      consecutiveFailures = partial ? consecutiveFailures + 1 : 0,
-      consecutiveFailures,
-    );
+    consecutiveFailures = partial ? consecutiveFailures + 1 : 0;
+    await saveCheckpoint(cursorState, !pagesPending, consecutiveFailures);
     if (partial) break;
     pageNumber = nextPageNumber;
   }
