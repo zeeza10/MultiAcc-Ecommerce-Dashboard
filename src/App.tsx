@@ -40,13 +40,22 @@ const DEFAULT_CONFIG: SystemConfig = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  'dashboard', 'orders', 'ebay-accounts', 'customers', 'returns', 'products',
+  'dashboard', 'orders', 'ebay-accounts', 'ebay-active-listings', 'ebay-seller-account',
+  'ebay-returns', 'ebay-analytics', 'ebay-finances', 'customers', 'returns', 'products',
   'inventory', 'adjustments', 'dropshipping', 'warehouse', 'locations',
   'warehouse-services', 'suppliers', 'purchase-orders', '3pl-clients',
   'fulfilment', 'shipping', 'storage', 'invoices', 'payments', 'expenses',
   'payouts', 'reconciliation', 'profitability', 'reports', 'notifications',
   'audit-log', 'settings', 'employee-access',
 ];
+
+const EBAY_MODULE_SECTIONS: Partial<Record<NavItem, 'LISTINGS' | 'SELLER_ACCOUNT' | 'RETURNS' | 'ANALYTICS' | 'FINANCES'>> = {
+  'ebay-active-listings': 'LISTINGS',
+  'ebay-seller-account': 'SELLER_ACCOUNT',
+  'ebay-returns': 'RETURNS',
+  'ebay-analytics': 'ANALYTICS',
+  'ebay-finances': 'FINANCES',
+};
 
 const readWorkspacePreference = <T,>(organizationId: string, key: string, fallback: T): T => {
   try {
@@ -520,13 +529,14 @@ export default function App() {
           )}
 
 
-          {activeTab === 'ebay-accounts' && (
+          {(activeTab === 'ebay-accounts' || Boolean(EBAY_MODULE_SECTIONS[activeTab])) && (
             <EbayAccountsView
-              key={`ebay-accounts:${selectedStoreId}`}
+              key={`ebay-accounts:${selectedStoreId}:${activeTab}`}
               currentUser={currentUser}
               config={config}
               selectedStoreId={selectedStoreId}
               onNavigate={handleNavigate}
+              initialSection={EBAY_MODULE_SECTIONS[activeTab] || null}
             />
           )}
 
