@@ -26,14 +26,23 @@ describe('eBay Finance RFC9421 request signatures', () => {
   });
 });
 
-describe('eBay signing private-key PEM parsing', () => {
-  it('decodes the PKCS#8 PEM body without storing or exposing key material', () => {
-    const pem = '-----BEGIN PRIVATE KEY-----\nAQIDBA==\n-----END PRIVATE KEY-----\n';
-    assert.deepEqual([...decodeEbayPrivateKeyPem(pem)], [1, 2, 3, 4]);
+describe('eBay signing private-key parsing', () => {
+  const apiPrivateKey = 'MC4CAQAwBQYDK2VwBCIEIK7aOaAmUXkpd03Tx/zHBvn12mM85C7SVkHLkaXcxwvf';
+
+  it('decodes the base64 PKCS#8 DER format returned by eBay Key Management API', () => {
+    const der = decodeEbayPrivateKeyPem(apiPrivateKey);
+    assert.equal(der[0], 0x30);
+    assert.equal(der.length, 48);
   });
 
-  it('rejects malformed or non-PEM private key values', () => {
-    assert.throws(() => decodeEbayPrivateKeyPem('not-a-pem'));
-    assert.throws(() => decodeEbayPrivateKeyPem('-----BEGIN PRIVATE KEY-----\n***\n-----END PRIVATE KEY-----'));
+  it('accepts the same PKCS#8 DER key wrapped in PEM headers', () => {
+    const pem = `-----BEGIN PRIVATE KEY-----\\n${apiPrivateKey}\\n-----END PRIVATE KEY-----\\n`;
+    assert.deepEqual(decodeEbayPrivateKeyPem(pem), decodeEbayPrivateKeyPem(apiPrivateKey));
+  });
+
+  it('rejects malformed and non-PKCS#8 values', () => {
+    assert.throws(() => decodeEbayPrivateKeyPem('not-a-key'));
+    assert.throws(() => decodeEbayPrivateKeyPem('AQIDBA=='));
+    assert.throws(() => decodeEbayPrivateKeyPem('-----BEGIN PRIVATE KEY-----\\n***\\n-----END PRIVATE KEY-----'));
   });
 });
