@@ -650,6 +650,7 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
   let pagesFetched = 0;
   let partial = false;
   const maxPagesPerRun = 10;
+  let consecutiveFailures = Number(checkpoint?.consecutive_failures || 0);
 
   const saveCheckpoint = async (cursorState: Record<string, unknown>, completed: boolean, consecutiveFailures: number) => {
     const { error } = await admin.from('marketplace_sync_checkpoints').upsert({
@@ -728,7 +729,8 @@ async function syncTradingActiveListings(account: any, env: WorkerEnv): Promise<
     await saveCheckpoint(
       cursorState,
       !pagesPending,
-      partial ? Number(checkpoint?.consecutive_failures || 0) + 1 : 0,
+      consecutiveFailures = partial ? consecutiveFailures + 1 : 0,
+      consecutiveFailures,
     );
     if (partial) break;
     pageNumber = nextPageNumber;
