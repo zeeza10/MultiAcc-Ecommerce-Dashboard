@@ -61,7 +61,7 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'POST' && path.startsWith('/payouts/') && path.endsWith('/confirm-deposit')) return 'finance.manage';
   if (method === 'GET' && path === '/payouts') return 'finance.view';
   if (method === 'GET' && path === '/reconciliation') return 'finance.view';
-  if (method === 'GET' && path.startsWith('/reports/R-') && path.length === 13 && !Number.isNaN(Number(path.slice(-2)))) return 'reports.view';
+  if (method === 'GET' && /^\\/reports\\/R-(0[1-9]|1[0-4])$/.test(path)) return 'reports.view';
   if (method === 'GET' && path === '/dropshipping/calculations') return 'orders.view';
   if (method === 'POST' && path === '/dropshipping/calculations') return 'products.create';
   if (method === 'GET' && path === '/warehouses') return 'inventory.view';
