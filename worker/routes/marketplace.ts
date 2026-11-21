@@ -412,14 +412,8 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
             return product?.id || null;
           },
         );
-        for (const lineException of lineResult.exceptions) {
-          const created = await recordEbayOrderException(
-            admin, account, 'INCOMPLETE_ORDER_LINE', lineException.referenceId,
-            lineException.details, lineException.rawPayload,
-          );
-          if (created) exceptions++;
-        }
-        progress.exceptions = exceptions;
+        // Defer incomplete-line exceptions until the import RPC confirms a new
+        // order. Re-seeing an existing order must not create fresh exceptions.
         const items = lineResult.items;
         const payload = {
           external_order_id: externalId, order_number: `EB-${account.id.slice(0, 6)}-${externalId}`,
@@ -455,6 +449,13 @@ async function syncSellerOrders(account: any, env: WorkerEnv, progress: EbaySync
         else if (inserted?.inserted) {
           imported++;
           exceptions += Number(inserted.exception_count || 0);
+          for (const lineException of lineResult.exceptions) {
+            const created = await recordEbayOrderException(
+              admin, account, 'INCOMPLETE_ORDER_LINE', lineException.referenceId,
+              lineException.details, lineException.rawPayload,
+            );
+            if (created) exceptions++;
+          }
           await notifyNewEbayOrder(admin, account, externalId, env);
         }
         progress.imported = imported; progress.skipped = skipped; progress.exceptions = exceptions;
