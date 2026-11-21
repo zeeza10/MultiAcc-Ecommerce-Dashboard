@@ -159,6 +159,11 @@ const FINANCE_SAFE_KEYS = new Set([
   'transactionCount','totalAmount','totalFeeAmount','amount','currency','value','count',
   'status','payoutStatus','totalPayoutAmount','totalPayoutCount','totalTransactionCount',
   'totalFees','feeAmount','totalRefundAmount','totalSalesAmount','totalCreditsAmount',
+  'creditCount','creditAmount','creditBookingEntry','debitCount','debitAmount','debitBookingEntry',
+  'refundCount','refundAmount','refundBookingEntry','purchaseCount','purchaseAmount','purchaseBookingEntry',
+  'adjustmentCount','adjustmentAmount','adjustmentBookingEntry','nonSaleChargeCount','nonSaleChargeAmount','nonSaleChargeBookingEntry',
+  'shippingLabelCount','shippingLabelAmount','shippingLabelBookingEntry','transferCount','transferAmount','transferBookingEntry',
+  'paymentDisputeCount','paymentDisputeAmount','paymentDisputeBookingEntry',
   'payoutSummary','transactionSummary','sellerFundsSummary',
 ]);
 
