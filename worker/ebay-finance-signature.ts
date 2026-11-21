@@ -19,6 +19,12 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function mintEbayApplicationToken(clientId: string, clientSecret: string): Promise<string> {
   const form = new URLSearchParams({
     grant_type: 'client_credentials',
@@ -116,7 +122,7 @@ export async function createEbayFinanceSignatureHeaders(
   const privateKey = await decryptEbayValue(key.private_key_ciphertext, env);
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
-    decodeBase64(privateKey),
+    toArrayBuffer(decodeBase64(privateKey)),
     { name: 'Ed25519' },
     false,
     ['sign'],
@@ -126,7 +132,7 @@ export async function createEbayFinanceSignatureHeaders(
   const signature = await crypto.subtle.sign(
     { name: 'Ed25519' },
     cryptoKey,
-    new TextEncoder().encode(signatureBase),
+    toArrayBuffer(new TextEncoder().encode(signatureBase)),
   );
   return {
     'x-ebay-signature-key': key.public_key_jwe,
