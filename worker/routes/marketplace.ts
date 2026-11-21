@@ -1366,7 +1366,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     return json({ success: !result.pagesPending, ...result });
   }
 
-  const returnsReadMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/returns$/);
+  const returnsReadMatch = path.match(/^\\/ebay\\/accounts\\/([^/]+)\\/returns$/);
   if (returnsReadMatch && request.method === 'GET') {
     if (!auth.permissions.has('*') && !auth.permissions.has('marketplace.view') && !auth.permissions.has('marketplace.manage')) {
       return json({ error: 'Marketplace view permission is required.' }, 403);
@@ -1377,18 +1377,31 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production return data is available.' }, 409);
     const admin = createServiceClient(env);
-    const { data: latest, error: latestError } = await admin.from('marketplace_provider_snapshots')
+    const { data: checkpoint, error: checkpointError } = await auth.repositoryContext.supabase.from('marketplace_sync_checkpoints')
+      .select('cursor_state,last_successful_at').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', accountId).eq('resource_type', 'RETURNS').maybeSingle();
+    if (checkpointError) throw new Error('The eBay returns checkpoint could not be loaded.');
+    const cursor = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
+      ? checkpoint.cursor_state as Record<string, unknown> : {};
+    const completedBatchId = typeof cursor.lastCompletedBatchId === 'string' ? cursor.lastCompletedBatchId : '';
+    const { data: latest, error: latestError } = completedBatchId ? { data: null, error: null } : await admin.from('marketplace_provider_snapshots')
       .select('sync_batch_id,synced_at').eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
       .order('synced_at', { ascending: false }).limit(1).maybeSingle();
     if (latestError) throw new Error('eBay return snapshots could not be loaded.');
-    if (!latest?.sync_batch_id) return json({ returns: [], total: 0, lastSyncedAt: null });
+    const batchId = completedBatchId || latest?.sync_batch_id || '';
+    if (!batchId) return json({ returns: [], total: 0, lastSyncedAt: null, pagesPending: Boolean(cursor.activeBatchId) });
     const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
       .select('id,external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
-      .eq('sync_batch_id', latest.sync_batch_id).order('synced_at', { ascending: false }).limit(500);
+      .eq('sync_batch_id', batchId).order('synced_at', { ascending: false }).limit(500);
     if (error) throw new Error('eBay return snapshots could not be loaded.');
-    return json({ returns: (data || []).map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })), total: data?.length || 0, lastSyncedAt: latest.synced_at });
+    return json({
+      returns: (data || []).map((row: any) => ({ id: row.external_id, ...row.snapshot, syncedAt: row.synced_at })),
+      total: data?.length || 0,
+      lastSyncedAt: checkpoint?.last_successful_at || latest?.synced_at || null,
+      pagesPending: Boolean(cursor.activeBatchId),
+    });
   }
 
   const financeSyncMatch = path.match(/^\/ebay\/accounts\/([^/]+)\/sync-finances$/);
