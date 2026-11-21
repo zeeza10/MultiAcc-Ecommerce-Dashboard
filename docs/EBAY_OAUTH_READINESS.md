@@ -23,6 +23,10 @@ The active integration is Production only. No Supabase Development Branch or tes
 
 PR #160 adds permanent/transient failure classification (including no automatic retry for eBay 30830), a separate last-attempt timestamp, an atomic per-account scheduled enqueue RPC, queue coalescing that preserves old job rows as DEAD_LETTER audit records, and one-job-per-account claim selection. It also treats fully imported orders with SKU mapping exceptions as completed sync work rather than retrying them. The Production migration `20261121170000_bound_marketplace_sync_queue_and_retries` is now present in the live Production migration history. The follow-on Production-only queue migration and provider-snapshot migration are in the current implementation PR and must be applied before the new Worker version is deployed.
 
+## PR #161 — Production eBay modules
+
+The implementation adds Seller Account read models, Trading API legacy active listing coverage, read-only Post-Order return imports, Analytics API traffic/standards/customer-service snapshots, and signed read-only Finances API imports. New normalized provider snapshots are separate from server-only raw payload storage. The Production-only queue policy and signing-key storage are explicit PRODUCTION migrations. Existing Production sellers currently have only the original OAuth scopes; Analytics and Finances sync will request reconnect with the additional read scopes before any API call. The Returns read import uses the currently authorized token; the modern Return API GraphQL path remains a follow-up. No seller-side write actions are exposed.
+
 ## Important limitations / not yet complete
 
 1. **Active Listings coverage:** Current listing snapshots are based on Inventory API inventory items/offers. eBay documents that Inventory API does not return listings created through Seller Hub or Trading API unless they are migrated into the Inventory API model. A separate compatibility/read path is required for complete Active Listings coverage; no listing create/revise/publish/delete scope is included in this milestone without approval.
