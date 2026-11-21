@@ -116,9 +116,12 @@ The module mapping above is a code-level contract inventory. This PR expands per
 
 - PR #158 was squash-merged to `main` at `5618378f83601dcd988edb3be9131338d8f68343`.
 - The Cloudflare build for that main-branch commit failed on the malformed eBay listings permission regex. It did not deploy successfully.
-- PR #159 corrects that regex. Cloudflare's Preview bot reported **Build: Success** and **Deployment: Success** for its original head commit `db079fb3b97e9c78d5eae463f47b68dbe33fee8d`.
-- This audit PR adds a customer-directory data-integrity correction after that original preview. The updated PR head must receive a fresh Preview build before merge.
-- GitHub Actions tests were not manually triggered because the repository's monthly Actions minutes were exhausted.
+- PR #159 corrects the eBay listings permission regex and adds fail-closed route coverage.
+- The Worker build command now runs `npm run lint && npm test && vite build`, so type checking and automated tests are part of the Cloudflare build gate.
+- Cloudflare Preview for source commit `8dc3b5773b967465714d87ae0f38f56566612394` completed successfully: `tsc --noEmit` passed, **82 tests passed / 0 failed**, Vite build succeeded, and `wrangler preview` deployment completed.
+- That test suite includes all mapped Worker route/method permission cases, unsupported method/path variants, and the implemented report ID range R-01 through R-14.
+- Preview intentionally lacks Production-only eBay OAuth and rate-limit bindings; therefore this is build/test/preview evidence, not a live Production API smoke test.
+- GitHub Actions were not manually triggered because the repository's monthly Actions minutes were exhausted.
 - No successful Production deployment of the PR #158 changes has been confirmed.
 - No Production migration was applied; no eBay sync, queue retry, scheduler, OAuth scope change, or Production business-data write was run.
 
