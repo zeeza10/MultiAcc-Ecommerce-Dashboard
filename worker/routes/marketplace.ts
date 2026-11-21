@@ -1782,6 +1782,7 @@ export async function runScheduledMarketplaceSync(env: WorkerEnv): Promise<void>
       const { data: account, error: accountError } = await admin.from('marketplace_accounts')
         .select('id,organization_id,environment,is_demo,auth_status,marketplace')
         .eq('id', job.marketplace_account_id).eq('organization_id', job.organization_id)
+        .eq('environment', 'PRODUCTION').eq('is_demo', false)
         .in('marketplace', ['EBAY_UK', 'EBAY_US', 'EBAY_DE']).maybeSingle();
       if (accountError || !account || account.is_demo || account.auth_status !== 'CONNECTED'
         || account.environment !== 'PRODUCTION') {
