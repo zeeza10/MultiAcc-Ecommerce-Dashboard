@@ -20,6 +20,8 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/connect$/.test(path)) return 'marketplace.manage';
   if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/sync$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/ebay/exceptions') return 'marketplace.view';
+  if (method === 'GET' && path === '/ebay/sku-mappings') return 'marketplace.view';
+  if (method === 'POST' && path === '/ebay/sku-mappings') return 'marketplace.manage';
   if (method === 'POST' && /^\/ebay\/exceptions\/[^/]+\/resolve$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && path === '/system/config') return 'dashboard.view';
   if (method === 'POST' && path === '/system/config') return 'settings.manage';

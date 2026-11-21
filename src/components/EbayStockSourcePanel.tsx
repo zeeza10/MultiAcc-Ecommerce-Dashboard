@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link2, RefreshCw, Store, Package, AlertCircle } from 'lucide-react';
+import { Link2, RefreshCw, Store, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 
 type ListingRow = {
@@ -15,6 +15,19 @@ type ListingRow = {
   syncedAt?: string;
 };
 
+type SkuMapping = {
+  id: string;
+  marketplaceAccountId: string;
+  productId: string;
+  externalSku: string;
+  externalListingId: string;
+  listingTitle: string;
+  internalSku: string;
+  internalName: string;
+};
+
+type ProductOption = { id: string; sku: string; name: string };
+
 interface EbayStockSourcePanelProps {
   selectedStoreId: string;
   localRecords?: any[];
@@ -28,15 +41,35 @@ const money = (value: unknown, currency = 'GBP') => {
   catch { return `${currency} ${amount.toFixed(2)}`; }
 };
 
+const rowKey = (row: ListingRow) => `${row.accountId}:${row.sku}`;
+
 export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ selectedStoreId, localRecords = [], mode }) => {
   const [rows, setRows] = useState<ListingRow[]>([]);
+  const [mappings, setMappings] = useState<SkuMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState('');
+
+  const products = useMemo<ProductOption[]>(() => {
+    const seen = new Set<string>();
+    return localRecords.map(record => ({
+      id: String(record.id || record.productId || ''),
+      sku: String(record.sku || '').trim(),
+      name: String(record.name || record.productName || record.sku || 'Product'),
+    })).filter(product => {
+      if (!product.id || !product.sku || seen.has(product.id)) return false;
+      seen.add(product.id);
+      return true;
+    });
+  }, [localRecords]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const accountResult = await api.getEbayAccounts(selectedStoreId);
       const accounts = (accountResult.accounts || []).filter((account: any) =>
@@ -44,8 +77,11 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
         account.authStatus === 'CONNECTED' &&
         (selectedStoreId === 'ALL' || account.id === selectedStoreId)
       );
-      const pages = await Promise.all(accounts.map(async (account: any) => {
-        const result = await api.getEbayListings(account.id, 100, 0);
+      const accountData = await Promise.all(accounts.map(async (account: any) => {
+        const [result, mappingResult] = await Promise.all([
+          api.getEbayListings(account.id, 100, 0),
+          api.getEbaySkuMappings(account.id),
+        ]);
         const sourceRows = [
           ...(result.tradingListings || []),
           ...(result.listings || []).map((listing: any) => ({
@@ -53,25 +89,28 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
             itemId: listing.itemId || listing.offers?.[0]?.listingId,
           })),
         ];
-        return sourceRows.map((listing: any): ListingRow => {
-          const offer = Array.isArray(listing.offers) ? listing.offers[0] : undefined;
-          const priceValue = offer?.pricingSummary?.price?.value ?? offer?.price?.value;
-          const currency = offer?.pricingSummary?.price?.currency ?? offer?.price?.currency ?? 'GBP';
-          return {
+        const unique = new Map<string, ListingRow>();
+        sourceRows.forEach((listing: any) => {
+          const sku = String(listing.sku || '').trim();
+          if (!sku) return;
+          const row: ListingRow = {
             accountId: account.id,
             accountName: account.name || account.sellerUsername || 'eBay Seller',
-            sku: String(listing.sku || '').trim(),
+            sku,
             title: String(listing.title || listing.product?.title || 'Untitled listing'),
             itemId: listing.itemId || listing.offerId,
             status: String(listing.listingStatus || 'UNKNOWN'),
             quantity: listing.inventoryQuantity == null ? null : Number(listing.inventoryQuantity),
-            price: priceValue == null ? undefined : String(priceValue),
-            currency,
+            price: listing.offers?.[0]?.pricingSummary?.price?.value ?? listing.offers?.[0]?.price?.value,
+            currency: listing.offers?.[0]?.pricingSummary?.price?.currency ?? listing.offers?.[0]?.price?.currency ?? 'GBP',
             syncedAt: listing.syncedAt,
           };
+          unique.set(`${row.sku}:${row.itemId || ''}`, row);
         });
+        return { rows: [...unique.values()], mappings: mappingResult.mappings || [] };
       }));
-      setRows(pages.flat().filter(row => row.sku));
+      setRows(accountData.flatMap(item => item.rows));
+      setMappings(accountData.flatMap(item => item.mappings));
       setUpdatedAt(new Date().toISOString());
     } catch (err: any) {
       setError(err?.message || 'eBay listing data could not be loaded.');
@@ -82,9 +121,47 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
 
   useEffect(() => { void load(); }, [load]);
 
-  const localSkus = useMemo(() => new Set(localRecords.map(record => String(record.sku || '').trim().toLowerCase()).filter(Boolean)), [localRecords]);
-  const matchedCount = rows.filter(row => localSkus.has(row.sku.toLowerCase())).length;
-  const unmatchedCount = rows.length - matchedCount;
+  const mappingByKey = useMemo(() => {
+    const result = new Map<string, SkuMapping>();
+    mappings.forEach(mapping => result.set(`${mapping.marketplaceAccountId}:${mapping.externalSku}`, mapping));
+    return result;
+  }, [mappings]);
+
+  const localSkuByKey = useMemo(() => new Map(products.map(product => [product.sku.toLowerCase(), product.id])), [products]);
+  const mappedCount = rows.filter(row => mappingByKey.has(rowKey(row))).length;
+  const unmatchedCount = rows.length - mappedCount;
+
+  const saveMapping = async (row: ListingRow) => {
+    const key = rowKey(row);
+    const productId = selectedProducts[key] || localSkuByKey.get(row.sku.toLowerCase()) || '';
+    if (!productId) {
+      setError('Please select an internal Product/SKU before saving this mapping.');
+      return;
+    }
+    setSavingKey(key);
+    setError('');
+    setNotice('');
+    try {
+      await api.createEbaySkuMapping({
+        marketplaceAccountId: row.accountId,
+        productId,
+        externalSku: row.sku,
+        externalListingId: row.itemId,
+        listingTitle: row.title,
+      });
+      const product = products.find(item => item.id === productId);
+      setMappings(current => [...current, {
+        id: `local:${key}`, marketplaceAccountId: row.accountId, productId,
+        externalSku: row.sku, externalListingId: row.itemId || '', listingTitle: row.title,
+        internalSku: product?.sku || '', internalName: product?.name || '',
+      }]);
+      setNotice(`External SKU ${row.sku} is now mapped to ${product?.sku || 'the selected product'}.`);
+    } catch (err: any) {
+      setError(err?.message || 'The SKU mapping could not be saved.');
+    } finally {
+      setSavingKey('');
+    }
+  };
 
   return (
     <section className="rounded-xl border border-indigo-100 bg-white shadow-sm overflow-hidden">
@@ -92,8 +169,8 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
         <div className="flex items-start gap-3">
           <span className="rounded-lg bg-indigo-100 p-2 text-indigo-700"><Store className="h-5 w-5" /></span>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">{mode === 'PRODUCTS' ? 'eBay Listing SKU Source' : 'eBay Marketplace Stock Feed'}</h2>
-            <p className="mt-1 text-xs text-slate-500">Read-only marketplace data · physical warehouse stock remains separate</p>
+            <h2 className="text-sm font-semibold text-slate-900">{mode === 'PRODUCTS' ? 'eBay Listing SKU Source & Mapping' : 'eBay Marketplace Stock Feed'}</h2>
+            <p className="mt-1 text-xs text-slate-500">Production marketplace data · warehouse physical stock remains separate</p>
           </div>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
@@ -102,36 +179,48 @@ export const EbayStockSourcePanel: React.FC<EbayStockSourcePanelProps> = ({ sele
       </div>
       <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">eBay SKUs</p><p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{rows.length}</p></div>
-        <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Matched to local SKU</p><p className="mt-1 text-xl font-semibold tabular-nums text-emerald-700">{matchedCount}</p></div>
+        <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Mapped to internal SKU</p><p className="mt-1 text-xl font-semibold tabular-nums text-emerald-700">{mappedCount}</p></div>
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Mapping required</p><p className="mt-1 text-xl font-semibold tabular-nums text-amber-700">{unmatchedCount}</p></div>
         <div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] text-slate-500">Connected scope</p><p className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedStoreId === 'ALL' ? 'All connected sellers' : 'Selected seller'}</p></div>
       </div>
       {error && <div role="alert" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+      {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>
-            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Local SKU Match</th>
+            <th className="px-4 py-3 font-semibold">External SKU</th><th className="px-4 py-3 font-semibold">Listing</th><th className="px-4 py-3 font-semibold">Seller</th><th className="px-4 py-3 font-semibold">Price</th><th className="px-4 py-3 font-semibold">eBay Qty</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Internal SKU Mapping</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing data…</td></tr> :
-              rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No synced eBay listing records found for this seller scope.</td></tr> :
+            {loading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading saved eBay listing and SKU mapping data…</td></tr> :
+              rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No synced Production eBay listing records found for this seller scope.</td></tr> :
               rows.map((row, index) => {
-                const matched = localSkus.has(row.sku.toLowerCase());
-                return <tr key={`${row.accountId}:${row.sku}:${row.itemId || index}`} className="hover:bg-slate-50/70">
+                const key = rowKey(row);
+                const mapping = mappingByKey.get(key);
+                const suggestedProductId = selectedProducts[key] || localSkuByKey.get(row.sku.toLowerCase()) || '';
+                return <tr key={`${key}:${row.itemId || index}`} className="hover:bg-slate-50/70">
                   <td className="whitespace-nowrap px-4 py-3 font-mono font-semibold text-indigo-700">{row.sku}</td>
                   <td className="min-w-[220px] px-4 py-3"><p className="font-medium text-slate-800">{row.title}</p><p className="mt-0.5 text-[10px] text-slate-400">{row.itemId || 'Item ID unavailable'}</p></td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.accountName}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">{row.price ? money(row.price, row.currency) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums font-semibold text-slate-800">{row.quantity ?? '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{row.status.replaceAll('_', ' ')}</span></td>
-                  <td className="whitespace-nowrap px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ${matched ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}><Link2 className="h-3 w-3" />{matched ? 'Matched' : 'Mapping required'}</span></td>
+                  <td className="min-w-[230px] px-4 py-3">
+                    {mapping ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{mapping.internalSku || 'Mapped'} · {mapping.internalName || 'Product'}</span> :
+                      <div className="flex min-w-[220px] items-center gap-2">
+                        <select value={suggestedProductId} onChange={event => setSelectedProducts(current => ({ ...current, [key]: event.target.value }))} className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-700 focus:border-indigo-500 focus:outline-none">
+                          <option value="">Select internal SKU</option>
+                          {products.map(product => <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>)}
+                        </select>
+                        <button type="button" onClick={() => void saveMapping(row)} disabled={!suggestedProductId || savingKey === key} className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{savingKey === key ? 'Saving…' : 'Map'}</button>
+                      </div>}
+                  </td>
                 </tr>;
               })}
           </tbody>
         </table>
       </div>
       <div className="flex flex-col gap-1 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 sm:flex-row sm:justify-between">
-        <span>Marketplace quantity is informational and is not posted to the physical stock ledger.</span>
+        <span>Mapping links seller SKU to an internal product. eBay quantity is never posted to physical stock ledger.</span>
         <span>{updatedAt ? `Loaded ${new Date(updatedAt).toLocaleString()}` : 'Not loaded yet'}</span>
       </div>
     </section>
