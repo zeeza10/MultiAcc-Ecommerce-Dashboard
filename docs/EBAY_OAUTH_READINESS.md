@@ -21,7 +21,7 @@ All new syncs and queue claims are limited to connected Production seller accoun
 Implemented directly on main in commit `e464f549daebd3fc09bc756aedc4ca52d4b85635`:
 
 - **Active Listings:** Inventory API plus Trading API `GetMyeBaySelling` to include Seller Hub/legacy listings. Pagination resumes from a saved checkpoint in batches of 10 pages. Completed batches remain visible until the next complete batch is ready. Original listing item XML is preserved in restricted raw storage.
-- **Returns:** Production Post-Order Search Returns import for the previous 18 months, bounded to 20 pages. Uses IAF authorization, correct Post-Order marketplace IDs and read-only GET requests. No seller-side mutation is called.
+- **Returns:** Production Post-Order Search Returns import for the previous 18 months, bounded to 20 pages, with saved offset/date-range checkpoints and last-completed-batch visibility. Uses IAF authorization, correct Post-Order marketplace IDs and read-only GET requests. No seller-side mutation is called.
 - **Seller Account:** Read-only seller privilege, subscription and payment/fulfillment/return business policies.
 - **Analytics:** Traffic reports, seller standards profile and supported customer-service metrics.
 - **Finances:** Seller funds summary, payout summary, transaction summaries, payouts and transactions. Requests use `apiz.ebay.com`, Ed25519 digital signatures and explicit 204 empty-result handling.
@@ -32,8 +32,9 @@ Implemented directly on main in commit `e464f549daebd3fc09bc756aedc4ca52d4b85635
 - `20261121180100_production_only_marketplace_sync.sql`
 - `20261121180200_production_ebay_signing_keys.sql`
 - `20261121180300_production_coalesce_expired_sync_jobs.sql`
+- `20261121180400_production_extend_marketplace_sync_checkpoint_resources.sql`
 
-All four versions are already present in the live Production migration history. The main commit above reconciles their SQL into GitHub source control.
+All five versions are present in the live Production migration history. The main branch tracks each SQL file, including the checkpoint-resource extension.
 
 ## OAuth consent requirements
 
