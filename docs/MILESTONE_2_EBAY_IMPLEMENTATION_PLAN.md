@@ -16,7 +16,7 @@
 |---|---|---|
 | M2.1 Order sync stabilization | Permanent/transient retry classification, eBay 30830 non-retryable handling, separate attempt/success timestamps, one active scheduled job per seller, bounded claims and duplicate queue coalescing. | Production queue recovery is approved; complete only after each claimed job and imported order is reconciled. |
 | M2.2 Active Listings | Inventory API snapshots plus Trading API GetMyeBaySelling for Seller Hub/legacy listings. Cursor-resume pagination in batches of 10 pages; stable batch IDs; original item XML preserved in restricted raw storage. | Production read-only listing sync; compare source item IDs/counts with Seller Hub. |
-| M2.3 Returns | Read-only Post-Order Search Returns import for the previous 18 months, bounded to 20 pages. Uses IAF authorization and documented marketplace IDs. No seller-side mutation. | Production read-only import; verify return IDs, status, pagination and provider timestamps. |
+| M2.3 Returns | Read-only Post-Order Search Returns import for the previous 18 months, bounded to 20 pages, with a persisted offset/date-range checkpoint and completed-batch visibility. Uses IAF authorization and documented marketplace IDs. No seller-side mutation. | Production read-only import; verify return IDs, status, pagination and provider timestamps. |
 | M2.4 Seller Account | Read seller privileges, subscriptions, payment, fulfillment and return business policies. | Production read-only snapshots, with account and marketplace scope verified. |
 | M2.5 Analytics | Traffic reports, seller standards profile and supported customer-service metrics. | Production read-only snapshots; respect marketplace support and API date limits. |
 | M2.6 Finances | Seller funds summary, payout summary, transaction summaries, payouts and transactions; official apiz.ebay.com host and Ed25519 digital signatures. | Production read-only sync after seller grants the required scope; reconcile source IDs, amounts and currencies without modifying the internal ledger. |
@@ -30,6 +30,7 @@ These Production migrations are already present in the live Production Supabase 
 - `20261121180100_production_only_marketplace_sync.sql`
 - `20261121180200_production_ebay_signing_keys.sql`
 - `20261121180300_production_coalesce_expired_sync_jobs.sql`
+- `20261121180400_production_extend_marketplace_sync_checkpoint_resources.sql`
 
 The queue hardening migration `20261121170000_bound_marketplace_sync_queue_and_retries.sql` is also present in Production history.
 
