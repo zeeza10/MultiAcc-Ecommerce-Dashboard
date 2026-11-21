@@ -77,6 +77,19 @@ describe('eBay order provider-data normalization', () => {
     assert.equal(JSON.stringify(result).includes('UNKNOWN'), false);
   });
 
+  it('removes provider tax reference identifiers from exception snippets', () => {
+    const result = normalizeEbayOrderLines('ORDER-4', [{
+      lineItemId: 'LINE-6', sku: 'SKU-6', title: 'Taxed item', quantity: 1,
+      lineItemCost: { value: '20.00', currency: 'GBP' },
+      ebayCollectAndRemitTaxes: [{
+        taxType: 'VAT', amount: { value: '4.00', currency: 'GBP' },
+        ebayReference: { name: 'VAT', value: 'GB123456789' },
+      }],
+    }], 'USD', () => null);
+    assert.equal(result.items.length, 0);
+    assert.equal(JSON.stringify(result.exceptions).includes('GB123456789'), false);
+  });
+
   it('calculates provider tax and net shipping from the supplied breakdown', () => {
     const order = {
       pricingSummary: {
