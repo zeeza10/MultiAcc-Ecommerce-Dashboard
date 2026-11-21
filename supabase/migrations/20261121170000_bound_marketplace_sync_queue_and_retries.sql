@@ -86,6 +86,7 @@ BEGIN
       AND a.organization_id = p_organization_id
       AND a.is_demo = false
       AND a.auth_status = 'CONNECTED'
+      AND a.marketplace IN ('EBAY_UK', 'EBAY_US', 'EBAY_DE')
       AND a.environment IN ('SANDBOX', 'PRODUCTION')
   ) THEN
     RETURN jsonb_build_object('queued', false, 'reason', 'ACCOUNT_NOT_ELIGIBLE');
