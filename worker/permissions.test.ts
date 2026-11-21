@@ -27,6 +27,15 @@ describe('Worker route permission policy', () => {
     assert.equal(permissionByRoute('GET', '/finance/invoices'), 'finance.view');
     assert.equal(permissionByRoute('GET', '/ebay/accounts'), 'marketplace.view');
     assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/listings'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync-active-listings'), 'marketplace.manage');
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/seller-account'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/seller-account'), 'marketplace.manage');
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/returns'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync-returns'), 'marketplace.manage');
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/analytics'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync-analytics'), 'marketplace.manage');
+    assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/finances'), 'marketplace.view');
+    assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/sync-finances'), 'marketplace.manage');
     assert.equal(permissionByRoute('POST', '/ebay/accounts/account-id/listings'), undefined);
     assert.equal(permissionByRoute('GET', '/ebay/accounts/account-id/unlisted-resource'), undefined);
     assert.equal(permissionByRoute('GET', '/ebay/integration/events'), 'marketplace.view');
