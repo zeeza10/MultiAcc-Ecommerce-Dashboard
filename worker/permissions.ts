@@ -2,6 +2,15 @@ export const permissionByRoute = (method: string, path: string): string | null |
   if (method === 'GET' && /^\/(auth\/me|me)\/?$/.test(path)) return null;
   if (method === 'GET' && /^\/dashboard\/(kpis|charts)$/.test(path)) return 'dashboard.view';
   if (method === 'GET' && path === '/ebay/accounts') return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/sync-active-listings$/.test(path)) return 'marketplace.manage';
+  if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/seller-account$/.test(path)) return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/seller-account$/.test(path)) return 'marketplace.manage';
+  if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/returns$/.test(path)) return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/sync-returns$/.test(path)) return 'marketplace.manage';
+  if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/analytics$/.test(path)) return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/sync-analytics$/.test(path)) return 'marketplace.manage';
+  if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/finances$/.test(path)) return 'marketplace.view';
+  if (method === 'POST' && /^\/ebay\/accounts\/[^/]+\/sync-finances$/.test(path)) return 'marketplace.manage';
   if (method === 'GET' && /^\/ebay\/accounts\/[^/]+\/listings$/.test(path)) return 'marketplace.view';
   if (method === 'GET' && path === '/ebay/integration/events') return 'marketplace.view';
   if (method === 'POST' && path === '/ebay/accounts') return 'marketplace.manage';
