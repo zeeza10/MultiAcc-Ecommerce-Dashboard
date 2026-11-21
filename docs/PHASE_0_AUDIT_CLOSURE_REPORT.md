@@ -9,7 +9,7 @@
 
 The repository, Worker route layer, UI navigation/API client, live database metadata, RLS policies, function grants, migration inventory, and current Cloudflare preview evidence have been rechecked.
 
-**Phase 0 is not yet release-complete.** The code and static security baseline are substantially mapped, but two key audit gates cannot honestly be marked passed yet: two-organization runtime isolation and migration-history reconciliation. The full SECURITY DEFINER function review is now complete; Production migration/deployment verification remains a separate release gate.
+**Phase 0 code/audit work is substantially closed, with Production release actions still gated.** Migration inventory is now reconciled on this PR branch, and a transaction-scoped two-tenant RLS read test passed across all 53 organization-scoped tables available to authenticated SELECT. That test exposed one permission-override read leak; a forward-only policy migration fixes it and passed the same rollback test. The new migrations still require separate Production approval/application, and full write-path testing across every role remains outstanding.
 
 No Production migration was applied and no business data, eBay orders, credentials, sync queues, or schedules were changed during this audit.
 
@@ -45,38 +45,41 @@ Live read-only database inspection returned:
 - 65 public tables.
 - 228 public RLS policies; 218 explicitly reference `organization_id`.
 - One Production organization with five active memberships: one each for SUPER_ADMIN, OPS_MANAGER, FINANCE_USER, WAREHOUSE_STAFF, and VIEWER. No active CLIENT_USER membership was found.
-- The live database currently has no second organization with active members. Therefore, a real two-organization, multi-role runtime isolation test cannot be executed against existing tenant data without creating a separate test tenant/environment.
+- The live database has only one persistent Production organization. A transaction-scoped test created a temporary second organization, temporarily moved the Ops Manager membership into it, and created two isolated test products; both test identities were evaluated under the `authenticated` role. All temporary records and membership changes were rolled back.
 
 The ten policies not matching the simple explicit-`organization_id` text check are special-case policies (membership/profile/self access, permission catalog, or server-only integration tables); they require semantic treatment rather than being counted as failures.
 
 Three backend tables have RLS enabled and no policies: `ebay_account_deletion_events`, `marketplace_listing_snapshots`, and `marketplace_sync_checkpoints`. Read-only privilege checks confirmed that neither `anon` nor `authenticated` has SELECT on these tables; `service_role` does. This is a deny-by-default server-only posture, not an exposed-table finding.
 
-**Status:** Static tenant/RLS review completed; two-organization runtime isolation remains a release gate because the live project has only one organization.
+**Runtime read-isolation test:** The first pass detected that `organization_member_permission_overrides` allowed a user to read their own override row even after they were no longer an active member of that organization. A new migration, `20261121150000_harden_member_permission_override_tenant_reads.sql`, now requires active organization membership for self-read while preserving Super Admin visibility. The exact policy change was tested inside a rollback-only transaction; after the change, tenant A and tenant B could each see only their own product, and cross-tenant reads returned zero across all **53** organization-scoped RLS tables with authenticated SELECT grants. No fixture, membership, or policy change was committed to Production. Full write-path/API isolation tests for all roles remain a separate release check.
 
 ## 3. GitHub migration files vs Supabase migration history
 
-Exact inventory comparison:
+Exact inventory comparison after reconciliation on this PR branch:
 
-- GitHub migration files: **84**
+- GitHub migration files: **86**
 - Supabase migration history entries: **83**
 - Duplicate 14-digit GitHub migration prefixes: **0**
+- Exact version matches: **83**
+- Live-history versions missing from GitHub: **0**
+- GitHub-only versions: **3**, all are reviewed forward-only migrations not yet applied to Production.
 
-### GitHub-only versions (not present in live migration history)
+### Reconciled history
 
-1. `20261119100000_mark_invitation_accepted_after_password_setup`
-2. `20261119120000_employee_lifecycle_first_login_activation`
-3. `20261120220000_ebay_order_status_history`
-4. `20261121140000_harden_customer_tenant_and_permissions`
+- The two employee lifecycle files were renamed to the already-applied live versions:
+  - `20261118212452_mark_invitation_accepted_after_password_setup.sql`
+  - `20261118212453_employee_lifecycle_first_login_activation.sql`
+- The live ledger also contains the historical `20261118130904_environment_safe_sync_foundation` entry. A comment-only history marker now represents that legacy version; the idempotent schema implementation remains in `20261118190000_environment_safe_sync_foundation.sql`.
+- The previous GitHub-only timestamp copies `20261119100000` and `20261119120000` were removed from the PR branch after aligning their version prefixes with the live ledger.
 
-### Live-history versions with no matching GitHub filename
+### Expected pending Production migrations
 
-1. `20261118130904_environment_safe_sync_foundation`
-2. `20261118212452_mark_invitation_accepted_after_password_setup`
-3. `20261118212453_employee_lifecycle_first_login_activation`
+1. `20261120220000_ebay_order_status_history`
+2. `20261121140000_harden_customer_tenant_and_permissions`
+3. `20261121150000_harden_member_permission_override_tenant_reads`
 
-The invitation and employee-lifecycle migrations have same-name version drift between GitHub and the live history; the actual SQL/schema equivalence must be confirmed before any migration-history repair. The `20261120220000` order-status-history migration and `20261121140000` customer-tenant/permission migration are pending in the live database.
+These are deliberately not marked applied and have not been run against Production. They must remain pending until separately approved. The inventory now has exact version parity for every existing live migration; the only difference is these three intentional pending files.
 
-**Do not rewrite applied migration files or blindly mark versions applied.** Reconciliation must compare the SQL effects to the live schema, then use a reviewed forward-only migration or a deliberate migration-history repair plan. Production migration execution requires separate explicit approval.
 
 ## 4. SECURITY DEFINER function review
 
@@ -99,7 +102,7 @@ Key invariants confirmed:
 - High-impact transactional functions scope source records and writes by organization, validate related entities, and use locks/idempotency where required. Marketplace finance allocation is additionally constrained by its validation trigger, source-type/positive-amount constraints, source organization/currency matching, and allocation ceiling.
 - Stock adjustment approval enforces role restrictions and separation of duties; order transitions validate status progression and apply stock/accounting changes transactionally.
 
-No critical privilege-escalation or cross-organization bypass was identified in the reviewed function definitions. This is a static semantic review; runtime cross-tenant testing remains separately gated by the absence of a second test organization.
+No critical privilege-escalation path was identified in the reviewed function definitions. The separate RLS runtime test did uncover and isolate the permission-override read-policy issue documented in section 2; the new migration fixes it and passed rollback-only verification.
 
 ## 5. API contract, permission map, and handler checks
 
@@ -123,21 +126,21 @@ The module mapping above is a code-level contract inventory. This PR expands per
 - Preview intentionally lacks Production-only eBay OAuth and rate-limit bindings; therefore this is build/test/preview evidence, not a live Production API smoke test.
 - GitHub Actions were not manually triggered because the repository's monthly Actions minutes were exhausted.
 - No successful Production deployment of the PR #158 changes has been confirmed.
-- No Production migration was applied; no eBay sync, queue retry, scheduler, OAuth scope change, or Production business-data write was run.
+- No Production migration was applied; no eBay sync, queue retry, scheduler, OAuth scope change, or Production business-data write was run. The three new migrations remain pending.
 
 ## 7. Final backlog and Phase 0 exit criteria
 
 | Priority | Required action | Exit evidence |
 |---|---|---|
-| P0 | Obtain a disposable second organization/test environment and run cross-tenant read/write isolation tests for each active role | Automated test results proving tenant A cannot read/write tenant B |
-| P0 | Reconcile the three live-only and four GitHub-only migration versions | Reviewed migration parity report; no destructive history rewrite |
-| P0 | Preserve the completed SECURITY DEFINER review as a regression baseline | Re-run grant/search_path/tenant-scope checks whenever SECURITY DEFINER functions change |
-| P1 | Preserve the Cloudflare lint/test/build/Preview gate for future code changes | Build command runs typecheck, the 82-test suite, Vite build, and Preview deployment |
-| P0 | Obtain approval, then apply the reviewed pending Production migrations | Migration history and post-migration schema checks |
-| P1 | Enable Supabase Leaked Password Protection | Supabase Auth security advisor warning cleared |
+| P0 | Review and explicitly approve the three pending Production migrations | Approval recorded, migration execution result, and post-migration schema checks |
+| P0 | Complete write-path/API tenant isolation tests across active roles in a disposable test environment | Automated results proving tenant A cannot read or write tenant B |
+| P0 | Merge PR #159 only after its latest Cloudflare Preview passes | Latest PR head has successful typecheck, test suite, Vite build, and Preview deployment |
+| P0 | Approve and verify Production deployment after merge | Production Worker build/deploy success and read-only smoke checks |
+| P1 | Enable Supabase Leaked Password Protection | Supabase Auth security setting enabled and security advisor warning cleared |
 | P1 | Add a real customer-master API/UI backed by `customers` and `customer_addresses` if customer CRUD is in scope | Customer CRUD contract tests and role coverage |
 | P1 | Add full endpoint/role contract tests and verify every visible UI action | Test matrix with no unexpected 501/404 paths |
-| P1 | Complete Production smoke verification after approved merge/deploy | Health, auth, read-only module checks, and error-log review |
+
+**Completed in this PR branch:** migration version inventory reconciliation, full SECURITY DEFINER review, static RLS/grant review, 53-table two-tenant read isolation test with rollback, permission-override policy correction, Worker route permission coverage, and passing Cloudflare Preview evidence for the earlier fully-tested source commit.
 
 ## Safety boundary
 
