@@ -110,27 +110,57 @@ export function normalizeEbaySellerAccountResource(resourceType: string, payload
 export function normalizeEbayAnalyticsResource(resourceType: string, payloadValue: unknown, marketplaceId: string): JsonRecord {
   const payload = record(payloadValue);
   if (resourceType === 'ANALYTICS_TRAFFIC') {
+    const header = record(payload.header);
+    const dimensionKeys = Array.isArray(header.dimensionKeys) ? header.dimensionKeys
+      : Array.isArray(payload.dimensionKeys) ? payload.dimensionKeys : [];
+    const metrics = Array.isArray(header.metrics) ? header.metrics
+      : Array.isArray(payload.metrics) ? payload.metrics : [];
     return {
       source: 'EBAY_ANALYTICS_API',
       marketplaceId,
-      dimensionKeys: Array.isArray(payload.dimensionKeys) ? payload.dimensionKeys.filter((v: unknown) => typeof v === 'string') : [],
-      metrics: Array.isArray(payload.metrics) ? payload.metrics.map((value: unknown) => {
+      reportType: textValue(payload.reportType),
+      startDate: textValue(payload.startDate),
+      endDate: textValue(payload.endDate),
+      lastUpdatedDate: textValue(payload.lastUpdatedDate),
+      dimensionKeys: dimensionKeys.map((value: unknown) => {
+        if (typeof value === 'string') return value;
+        const dimension = record(value);
+        return {
+          key: textValue(dimension.key),
+          localizedName: textValue(dimension.localizedName),
+          dataType: textValue(dimension.dataType),
+        };
+      }),
+      metrics: metrics.map((value: unknown) => {
         if (typeof value === 'string') return value;
         const metric = record(value);
-        return { metricType: textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name), value: metric.value ?? metric.metricValue ?? null };
-      }) : [],
+        return {
+          key: textValue(metric.key),
+          localizedName: textValue(metric.localizedName),
+          dataType: textValue(metric.dataType),
+        };
+      }),
       records: Array.isArray(payload.records) ? payload.records.map((entry: unknown) => {
         const item = record(entry);
         return {
           dimensionValues: Array.isArray(item.dimensionValues) ? item.dimensionValues.map((value: unknown) => {
             if (typeof value === 'string') return value;
             const dimension = record(value);
-            return { dimension: textValue(dimension.dimension) || textValue(dimension.name), value: dimension.value ?? null };
+            return {
+              ...(textValue(dimension.dimension) || textValue(dimension.name) ? { dimension: textValue(dimension.dimension) || textValue(dimension.name) } : {}),
+              value: dimension.value ?? null,
+              ...(typeof dimension.applicable === 'boolean' ? { applicable: dimension.applicable } : {}),
+            };
           }) : [],
           metricValues: Array.isArray(item.metricValues) ? item.metricValues.map((value: unknown) => {
             if (typeof value === 'number' || typeof value === 'string') return value;
             const metric = record(value);
-            return { metricType: textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name), value: metric.value ?? metric.metricValue ?? null };
+            return {
+              ...(textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name)
+                ? { metricType: textValue(metric.metricType) || textValue(metric.metricName) || textValue(metric.name) } : {}),
+              value: metric.value ?? metric.metricValue ?? null,
+              ...(typeof metric.applicable === 'boolean' ? { applicable: metric.applicable } : {}),
+            };
           }) : [],
         };
       }) : [],
