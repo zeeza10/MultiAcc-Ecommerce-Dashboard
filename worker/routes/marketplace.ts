@@ -938,6 +938,50 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', account.id).eq('organization_id', auth.organizationId)
       .order('synced_at', { ascending: false }).range(offset, offset + limit - 1);
     if (error) throw new Error('eBay listing snapshots could not be loaded.');
+    const { data: latestTradingBatch, error: latestTradingBatchError } = await admin.from('marketplace_provider_snapshots')
+      .select('sync_batch_id').eq('organization_id', auth.organizationId)
+      .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
+      .order('synced_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestTradingBatchError) throw new Error('Trading API active listing snapshots could not be loaded.');
+    const { data: tradingRows, error: tradingError } = latestTradingBatch?.sync_batch_id
+      ? await admin.from('marketplace_provider_snapshots')
+          .select('external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
+          .eq('marketplace_account_id', account.id).eq('resource_type', 'ACTIVE_LISTING_TRADING')
+          .eq('sync_batch_id', latestTradingBatch.sync_batch_id).order('synced_at', { ascending: false })
+      : { data: [], error: null };
+    if (tradingError) throw new Error('Trading API active listing snapshots could not be loaded.');
+    const inventoryListingIds = new Set((data || []).flatMap((row: any) =>
+      (Array.isArray(row.offers) ? row.offers : []).map((offer: any) => String(offer.listingId || '')).filter(Boolean)
+    ));
+    const tradingListings = (tradingRows || []).filter((row: any) => !inventoryListingIds.has(row.external_id)).map((row: any) => {
+      const item = row.snapshot && typeof row.snapshot === 'object' ? row.snapshot as Record<string, any> : {};
+      const quantity = Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : null;
+      const sold = Number.isFinite(Number(item.quantitySold)) ? Number(item.quantitySold) : null;
+      const availableQuantity = quantity !== null && sold !== null ? Math.max(0, quantity - sold) : null;
+      const hasPrice = item.currentPrice !== null && item.currentPrice !== undefined && item.currency;
+      return {
+        offerId: row.external_id,
+        itemId: row.external_id,
+        sku: typeof item.sku === 'string' ? item.sku : '',
+        title: typeof item.title === 'string' ? item.title : '',
+        description: '',
+        imageUrls: typeof item.galleryUrl === 'string' ? [item.galleryUrl] : [],
+        condition: '',
+        inventoryQuantity: quantity,
+        listingStatus: typeof item.listingStatus === 'string' ? item.listingStatus : '',
+        offers: hasPrice ? [{
+          listingId: row.external_id,
+          ...(availableQuantity !== null ? { availableQuantity } : {}),
+          pricingSummary: { price: { value: String(item.currentPrice), currency: String(item.currency) } },
+        }] : [],
+        source: 'TRADING_API',
+        sourceUpdatedAt: item.startTime || null,
+        syncedAt: row.synced_at,
+        syncStatus: 'SYNCED',
+        syncError: null,
+        syncErrorDetails: null,
+      };
+    });
     const { data: skuFailureEvents, error: skuEventsError } = await admin.from('marketplace_integration_events')
       .select('message,metadata,created_at,error_code')
       .eq('organization_id', auth.organizationId)
@@ -977,7 +1021,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
           occurredAt: failure.created_at,
         } : null,
       }); }),
-      total: count || 0,
+      tradingListings,
+      tradingTotal: tradingListings.length,
+      total: (count || 0) + tradingListings.length,
       limit,
       offset,
     });
