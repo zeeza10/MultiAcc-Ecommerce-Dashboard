@@ -1377,7 +1377,7 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
     if (accountError || !account) return json({ error: 'Marketplace account was not found in this workspace.' }, 404);
     if (account.environment !== 'PRODUCTION' || account.is_demo) return json({ error: 'Only Production return data is available.' }, 409);
     const admin = createServiceClient(env);
-    const { data: checkpoint, error: checkpointError } = await auth.repositoryContext.supabase.from('marketplace_sync_checkpoints')
+    const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
       .select('cursor_state,last_successful_at').eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', accountId).eq('resource_type', 'RETURNS').maybeSingle();
     if (checkpointError) throw new Error('The eBay returns checkpoint could not be loaded.');
@@ -1389,8 +1389,9 @@ export async function handleMarketplaceRoute(path: string, request: Request, aut
       .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
       .order('synced_at', { ascending: false }).limit(1).maybeSingle();
     if (latestError) throw new Error('eBay return snapshots could not be loaded.');
-    const batchId = completedBatchId || latest?.sync_batch_id || '';
-    if (!batchId) return json({ returns: [], total: 0, lastSyncedAt: null, pagesPending: Boolean(cursor.activeBatchId) });
+    const activeBatchId = typeof cursor.activeBatchId === 'string' ? cursor.activeBatchId : '';
+    const batchId = completedBatchId || (!activeBatchId ? latest?.sync_batch_id || '' : '');
+    if (!batchId) return json({ returns: [], total: 0, lastSyncedAt: null, pagesPending: Boolean(activeBatchId) });
     const { data, error } = await auth.repositoryContext.supabase.from('marketplace_provider_snapshots')
       .select('id,external_id,snapshot,synced_at').eq('organization_id', auth.organizationId)
       .eq('marketplace_account_id', accountId).eq('resource_type', 'EBAY_RETURN')
