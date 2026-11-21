@@ -42,7 +42,6 @@ export function decodeEbayPrivateKeyPem(pemOrBase64: string): Uint8Array {
   }
   return der;
 }
-}
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
