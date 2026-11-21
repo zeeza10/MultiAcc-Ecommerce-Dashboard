@@ -174,3 +174,50 @@ This report is documentation and audit only. It does not authorize:
 - merging code.
 
 All subsequent implementation should be delivered as reviewable GitHub PRs. Production actions require separate explicit approval.
+
+
+## 10. Supplemental verification — 2026-11-21
+
+### 10.1 Frontend API client vs Worker permission gate
+
+A direct comparison of `src/services/api.ts` with `worker/permissions.ts` and the Worker router identified two concrete permission-map omissions:
+
+| Frontend request | Expected result | Current gate result | Required correction |
+|---|---|---|---|
+| `GET /orders/count` | Order count for selected account/environment | `501` because no route rule matches | Add an explicit read permission (likely `orders.view`) and a route test |
+| `GET /ebay/accounts/:accountId/listings` | Paginated listing detail report | `501` because no route rule matches | Add an explicit read permission (likely `marketplace.view`) and a route test |
+
+These are Worker authorization-gate coverage defects, not proof that the downstream handlers are absent. Keep the route allowlist fail-closed; do not replace it with a permissive fallback. Other frontend API methods still need full automated route-contract coverage before Phase 0 can be considered fully closed.
+
+### 10.2 Live RLS policy exception review
+
+The live policy catalog was re-queried and all 228 public policies were classified:
+
+- 218 policies explicitly reference `organization_id` in their predicate/check expression.
+- The remaining 10 are explainable special cases: three server-only marketplace table deny policies; two organization membership/admin policies keyed by organization row ID; one global authenticated read-only permissions catalog policy; two platform integration credential/audit deny policies; and two profile self-access policies keyed to `auth.uid()`.
+- The only unconditional `true` predicate is `permissions.permissions_read`, the global permission-code catalog. This is intended metadata, not tenant business data.
+- Marketplace credentials, OAuth states, sync jobs, platform integration credentials and platform integration audit tables have explicit browser-role deny policies.
+
+This is a strong structural signal, but does not replace role-based negative tests or verification that every referenced helper enforces the intended organization and employee/client boundary.
+
+### 10.3 SECURITY DEFINER metadata review
+
+The live catalog returned 34 SECURITY DEFINER functions across `private` and `public` schemas. The inspected functions have an empty function-level `search_path` setting, and none of the listed functions grants EXECUTE to `anon`. A number of private RPCs are executable by `authenticated`, so their internal authorization checks remain security-critical.
+
+Spot checks confirmed organization/role checks in sensitive functions including organization bootstrap, employee invitation, role assignment and manual order creation. Role assignment requires organization Super Admin membership and AAL2 when granting Super Admin. Manual order creation checks the `orders.create` permission and validates products against the same organization. This is a spot check, not a line-by-line approval of all 34 function bodies; the remaining RPC bodies and schema USAGE grants still require a full review.
+
+### 10.4 Live migration history
+
+Supabase currently reports 78 applied migration-history entries, from `20261110150000` through `20261119214407`. The live history includes several repeated/similarly named migrations, so compare by exact version and filename rather than migration name alone. The GitHub migration directory listing was not available from the repository search result in this pass; therefore exact GitHub-to-live parity is **not yet verified**. Do not apply, repair, or replay migrations as part of this audit.
+
+### 10.5 Phase 0 disposition
+
+The audit baseline and concrete defects are now documented. Phase 0 is **audit-baseline complete, with security/contract verification gates still open**. Before implementation PRs are treated as safe to merge, complete:
+
+1. Add route contract tests for every frontend API method; first fix the two missing permission-map entries above.
+2. Review all 34 SECURITY DEFINER function bodies and grants, not just spot checks.
+3. Run two-organization positive/negative RLS tests for Super Admin, Ops Manager, Finance User, Warehouse Staff, Viewer and Client 3PL roles.
+4. Obtain the exact GitHub migration file inventory and compare every version with the 78 live history entries.
+5. Verify module UI → API → Worker handler → repository/table mappings and record acceptance tests.
+
+No Production business data, credentials, OAuth grants, schema, migration state, Cloudflare configuration, or deployments were changed by this supplemental audit.
