@@ -763,20 +763,56 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
   }
   const accessToken = await getSellerAccessToken(env, account);
   const admin = createServiceClient(env);
-  const batchId = crypto.randomUUID();
-  const endDate = new Date();
-  const startDate = subtractUtcMonthsClamped(endDate, 18);
+  const { data: checkpoint, error: checkpointError } = await admin.from('marketplace_sync_checkpoints')
+    .select('cursor_state,last_successful_at,consecutive_failures')
+    .eq('marketplace_account_id', account.id).eq('organization_id', account.organization_id)
+    .eq('resource_type', 'RETURNS').maybeSingle();
+  if (checkpointError) throw new Error('The eBay returns sync checkpoint could not be loaded.');
+
+  const saved = checkpoint?.cursor_state && typeof checkpoint.cursor_state === 'object'
+    ? checkpoint.cursor_state as Record<string, unknown> : {};
+  const savedBatchId = typeof saved.activeBatchId === 'string' ? saved.activeBatchId : '';
+  const savedOffset = Number(saved.nextOffset);
+  const resuming = Boolean(savedBatchId && Number.isSafeInteger(savedOffset) && savedOffset >= 0);
+  const batchId = resuming ? savedBatchId : crypto.randomUUID();
+  const endDate = resuming && typeof saved.endDate === 'string' && Number.isFinite(Date.parse(saved.endDate))
+    ? new Date(saved.endDate) : new Date();
+  const startDate = resuming && typeof saved.startDate === 'string' && Number.isFinite(Date.parse(saved.startDate))
+    ? new Date(saved.startDate) : subtractUtcMonthsClamped(endDate, 18);
   const startIso = startDate.toISOString();
   const endIso = endDate.toISOString();
   const limit = 200;
   const maxPages = 20;
-  let offset = 0;
+  let offset = resuming ? savedOffset : 0;
   let totalEntries = 0;
   let totalPages = 1;
   let pagesFetched = 0;
   let fetched = 0;
+  let noContent = false;
+  const lastCompletedBatchId = typeof saved.lastCompletedBatchId === 'string' ? saved.lastCompletedBatchId : '';
 
-  while (pagesFetched < Math.min(totalPages, maxPages)) {
+  const saveCheckpoint = async (pagesPending: boolean) => {
+    const cursorState = pagesPending
+      ? { activeBatchId: batchId, nextOffset: offset, startDate: startIso, endDate: endIso,
+          ...(lastCompletedBatchId ? { lastCompletedBatchId } : {}) }
+      : { lastCompletedBatchId: batchId };
+    const { error } = await admin.from('marketplace_sync_checkpoints').upsert({
+      organization_id: account.organization_id,
+      marketplace_account_id: account.id,
+      resource_type: 'RETURNS',
+      data_environment: 'PRODUCTION',
+      cursor_state: cursorState,
+      last_attempt_at: new Date().toISOString(),
+      last_successful_at: pagesPending ? (checkpoint?.last_successful_at || null) : new Date().toISOString(),
+      consecutive_failures: pagesPending ? Number(checkpoint?.consecutive_failures || 0) : 0,
+      last_error_code: null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'marketplace_account_id,resource_type' });
+    if (error) throw new Error('The eBay returns sync checkpoint could not be saved.');
+  };
+
+  await saveCheckpoint(true);
+  while (pagesFetched < maxPages && pagesFetched < totalPages) {
     const endpoint = new URL('https://api.ebay.com/post-order/v2/return/search');
     endpoint.searchParams.set('creation_date_range_from', startIso);
     endpoint.searchParams.set('creation_date_range_to', endIso);
@@ -785,11 +821,12 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
     endpoint.searchParams.set('offset', String(offset));
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: {
-        ...buildEbayPostOrderHeaders(accessToken, account.marketplace),
-      },
+      headers: { ...buildEbayPostOrderHeaders(accessToken, account.marketplace) },
     });
-    if (response.status === 204) break;
+    if (response.status === 204) {
+      noContent = true;
+      break;
+    }
     if (!response.ok) throw await readEbayOrdersApiError(response);
     const payload = await response.json() as Record<string, any>;
     const members = Array.isArray(payload.members) ? payload.members : [];
@@ -836,9 +873,11 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
 
     offset += members.length;
     if (!members.length || offset >= totalEntries) break;
+    await saveCheckpoint(true);
   }
 
-  const pagesPending = pagesFetched < totalPages;
+  const pagesPending = !noContent && offset < totalEntries && pagesFetched >= maxPages;
+  await saveCheckpoint(pagesPending);
   await admin.from('marketplace_integration_events').insert({
     organization_id: account.organization_id,
     marketplace_account_id: account.id,
