@@ -217,7 +217,7 @@ async function recordEbayOrderException(
   rawPayload: Record<string, unknown>,
 ): Promise<boolean> {
   const { data: existing, error: lookupError } = await admin.from('marketplace_exceptions')
-    .select('id').eq('marketplace_account_id', account.id).eq('source', 'EBAY')
+    .select('id').eq('organization_id', account.organization_id).eq('marketplace_account_id', account.id).eq('source', 'EBAY')
     .eq('exception_type', exceptionType).eq('reference_id', referenceId)
     .eq('status', 'PENDING').limit(1).maybeSingle();
   if (lookupError) throw new Error('An existing eBay order exception could not be checked safely.');
