@@ -789,6 +789,7 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
   let pagesFetched = 0;
   let fetched = 0;
   let noContent = false;
+  let noMoreData = false;
   const lastCompletedBatchId = typeof saved.lastCompletedBatchId === 'string' ? saved.lastCompletedBatchId : '';
 
   const saveCheckpoint = async (pagesPending: boolean) => {
@@ -872,11 +873,14 @@ async function syncSellerReturns(account: any, env: WorkerEnv): Promise<{ batchI
     }
 
     offset += members.length;
-    if (!members.length || offset >= totalEntries) break;
+    if (!members.length || offset >= totalEntries) {
+      noMoreData = true;
+      break;
+    }
     await saveCheckpoint(true);
   }
 
-  const pagesPending = !noContent && offset < totalEntries && pagesFetched >= maxPages;
+  const pagesPending = !noContent && !noMoreData && (offset < totalEntries || pagesFetched < totalPages) && pagesFetched >= maxPages;
   await saveCheckpoint(pagesPending);
   await admin.from('marketplace_integration_events').insert({
     organization_id: account.organization_id,
