@@ -128,6 +128,8 @@ export interface Order {
   orderNumber: string;
   marketplaceAccountId?: string;
   externalOrderId?: string;
+  /** Exact eBay buyer username/ID from the original provider order payload. */
+  buyerId?: string;
   salesSource: 'EBAY' | 'MANUAL' | 'DIRECT';
   ownerType: OwnerType;
   ownerId: string;
