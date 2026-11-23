@@ -204,7 +204,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={exportCsv} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 shadow-2xs transition"><Download className="w-3.5 h-3.5" /><span>Export CSV</span></button>
           <button onClick={exportPdf} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-800 rounded-md hover:bg-slate-900 shadow-2xs transition"><Download className="w-3.5 h-3.5" /><span>Export PDF</span></button>
 
@@ -222,7 +222,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
       {/* Filter Bar */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex-1 min-w-[240px] relative">
+        <div className="w-full flex-1 min-w-0 sm:min-w-[240px] relative">
           <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -234,12 +234,12 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex w-full flex-col sm:w-auto sm:flex-row sm:items-center gap-2">
           <span className="text-gray-500 font-medium">Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="w-full sm:w-auto border border-gray-300 rounded-md px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="PENDING_GROUP">Pending Pipeline (New → Packed)</option>
