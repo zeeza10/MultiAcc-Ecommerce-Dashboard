@@ -98,7 +98,7 @@ const mapOrder = (row: OrderRow, lines: OrderLine[], includeRawPayload = false):
   const address = row.shipping_address || {};
   return {
     id: row.id,
-    orderNumber: row.order_number,
+    orderNumber: row.sales_source === 'EBAY' && row.external_order_id ? row.external_order_id : row.order_number,
     marketplaceAccountId: row.marketplace_account_id || undefined,
     externalOrderId: row.external_order_id || undefined,
     buyerId: typeof (row.raw_payload as any)?.buyer?.username === 'string' ? (row.raw_payload as any).buyer.username : undefined,
