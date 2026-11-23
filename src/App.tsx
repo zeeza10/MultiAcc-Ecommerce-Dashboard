@@ -126,12 +126,18 @@ export default function App() {
         console.error('Failed to refresh live eBay notifications:', error);
       }
     };
+    // Poll while the workspace is open so alerts created by background eBay
+    // syncs appear without requiring a tab switch or manual refresh.
+    const pollTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshNotifications();
+    }, 15000);
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshNotifications(); };
     const onWindowFocus = () => { void refreshNotifications(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', onWindowFocus);
     return () => {
       active = false;
+      window.clearInterval(pollTimer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', onWindowFocus);
     };
