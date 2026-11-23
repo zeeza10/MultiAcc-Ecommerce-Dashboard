@@ -238,3 +238,36 @@
   overscroll-behavior-y: contain;
   touch-action: pan-y;
 }
+
+
+/* Responsive safety net shared by every workspace module. */
+html, body, #root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+*, *::before, *::after { box-sizing: border-box; }
+#root { min-height: 100dvh; }
+body { overflow-x: hidden; }
+#root main, #root aside, #root section, #root article,
+#root form, #root .min-w-0 { min-width: 0; }
+#root img, #root video, #root canvas, #root svg { max-width: 100%; }
+#root table { max-width: 100%; }
+#root :where(button, input, select, textarea) { max-width: 100%; }
+#root :where(input, select, textarea) { min-width: 0; }
+#root :where(.overflow-x-auto) {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 639px) {
+  #root .text-2xl { font-size: 1.25rem; line-height: 1.75rem; }
+  #root .text-xl { font-size: 1.125rem; line-height: 1.6rem; }
+  #root main { padding-left: .75rem; padding-right: .75rem; }
+  #root :where(table) { min-width: 640px; }
+  #root :where(.grid) { min-width: 0; }
+  #root :where(.flex) > * { min-width: 0; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  #root main { padding: 1.25rem; }
+}
