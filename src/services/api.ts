@@ -345,6 +345,8 @@ export const api = {
   getNotifications: () => request<{ notifications: NotificationItem[] }>('/notifications'),
   dismissNotification: (id: string) =>
     request<{ success: boolean }>(`/notifications/${id}/dismiss`, { method: 'POST' }),
+  markNotificationsRead: () =>
+    request<{ success: boolean; updated: number }>('/notifications/read-all', { method: 'POST' }),
   getPushPublicKey: () => request<{ enabled: boolean; publicKey: string | null }>('/notifications/push/public-key'),
   savePushSubscription: (subscription: PushSubscriptionJSON) =>
     request<{ success: boolean; alreadySubscribed?: boolean }>('/notifications/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription) }),

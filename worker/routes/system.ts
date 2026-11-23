@@ -138,7 +138,7 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
     let notificationsQuery = auth.repositoryContext.supabase.from('notifications')
       .select('id,notification_type,title,message,severity,reference_url,is_read,is_dismissed,created_at,user_id,source')
       .eq('organization_id', auth.organizationId)
-      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER').order('created_at', { ascending: false }).limit(100);
+      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER').order('created_at', { ascending: false }).limit(500);
     if (auth.user.role === 'CLIENT_USER') notificationsQuery = notificationsQuery.eq('user_id', auth.user.id);
     else notificationsQuery = notificationsQuery.or(`user_id.is.null,user_id.eq.${auth.user.id}`);
     const { data, error } = await notificationsQuery;
@@ -159,6 +159,17 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
       severity: row.severity, referenceUrl: row.reference_url || '', isRead: row.is_read, source: row.source,
       isDismissed: row.is_dismissed, createdAt: row.created_at,
     })) });
+  }
+
+  if (path === '/notifications/read-all' && request.method === 'POST') {
+    const { data, error } = await auth.repositoryContext.supabase.from('notifications')
+      .update({ is_read: true })
+      .eq('organization_id', auth.organizationId)
+      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER')
+      .or(`user_id.is.null,user_id.eq.${auth.user.id}`)
+      .select('id');
+    if (error) throw new Error('Notifications could not be marked as read.');
+    return json({ success: true, updated: data?.length || 0 });
   }
 
   const dismissNotificationMatch = path.match(/^\/notifications\/([^/]+)\/dismiss$/);

@@ -480,6 +480,14 @@ export default function App() {
         config={config}
         onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
         notifications={notifications}
+        onOpenNotificationMenu={async () => {
+          try {
+            await api.markNotificationsRead();
+            setNotifications((current) => current.map((notification) => ({ ...notification, isRead: true })));
+          } catch (error) {
+            console.error('Could not mark notifications as read:', error);
+          }
+        }}
         onDismissNotification={async (id) => {
           await api.dismissNotification(id);
           setNotifications(notifications.filter((n) => n.id !== id));
@@ -518,7 +526,7 @@ export default function App() {
           currentUser={currentUser}
           permissions={permissions}
           config={config}
-          unreadAlertCount={notifications.filter((n) => !n.isDismissed).length}
+          unreadAlertCount={notifications.filter((n) => !n.isRead && !n.isDismissed).length}
           pendingExceptionsCount={exceptionsCount}
           ordersCount={ordersCount}
           isMobileOpen={isMobileSidebarOpen}
