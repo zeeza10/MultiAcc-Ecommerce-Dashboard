@@ -33,6 +33,7 @@ interface OrdersViewProps {
 }
 
 const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format((Number(minor) || 0) / 100);
+const getSourceOrderNumber = (order: Order) => order.salesSource === 'EBAY' && order.externalOrderId ? order.externalOrderId : order.orderNumber;
 
 export const OrdersView: React.FC<OrdersViewProps> = ({
   currentUser,
@@ -264,8 +265,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
       {/* Orders Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-2.5 px-3 w-12">#</th>
@@ -301,7 +302,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       <td className="py-2.5 px-3 text-gray-400 font-mono tabular-nums">{index + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-gray-900">
                         <div className="flex items-center space-x-1.5">
-                          <span>{order.orderNumber}</span>
+                          <span>{getSourceOrderNumber(order)}</span>
                           {hasBackorder && (
                             <span
                               title="Insufficient stock: Line backordered"
@@ -311,9 +312,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                             </span>
                           )}
                         </div>
-                        {order.externalOrderId && (
-                          <div className="text-[10px] font-mono text-gray-400">eBay: {order.externalOrderId}</div>
-                        )}
                       </td>
                       <td className="py-2.5 px-3">
                         <span
@@ -378,6 +376,26 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             </tbody>
           </table>
         </div>
+        <div className="sm:hidden divide-y divide-gray-100">
+          {orders.map((order) => (
+            <article key={order.id} className="p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-mono font-semibold text-sm text-gray-900 break-all">{getSourceOrderNumber(order)}</div>
+                  <div className="text-xs text-gray-600 mt-1">{order.customerName}</div>
+                  {order.buyerId && <div className="text-[11px] text-gray-500 break-all">Buyer ID: {order.buyerId}</div>}
+                </div>
+                {getStatusBadge(order.status)}
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs text-gray-600">
+                <span>{order.createdAt.split('T')[0]}</span>
+                <span className="font-semibold text-gray-900">{formatMoney(order.totalMinor, order.currency || config.baseCurrency)}</span>
+              </div>
+              <button onClick={() => openOrderDetail(order.id)} className="w-full rounded-md border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700">View Detail</button>
+            </article>
+          ))}
+          {!loading && orders.length === 0 && <p className="p-6 text-center text-sm text-gray-500">No orders found matching the filter criteria.</p>}
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-slate-50 px-3 py-2 text-xs text-gray-600">
           <span>{loading ? 'Loading order count…' : `Total orders in this view: ${orders.length}`}</span>
           <span className="font-medium">{statusFilter === 'ALL' ? 'All statuses' : `Filter: ${statusFilter}`}</span>
@@ -386,13 +404,13 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
       {/* Order Detail Drawer / Modal (SRS FR-ORD-02 & Traceability) */}
       {showDetailModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-stretch sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden border border-gray-200">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between bg-slate-50">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-lg font-bold text-gray-900">{selectedOrder.orderNumber}</h2>
+            <div className="p-3 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 font-mono break-all">{getSourceOrderNumber(selectedOrder)}</h2>
                   <span className="text-[10px] font-semibold text-gray-500">Workspace:</span>
                   {getStatusBadge(selectedOrder.status)}
                   <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-800 font-mono font-medium">
@@ -401,11 +419,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Placed on {selectedOrder.createdAt.replace('T', ' ').split('.')[0]} UTC
-                  {selectedOrder.externalOrderId && ` • eBay Reference: ${selectedOrder.externalOrderId}`}
+
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                 {currentUser.role !== 'CLIENT_USER' && currentUser.role !== 'VIEWER' && (
                   <button
                     onClick={() => setShowEditModal(true)}
@@ -428,7 +446,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
             {/* Error banner inside modal */}
             {actionError && (
-              <div className="mx-5 mt-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+              <div className="mx-3 sm:mx-5 mt-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <span>{actionError}</span>
               </div>
@@ -436,7 +454,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
             {/* Marketplace status is provider data; workspace status remains the local operational workflow. */}
             {selectedOrder.salesSource === 'EBAY' && (
-              <div className="mx-5 mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="mx-3 sm:mx-5 mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                   <div className="font-semibold text-blue-900 mb-1">Current eBay Fulfillment Status</div>
                   <div className="text-sm font-bold text-blue-950">{selectedOrder.marketplaceStatus || 'Not provided by eBay'}</div>
@@ -526,17 +544,18 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               </div>
             </div>
 
-            <div className="p-5 space-y-6">
+            <div className="p-3 sm:p-5 space-y-5 sm:space-y-6">
               {/* Customer & Address Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="font-bold text-gray-900 mb-1.5 uppercase tracking-wide">
                     Buyer & Customer Record
                   </div>
-                  <div className="space-y-1 text-gray-700">
+                  <div className="space-y-1 text-gray-700 break-words">
                     <div>
                       <span className="text-gray-500 font-medium">Name:</span> {selectedOrder.customerName}
                     </div>
+                    {selectedOrder.buyerId && <div><span className="text-gray-500 font-medium">Buyer ID:</span> <span className="font-mono break-all">{selectedOrder.buyerId}</span></div>}
                     <div>
                       <span className="text-gray-500 font-medium">Email:</span> {selectedOrder.customerEmail}
                     </div>
@@ -567,7 +586,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-2">
                   Order Line Items ({selectedOrder.lines.length})
                 </h3>
-                <table className="w-full text-left text-xs border border-gray-200 rounded-md overflow-hidden">
+                <div className="overflow-x-auto rounded-md border border-gray-200"><table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="bg-slate-100 text-gray-600 font-semibold text-[11px]">
                     <tr>
                       <th className="py-2 px-3">SKU</th>
