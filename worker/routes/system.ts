@@ -161,6 +161,17 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
     })) });
   }
 
+  if (path === '/notifications/read-all' && request.method === 'POST') {
+    const { data, error } = await auth.repositoryContext.supabase.from('notifications')
+      .update({ is_read: true })
+      .eq('organization_id', auth.organizationId)
+      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER')
+      .or(`user_id.is.null,user_id.eq.${auth.user.id}`)
+      .select('id');
+    if (error) throw new Error('Notifications could not be marked as read.');
+    return json({ success: true, updated: data?.length || 0 });
+  }
+
   const dismissNotificationMatch = path.match(/^\/notifications\/([^/]+)\/dismiss$/);
   if (dismissNotificationMatch && request.method === 'POST') {
     const { data, error } = await auth.repositoryContext.supabase.from('notifications')
