@@ -23,6 +23,7 @@ import { EbayPayoutsView } from './components/EbayPayoutsView';
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
+import { supabase } from './lib/supabase';
 import { API_LOADING_EVENT } from './services/loadingEvents';
 import { useAuth } from './context/AuthContext';
 import { NavItem, User, SystemConfig, NotificationItem, Order, Product } from './types';
@@ -114,32 +115,67 @@ export default function App() {
 
   useEffect(() => { setCurrentUser(authenticatedUser); }, [authenticatedUser]);
 
-  // Keep the notification bell current while the workspace is open. Only live eBay order alerts are returned by the API.
+  // Receive new eBay order alerts from Supabase Realtime. No polling or page refresh:
+  // the bell counter updates only when the backend inserts a notification row.
   useEffect(() => {
-    let active = true;
-    const refreshNotifications = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const result = await api.getNotifications();
-        if (active) setNotifications(result.notifications);
-      } catch (error) {
-        console.error('Failed to refresh live eBay notifications:', error);
-      }
-    };
-    // Poll while the workspace is open so alerts created by background eBay
-    // syncs appear without requiring a tab switch or manual refresh.
-    const pollTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshNotifications();
-    }, 15000);
-    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshNotifications(); };
-    const onWindowFocus = () => { void refreshNotifications(); };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('focus', onWindowFocus);
+    if (!organizationId) return;
+
+    const channel = supabase
+      .channel(`notifications:${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            organization_id: string;
+            notification_type: NotificationItem['type'];
+            title: string;
+            message: string;
+            severity: NotificationItem['severity'];
+            reference_url: string | null;
+            is_read: boolean;
+            is_dismissed: boolean;
+            created_at: string;
+            source: string | null;
+          };
+
+          // The bell is intentionally limited to verified live eBay order alerts.
+          if (row.source !== 'EBAY' || row.notification_type !== 'NEW_EBAY_ORDER') return;
+
+          const notification: NotificationItem = {
+            id: row.id,
+            type: row.notification_type,
+            title: row.title,
+            message: row.message,
+            severity: row.severity,
+            referenceUrl: row.reference_url || undefined,
+            isRead: row.is_read,
+            isDismissed: row.is_dismissed,
+            createdAt: row.created_at,
+            source: row.source,
+          };
+
+          setNotifications((current) =>
+            current.some((item) => item.id === notification.id)
+              ? current
+              : [notification, ...current]
+          );
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Notification realtime channel status:', status);
+        }
+      });
+
     return () => {
-      active = false;
-      window.clearInterval(pollTimer);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('focus', onWindowFocus);
+      void supabase.removeChannel(channel);
     };
   }, [organizationId]);
 
