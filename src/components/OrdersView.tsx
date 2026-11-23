@@ -630,7 +630,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </td>
                     </tr>
                   </tfoot>
-                </table>
+                </table></div>
               </div>
 
               {/* Status History Audit Trail (SRS FR-ORD-02) */}
