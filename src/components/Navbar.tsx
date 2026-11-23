@@ -84,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
 
-  const unreadNotifications = notifications.filter((n) => !n.isDismissed);
+  const unreadNotifications = notifications.filter((n) => !n.isRead && !n.isDismissed);
 
   const getRoleBadge = (role: string) => {
     switch (role) {
