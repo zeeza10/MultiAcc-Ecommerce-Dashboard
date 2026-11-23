@@ -101,6 +101,7 @@ const mapOrder = (row: OrderRow, lines: OrderLine[], includeRawPayload = false):
     orderNumber: row.order_number,
     marketplaceAccountId: row.marketplace_account_id || undefined,
     externalOrderId: row.external_order_id || undefined,
+    buyerId: typeof (row.raw_payload as any)?.buyer?.username === 'string' ? (row.raw_payload as any).buyer.username : undefined,
     salesSource: row.sales_source,
     ownerType: row.owner_type,
     ownerId: row.client_3pl_id || 'operator',
