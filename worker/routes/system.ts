@@ -138,7 +138,7 @@ export async function handleSystemRoute(path: string, request: Request, auth: Au
     let notificationsQuery = auth.repositoryContext.supabase.from('notifications')
       .select('id,notification_type,title,message,severity,reference_url,is_read,is_dismissed,created_at,user_id,source')
       .eq('organization_id', auth.organizationId)
-      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER').order('created_at', { ascending: false }).limit(100);
+      .eq('is_dismissed', false).eq('source', 'EBAY').eq('notification_type', 'NEW_EBAY_ORDER').order('created_at', { ascending: false }).limit(500);
     if (auth.user.role === 'CLIENT_USER') notificationsQuery = notificationsQuery.eq('user_id', auth.user.id);
     else notificationsQuery = notificationsQuery.or(`user_id.is.null,user_id.eq.${auth.user.id}`);
     const { data, error } = await notificationsQuery;
