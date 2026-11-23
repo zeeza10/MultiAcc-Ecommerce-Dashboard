@@ -25,6 +25,7 @@ interface NavbarProps {
   onUpdateConfig: (cfg: Partial<SystemConfig>) => void;
   notifications: NotificationItem[];
   onDismissNotification: (id: string) => void;
+  onOpenNotificationMenu: () => void;
   onNavigate: (tab: any) => void;
   onOpenNewAdjustment: () => void;
   onOpenNewOrder: () => void;
@@ -57,6 +58,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onUpdateConfig,
   notifications,
   onDismissNotification,
+  onOpenNotificationMenu,
   onNavigate,
   onOpenNewAdjustment,
   onOpenNewOrder,
@@ -212,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Notifications Center Bell */}
           <div className="relative shrink-0">
             <button
-              onClick={() => setShowNotifMenu(!showNotifMenu)}
+              onClick={() => { const opening = !showNotifMenu; setShowNotifMenu(opening); if (opening) onOpenNotificationMenu(); }}
               className="relative inline-flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none sm:h-9 sm:w-9"
               title="Live eBay Order Notifications"
             >
@@ -225,10 +227,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {showNotifMenu && (
-              <div className="absolute right-0 top-full mt-2 z-[70] w-[min(24rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl sm:w-96">
+              <div className="fixed right-2 top-[7.5rem] z-[70] w-[min(24rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-96">
                 <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-3 sm:px-4">
                   <span className="min-w-0 text-[11px] font-bold text-gray-800 uppercase tracking-wider">
-                    New eBay Orders ({unreadNotifications.length})
+                    New eBay Orders
                   </span>
                   <button
                     onClick={() => {
@@ -242,10 +244,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
 
                 <div className="max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain divide-y divide-gray-100">
-                  {unreadNotifications.length === 0 ? (
+                  {notifications.length === 0 ? (
                     <div className="p-4 text-center text-xs text-gray-500">No new live eBay order alerts.</div>
                   ) : (
-                    unreadNotifications.map((n) => (
+                    notifications.slice(0, 10).map((n) => (
                       <div key={n.id} className="p-3 text-xs hover:bg-gray-50 break-words">
                         <div className="flex items-start justify-between gap-2">
                           <span className="font-semibold text-gray-900">{n.title}</span>
