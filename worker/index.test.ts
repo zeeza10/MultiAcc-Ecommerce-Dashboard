@@ -103,6 +103,36 @@ describe('Cloudflare Worker request boundary', () => {
     assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
   });
 
+  it('serves the private-app robots policy as a static text asset', async () => {
+    const request = new Request('https://dashboard.example.com/robots.txt');
+    const response = await worker.fetch(request, {
+      ASSETS: { fetch: async () => new Response('User-agent: *\\nDisallow: /\\n', { headers: { 'Content-Type': 'text/plain' } }) },
+    }, context);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('Content-Type') || '', /text\\/plain/i);
+    assert.equal(await response.text(), 'User-agent: *\\nDisallow: /\\n');
+  });
+
+  it('keeps the protected orders deep link inside the SPA auth boundary', async () => {
+    const request = new Request('https://dashboard.example.com/orders');
+    const response = await worker.fetch(request, {
+      ASSETS: { fetch: async () => new Response('application shell', { headers: { 'Content-Type': 'text/html' } }) },
+    }, context);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'application shell');
+  });
+
+  it('returns a branded 404 page for unknown application paths', async () => {
+    const request = new Request('https://dashboard.example.com/this-page-does-not-exist-123');
+    const response = await worker.fetch(request, {
+      ASSETS: { fetch: async () => new Response('SPA fallback should not run') },
+    }, context);
+    assert.equal(response.status, 404);
+    const body = await response.text();
+    assert.match(body, /404/);
+    assert.match(body, /href="\\/">Return to Oria Future dashboard/);
+  });
+
   it('requires authentication before resolving marketplace SKU exceptions', async () => {
     const request = new Request('https://dashboard.example.com/api/v1/ebay/exceptions/00000000-0000-0000-0000-000000000000/resolve', {
       method: 'POST',
