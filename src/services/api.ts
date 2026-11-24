@@ -35,7 +35,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   notifyApiLoading(1);
   try {
     const headers = new Headers(options.headers || {});
-    const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
+    const organizationId = window.localStorage.getItem('oriafuture_active_organization_id');
     if (organizationId) headers.set('X-Organization-Id', organizationId);
     if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
       headers.set('Content-Type', 'application/json');
@@ -65,7 +65,7 @@ async function requestBlob(endpoint: string): Promise<Blob> {
   notifyApiLoading(1);
   try {
     const headers = new Headers();
-    const organizationId = window.localStorage.getItem('nexusops_active_organization_id');
+    const organizationId = window.localStorage.getItem('oriafuture_active_organization_id');
     if (organizationId) headers.set('X-Organization-Id', organizationId);
     const response = await fetchWithSessionRecovery(
       fetch,
