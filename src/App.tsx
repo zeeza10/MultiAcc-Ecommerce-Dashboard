@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
-import { DashboardView } from './components/DashboardView';
-import { OrdersView } from './components/OrdersView';
-import { ProductsView } from './components/ProductsView';
-import { InventoryView } from './components/InventoryView';
-import { AdjustmentsView } from './components/AdjustmentsView';
-import { EbayAccountsView } from './components/EbayAccountsView';
-import { EbayMarketplaceModuleView } from './components/EbayMarketplaceModuleView';
-import { BuyingReturnsView } from './components/BuyingReturnsView';
-import { WarehouseLocationsView } from './components/WarehouseLocationsView';
-import { Clients3PLView } from './components/Clients3PLView';
-import { FinanceView } from './components/FinanceView';
-import { ReportsView } from './components/ReportsView';
-import { NotificationsView } from './components/NotificationsView';
-import { AuditLogView } from './components/AuditLogView';
-import { SettingsView } from './components/SettingsView';
-import { EmployeeAccessView } from './components/EmployeeAccessView';
-import { WarehouseServicesView } from './components/WarehouseServicesView';
-import { DropshippingCalculatorView } from './components/DropshippingCalculatorView';
-import { EbayPayoutsView } from './components/EbayPayoutsView';
+const DashboardView = lazy(() => import('./components/DashboardView').then((module) => ({ default: module.DashboardView })));
+const OrdersView = lazy(() => import('./components/OrdersView').then((module) => ({ default: module.OrdersView })));
+const ProductsView = lazy(() => import('./components/ProductsView').then((module) => ({ default: module.ProductsView })));
+const InventoryView = lazy(() => import('./components/InventoryView').then((module) => ({ default: module.InventoryView })));
+const AdjustmentsView = lazy(() => import('./components/AdjustmentsView').then((module) => ({ default: module.AdjustmentsView })));
+const EbayAccountsView = lazy(() => import('./components/EbayAccountsView').then((module) => ({ default: module.EbayAccountsView })));
+const EbayMarketplaceModuleView = lazy(() => import('./components/EbayMarketplaceModuleView').then((module) => ({ default: module.EbayMarketplaceModuleView })));
+const BuyingReturnsView = lazy(() => import('./components/BuyingReturnsView').then((module) => ({ default: module.BuyingReturnsView })));
+const WarehouseLocationsView = lazy(() => import('./components/WarehouseLocationsView').then((module) => ({ default: module.WarehouseLocationsView })));
+const Clients3PLView = lazy(() => import('./components/Clients3PLView').then((module) => ({ default: module.Clients3PLView })));
+const FinanceView = lazy(() => import('./components/FinanceView').then((module) => ({ default: module.FinanceView })));
+const ReportsView = lazy(() => import('./components/ReportsView').then((module) => ({ default: module.ReportsView })));
+const NotificationsView = lazy(() => import('./components/NotificationsView').then((module) => ({ default: module.NotificationsView })));
+const AuditLogView = lazy(() => import('./components/AuditLogView').then((module) => ({ default: module.AuditLogView })));
+const SettingsView = lazy(() => import('./components/SettingsView').then((module) => ({ default: module.SettingsView })));
+const EmployeeAccessView = lazy(() => import('./components/EmployeeAccessView').then((module) => ({ default: module.EmployeeAccessView })));
+const WarehouseServicesView = lazy(() => import('./components/WarehouseServicesView').then((module) => ({ default: module.WarehouseServicesView })));
+const DropshippingCalculatorView = lazy(() => import('./components/DropshippingCalculatorView').then((module) => ({ default: module.DropshippingCalculatorView })));
+const EbayPayoutsView = lazy(() => import('./components/EbayPayoutsView').then((module) => ({ default: module.EbayPayoutsView })));
 import { NewAdjustmentModal } from './components/NewAdjustmentModal';
 import { NewOrderModal } from './components/NewOrderModal';
 import { api } from './services/api';
@@ -541,6 +541,7 @@ export default function App() {
               <span className="sr-only">{pendingApiRequests} requests in progress</span>
             </div>
           )}
+          <Suspense fallback={<div className="flex min-h-64 items-center justify-center text-sm font-medium text-slate-500" role="status">Loading workspace module…</div>}>
           {activeTab === 'dashboard' && (
             <DashboardView
               key={`dashboard:${selectedStoreId}`}
@@ -733,7 +734,8 @@ export default function App() {
               config={config}
               onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
                   />
-          )}
+          )}          </Suspense>
+
         </main>
       </div>
 
