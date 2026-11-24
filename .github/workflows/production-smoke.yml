@@ -40,7 +40,7 @@ jobs:
           test -n "$js_asset"
           curl --silent --show-error --fail-with-body -D asset.headers -o app.bundle.js "$WORKER_URL$js_asset"
           grep -Eqi '^cache-control: public, max-age=31536000, immutable' asset.headers
-          if grep -Eq 'console\\.log[[:space:]]*\\(' app.bundle.js; then
+          if grep -Eq 'console\.log[[:space:]]*\(' app.bundle.js; then
             echo "Production bundle contains console.log debug calls."
             exit 1
           fi
