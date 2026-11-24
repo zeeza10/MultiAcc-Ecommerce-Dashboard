@@ -13,9 +13,10 @@ describe('Cloudflare Worker request boundary', () => {
     const request = new Request('https://dashboard.example.com/api/v1/health');
     const response = await worker.fetch(request, {}, context);
     assert.equal(response.status, 200);
-    const body = await response.json() as { success?: boolean; platform?: string };
-    assert.equal(body.success, true);
-    assert.equal(body.platform, 'Cloudflare Workers');
+    const body = await response.json() as Record<string, unknown>;
+    assert.deepEqual(body, { status: 'ok' });
+    assert.equal(JSON.stringify(body).includes('Cloudflare'), false);
+    assert.equal(JSON.stringify(body).includes('Worker'), false);
     assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
     assert.equal(response.headers.get('Referrer-Policy'), 'strict-origin-when-cross-origin');
     assert.equal(response.headers.get('X-Frame-Options'), 'DENY');
