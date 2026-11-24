@@ -74,7 +74,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavItem>(() => {
     // Honor a protected deep link after authentication before falling back to
     // the last workspace preference. This lets /orders return to Orders after sign-in.
-    const requestedTab = window.location.pathname.replace(/^\\/+|\\/+$/g, '') as NavItem;
+    const requestedTab = window.location.pathname.replace(/^\/+|\/+$/g, '') as NavItem;
     if (NAV_ITEMS.includes(requestedTab)) return requestedTab;
     const saved = readWorkspacePreference<string>(organizationId, 'active-tab', 'dashboard');
     return NAV_ITEMS.includes(saved as NavItem) ? saved as NavItem : 'dashboard';
