@@ -9,6 +9,27 @@ import type { RateLimitBinding } from './types';
 import { exceedsApiRequestBodyLimit, MAX_API_REQUEST_BODY_BYTES } from './request-limits';
 import { withBrowserSecurityHeaders } from './security-headers';
 
+
+const APP_ROUTES = new Set([
+  '/', '/forgot-password', '/accept-invitation',
+  '/dashboard', '/orders', '/ebay-accounts', '/ebay-active-listings',
+  '/ebay-returns', '/ebay-analytics', '/ebay-finances', '/customers', '/returns',
+  '/products', '/inventory', '/adjustments', '/dropshipping', '/warehouse',
+  '/locations', '/warehouse-services', '/suppliers', '/purchase-orders',
+  '/3pl-clients', '/fulfilment', '/shipping', '/storage', '/invoices',
+  '/payments', '/expenses', '/payouts', '/reconciliation', '/profitability',
+  '/reports', '/notifications', '/audit-log', '/settings', '/employee-access',
+]);
+
+const STATIC_ASSETS = new Set([
+  '/robots.txt', '/site.webmanifest', '/sw.js', '/oria-icon.svg', '/report-export.css',
+]);
+
+const notFoundPage = () => new Response(
+  '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found | Oria Future</title></head><body><main><h1>404 — Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to Oria Future dashboard</a></main></body></html>',
+  { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
+);
+
 export interface Env {
   ASSETS?: {
     fetch: (request: Request | string) => Promise<Response>;
@@ -79,6 +100,10 @@ export default {
       }));
     }
 
+    if (STATIC_ASSETS.has(url.pathname) || url.pathname.startsWith('/assets/')) {
+      if (env.ASSETS) return secure(await env.ASSETS.fetch(request));
+    }
+    if (!APP_ROUTES.has(url.pathname)) return secure(notFoundPage());
     if (env.ASSETS) return secure(await env.ASSETS.fetch(request));
     return secure(new Response('Not Found', { status: 404 }));
   },
