@@ -7,6 +7,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss(), cloudflare()],
+    // Keep intentional error reporting, but strip debug logging and debugger statements from production bundles.
+    esbuild: { pure: ['console.log'], drop: ['debugger'] },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname || '.', '.'),
