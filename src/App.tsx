@@ -734,7 +734,8 @@ export default function App() {
               config={config}
               onUpdateConfig={(cfg) => setConfig({ ...config, ...cfg })}
                   />
-          )}          </Suspense>
+          )}
+          </Suspense>
 
         </main>
       </div>
