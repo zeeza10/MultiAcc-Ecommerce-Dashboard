@@ -42,8 +42,8 @@ jobs:
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8787/api/v1/health > /tmp/multiacc-health.json; then
               cat /tmp/multiacc-health.json
-              grep -q '"success":true' /tmp/multiacc-health.json
-              grep -q 'Cloudflare Workers' /tmp/multiacc-health.json
+              grep -q '"status":"ok"' /tmp/multiacc-health.json
+              ! grep -qiE 'cloudflare|worker|platform' /tmp/multiacc-health.json
               exit 0
             fi
             sleep 1
