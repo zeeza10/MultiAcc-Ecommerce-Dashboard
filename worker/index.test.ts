@@ -106,11 +106,11 @@ describe('Cloudflare Worker request boundary', () => {
   it('serves the private-app robots policy as a static text asset', async () => {
     const request = new Request('https://dashboard.example.com/robots.txt');
     const response = await worker.fetch(request, {
-      ASSETS: { fetch: async () => new Response('User-agent: *\\nDisallow: /\\n', { headers: { 'Content-Type': 'text/plain' } }) },
+      ASSETS: { fetch: async () => new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain' } }) },
     }, context);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get('Content-Type') || '', /text\\/plain/i);
-    assert.equal(await response.text(), 'User-agent: *\\nDisallow: /\\n');
+    assert.match(response.headers.get('Content-Type') || '', /text\/plain/i);
+    assert.equal(await response.text(), 'User-agent: *\nDisallow: /\n');
   });
 
   it('keeps the protected orders deep link inside the SPA auth boundary', async () => {
@@ -130,7 +130,7 @@ describe('Cloudflare Worker request boundary', () => {
     assert.equal(response.status, 404);
     const body = await response.text();
     assert.match(body, /404/);
-    assert.match(body, /href="\\/">Return to Oria Future dashboard/);
+    assert.match(body, /href="\/">Return to Oria Future dashboard/);
   });
 
   it('requires authentication before resolving marketplace SKU exceptions', async () => {
