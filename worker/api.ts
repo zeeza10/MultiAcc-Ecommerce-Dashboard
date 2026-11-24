@@ -161,7 +161,8 @@ async function authenticate(request: Request, env: WorkerEnv, createSupabaseClie
 export async function handleApiRequest(request: Request, env: WorkerEnv, createSupabaseClient: typeof createClient = createClient): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/api/health' || url.pathname === '/api/v1/health') {
-    return json({ success: true, message: 'MultiAcc Backend Worker is running', platform: 'Cloudflare Workers' });
+    // Keep public health checks deliberately minimal; never disclose runtime or infrastructure details.
+    return json({ status: 'ok' });
   }
   if (!url.pathname.startsWith('/api/v1/')) return json({ error: 'API route not found.' }, 404);
 
