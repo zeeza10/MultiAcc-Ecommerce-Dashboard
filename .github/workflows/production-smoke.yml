@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --silent --show-error --fail-with-body "$WORKER_URL/" -o index.html
-          js_asset=$(grep -oE 'src="/assets/[^" ]+\\.js"' index.html | head -n 1 | cut -d '"' -f 2)
+          js_asset=$(grep -oE 'src="/assets/[^" ]+\.js"' index.html | head -n 1 | cut -d '"' -f 2)
           test -n "$js_asset"
           curl --silent --show-error --fail-with-body -D asset.headers -o /dev/null "$WORKER_URL$js_asset"
           grep -Eqi '^cache-control: public, max-age=31536000, immutable' asset.headers
