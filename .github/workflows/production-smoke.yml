@@ -30,6 +30,17 @@ jobs:
           grep -qi '^strict-transport-security: max-age=31536000' health.headers
           cat health.json
 
+      - name: Verify fingerprinted frontend assets use immutable caching
+        env:
+          WORKER_URL: https://app.oriafuture.com
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body "$WORKER_URL/" -o index.html
+          js_asset=$(grep -oE 'src="/assets/[^" ]+\\.js"' index.html | head -n 1 | cut -d '"' -f 2)
+          test -n "$js_asset"
+          curl --silent --show-error --fail-with-body -D asset.headers -o /dev/null "$WORKER_URL$js_asset"
+          grep -Eqi '^cache-control: public, max-age=31536000, immutable' asset.headers
+
       - name: Verify unauthenticated API requests are rejected
         env:
           WORKER_URL: https://app.oriafuture.com
