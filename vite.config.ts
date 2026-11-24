@@ -8,7 +8,7 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss(), cloudflare()],
     // Keep intentional error reporting, but strip debug logging and debugger statements from production bundles.
-    esbuild: { pure: ['console.log'], drop: ['debugger' as 'debugger'] },
+    esbuild: { drop: ['console' as 'console', 'debugger' as 'debugger'] },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname || '.', '.'),
