@@ -30,7 +30,7 @@ type Workspace = {
 const toOne = <T,>(value: T | T[] | null): T | null =>
   Array.isArray(value) ? value[0] ?? null : value;
 
-const getAuthRedirectUrl = () => window.location.origin;
+const getAuthRedirectUrl = () => new URL('/forgot-password', window.location.origin).toString();
 
 /**
  * The single application authentication provider and route boundary.
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authEventGeneration = useRef(0);
   const inFlightAccountLoad = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const completedAccountLoadKey = useRef<string | null>(null);
-  const [mode, setMode] = useState<'login' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'reset'>(() => window.location.pathname === '/forgot-password' ? 'reset' : 'login');
   const [recoveryActive, setRecoveryActive] = useState(false);
   const [inviteSetupActive, setInviteSetupActive] = useState(() => {
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loadGeneration.current += 1;
       inFlightAccountLoad.current = null;
       completedAccountLoadKey.current = null;
-      window.localStorage.removeItem('nexusops_active_organization_id');
+      window.localStorage.removeItem('oriafuture_active_organization_id');
       setAppUser(null);
       setWorkspace(null);
       setPermissions([]);
@@ -179,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (!profile) throw new Error('Your account profile is not ready. Please contact support.');
         if (!member) {
-          window.localStorage.removeItem('nexusops_active_organization_id');
+          window.localStorage.removeItem('oriafuture_active_organization_id');
           setPermissions([]);
           setWorkspace(null);
           setAppUser(null);
@@ -228,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : [...new Set([...rolePermissionCodes, ...granted])].filter(code => !denied.has(code));
 
         if (requestId !== loadGeneration.current) return;
-        window.localStorage.setItem('nexusops_active_organization_id', member.organization_id);
+        window.localStorage.setItem('oriafuture_active_organization_id', member.organization_id);
         setPermissions(activePermissions);
         setWorkspace({ id: member.organization_id, name: orgRow?.name || 'Workspace' });
         setAppUser({
@@ -404,6 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error: updateError } = await supabase.auth.updateUser({ password });
         if (!updateError) {
           setMessage('Password updated. Please sign in with your new password.');
+          window.history.replaceState({}, '', '/');
           setRecoveryActive(false);
           await supabase.auth.signOut();
           setMode('login');
@@ -433,7 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) throw signOutError;
-    window.localStorage.removeItem('nexusops_active_organization_id');
+    window.localStorage.removeItem('oriafuture_active_organization_id');
     setPermissions([]);
     setAppUser(null);
     setWorkspace(null);
@@ -474,7 +475,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 : session ? `Invitation verified for ${session.user.email || 'your email'}. Create your password to activate your workspace account.` : pendingInviteToken ? 'Create a password to continue. Your one-time invitation will be verified securely when you submit this form.' : 'This invitation link could not be verified. It may have expired or already been used; ask your Super Admin to resend it.'
               : signedInWithoutWorkspace
                 ? accountState === 'error' ? 'Workspace access could not be verified. Your access has not been assumed or granted. Retry the check or contact your administrator.' : 'This account has no active organization membership. Contact your organization administrator.'
-                : 'Secure sign-in to your Oria Future workspace.'}
+                : mode === 'reset' ? recoveryActive ? 'Choose a new password for your Oria Future account.' : 'Enter your account email and we will send a secure password reset link.' : 'Secure sign-in to your Oria Future workspace.'}
           </p>
         </div>
 
@@ -548,12 +549,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             </button>
             <div className="flex flex-wrap justify-between gap-3 text-sm">
               {mode === 'login' && (
-                <button type="button" onClick={() => { setMode('reset'); setError(''); setMessage(''); }} className="text-slate-500">
+                <button type="button" onClick={() => { window.history.pushState({}, '', '/forgot-password'); setMode('reset'); setError(''); setMessage(''); }} className="text-slate-500">
                   Forgot password?
                 </button>
               )}
               {mode === 'reset' && (
-                <button type="button" onClick={() => setMode('login')} className="text-slate-500">Back to sign in</button>
+                <button type="button" onClick={() => { window.history.replaceState({}, '', '/'); setMode('login'); setError(''); setMessage(''); }} className="text-slate-500">Back to sign in</button>
               )}
             </div>
           </form>
